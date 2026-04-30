@@ -1,0 +1,10 @@
+builds/
+
+frontend/voxcpm_studio_electron/node_modules/
+frontend/voxcpm_studio_electron/dist/
+frontend/voxcpm_studio_electron/release/
+frontend/voxcpm_studio_electron/electron-v*.zip
+
+*.log
+Thumbs.db
+.DS_Store
