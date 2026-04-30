@@ -2,6 +2,17 @@
 
 这是 `VoxCPM Studio` 的 Electron 原生桌面版源码仓库目录，包含：
 
+![VoxCPM Studio Electron 首页预览](./docs/screenshots/homepage-hero.png)
+
+一个面向中文本地工作流优化的 `Electron + React + TypeScript + Vite` 桌面前端，连接本地 `Python HTTP API`，覆盖：
+
+1. 语音工作台
+2. 运行控制
+3. 概览
+4. 批量生成
+5. 训练
+6. 设置
+
 1. `frontend/voxcpm_studio_electron`
    - Electron 主进程
    - React + TypeScript + Vite 渲染层
@@ -10,6 +21,19 @@
    - Windows 便携包构建脚本
 3. `docs`
    - 便携包、打包和使用说明
+
+## 界面预览
+
+首图展示当前首页，下面是其他页面截图：
+
+![首页界面](./docs/screenshots/homepage-hero.png)
+
+| 页面截图 1 | 页面截图 2 |
+| --- | --- |
+| ![页面截图 1](./docs/screenshots/page-01.png) | ![页面截图 2](./docs/screenshots/page-02.png) |
+| ![页面截图 3](./docs/screenshots/page-03.png) | ![页面截图 4](./docs/screenshots/page-04.png) |
+
+![页面截图 5](./docs/screenshots/page-05.png)
 
 ## 目录结构
 
