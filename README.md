@@ -213,3 +213,11 @@ powershell -ExecutionPolicy Bypass -File .\scripts\build_windows_electron_bundle
 
 1. [docs/Windows便携打包说明.md](./docs/Windows便携打包说明.md)
 2. [docs/Electron便携包开箱即用说明.md](./docs/Electron便携包开箱即用说明.md)
+
+## 联系作者
+
+欢迎友好交流，添加时请注明来意。
+
+1. QQ：`419773176`
+2. QQ邮箱：`419773176@qq.com`
+3. 微信：`15085152352`
