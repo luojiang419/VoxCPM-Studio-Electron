@@ -34,7 +34,13 @@ function Icon({ name, size = 17 }: { name: IconName; size?: number }) {
 function IconButton({ icon, label, onClick, disabled, className = "" }: { icon: IconName; label: string; onClick: () => void; disabled?: boolean; className?: string }) {
   return <button type="button" className={`ps-icon-button ${className}`} title={label} aria-label={label} onClick={onClick} disabled={disabled}><Icon name={icon} /></button>;
 }
-const COLORS = ["#f6a66d", "#9caef4", "#8ac6ad", "#df9ac4", "#81bfd6", "#d6c98c"];
+const COLORS = ["#f6a66d", "#a6b880", "#d6b66b", "#d59683", "#bd8d62", "#b9ae79"];
+const COLOR_NAMES = ["暖橙", "苔绿", "赭金", "玫瑰", "陶土", "橄榄"];
+function warmRoleColor(color: string) {
+  if (COLORS.includes(color.toLowerCase())) return color;
+  const hash = Array.from(color).reduce((sum, char) => sum + char.charCodeAt(0), 0);
+  return COLORS[hash % COLORS.length];
+}
 const PROJECT_KEY = "voxcpm-production-project";
 const TASK_KEY = "voxcpm-production-task";
 const DRAFT_KEY = "voxcpm-production-draft:";
@@ -44,7 +50,7 @@ const durationText = (value: number) => { const seconds = Number.isFinite(value)
 const basename = (value: string) => value.split(/[\\/]/).pop() || value;
 const dateText = (value: string) => { const date = new Date(value); return Number.isNaN(date.getTime()) ? "" : date.toLocaleString("zh-CN", { month: "2-digit", day: "2-digit", hour: "2-digit", minute: "2-digit" }); };
 const ready = (segment: StudioSegment) => !!segment.audioPath && !segment.stale && segment.status === "ready";
-const roleStyle = (color: string): CSSProperties => ({ "--ps-role": color } as CSSProperties);
+const roleStyle = (color: string): CSSProperties => ({ "--ps-role": warmRoleColor(color) } as CSSProperties);
 function rememberDraft(project: StudioProject) {
   try { localStorage.setItem(`${DRAFT_KEY}${project.id}`, JSON.stringify(project)); } catch { /* Saving to the backend remains available if browser storage is full. */ }
 }
@@ -466,7 +472,7 @@ export default function ProductionStudio({ backendBaseUrl, view = "editor", onNa
           <div className="ps-inspector-heading"><h2>角色与声音</h2><span>VOICE DIRECTION</span></div>
           <div className="ps-role-tabs">{project.roles.map(role => <button className={`ps-role-tab ${selectedRole?.id === role.id ? "active" : ""}`} key={role.id} style={roleStyle(role.color)} onClick={() => setSelectedRoleId(role.id)} disabled={locked}><i />{role.name}<span>{segments.filter(item => item.roleId === role.id).length}</span></button>)}<button className="ps-add-role" title="添加角色" aria-label="添加角色" disabled={locked} onClick={() => { const role: StudioRole = { id: uid(), name: `角色 ${project.roles.length + 1}`, color: COLORS[project.roles.length % COLORS.length], config: { ...DEFAULT_GENERATION_CONFIG }, volume: 1, pan: 0 }; updateProject(current => ({ ...current, roles: [...current.roles, role] })); setSelectedRoleId(role.id); }}><Icon name="plus" size={15} /></button></div>
           {selectedRole && <div className="ps-inspector-body">
-            <div className="ps-selected-role" style={roleStyle(selectedRole.color)}><div className="ps-role-avatar"><Icon name="mic" size={21} /></div><div><label htmlFor="ps-role-name">当前角色</label><input id="ps-role-name" aria-label="角色名称" value={selectedRole.name} onChange={event => updateRole({ name: event.target.value })} disabled={locked} maxLength={32} /></div><input aria-label="角色颜色" type="color" className="ps-color-input" value={selectedRole.color} onChange={event => updateRole({ color: event.target.value })} disabled={locked} /></div>
+            <div className="ps-selected-role" style={roleStyle(selectedRole.color)}><div className="ps-role-avatar"><Icon name="mic" size={21} /></div><div><label htmlFor="ps-role-name">当前角色</label><input id="ps-role-name" aria-label="角色名称" value={selectedRole.name} onChange={event => updateRole({ name: event.target.value })} disabled={locked} maxLength={32} /></div><select aria-label="角色颜色" className="ps-color-palette" value={warmRoleColor(selectedRole.color)} onChange={event => updateRole({ color: event.target.value })} disabled={locked}>{COLORS.map((color, index) => <option key={color} value={color}>{COLOR_NAMES[index]}</option>)}</select></div>
             <div className="ps-field"><label>生成模式</label><div className="ps-mode-switch">{(["声音设计", "可控克隆", "极致克隆"] as const).map(mode => <button key={mode} className={selectedRole.config.mode === mode ? "active" : ""} onClick={() => updateConfig({ mode })} disabled={locked}>{mode}</button>)}</div><p className="ps-hint">{selectedRole.config.mode === "声音设计" ? "用自然语言描述音色、情绪和表达方式。" : selectedRole.config.mode === "可控克隆" ? "以参考音色为基础，自由控制表达风格。" : "参考音频与逐字文本配合，还原声音特征。"}</p></div>
             {selectedRole.config.mode !== "声音设计" && <><div className="ps-field"><label>参考音频 <span>本地文件</span></label><button className={`ps-file-picker ${selectedRole.config.referenceAudio ? "has-file" : ""}`} onClick={() => void chooseAudio("reference")} disabled={locked}><Icon name={selectedRole.config.referenceAudio ? "music" : "upload"} size={19} /><span>{selectedRole.config.referenceAudio ? basename(selectedRole.config.referenceAudio) : "选择参考音频"}<small>{selectedRole.config.referenceAudio ? "点击更换音频" : "WAV / MP3 / FLAC / OGG"}</small></span><Icon name="chevron" size={14} /></button></div><div className="ps-field"><label htmlFor="ps-prompt-text">参考文本{selectedRole.config.mode === "极致克隆" ? <span>留空自动识别</span> : <span>可选</span>}<button className="ps-text-button" disabled={locked || !selectedRole.config.referenceAudio} onClick={() => void recognizeReference()}>自动识别</button></label><textarea id="ps-prompt-text" placeholder="参考音频中实际说出的内容…" rows={3} value={selectedRole.config.promptText} onChange={event => updateConfig({ promptText: event.target.value })} disabled={locked} /></div></>}
             {selectedRole.config.mode !== "极致克隆" && <div className="ps-field"><label htmlFor="ps-control">声音描述<span>风格 / 情绪 / 语速</span></label><textarea id="ps-control" className="ps-control-input" placeholder="例如：温暖沉稳的女声，像在讲述一段珍贵的回忆，语气自然，停顿从容。" value={selectedRole.config.control} onChange={event => updateConfig({ control: event.target.value })} rows={4} disabled={locked} /><div className="ps-preset-chips">{["温暖叙事", "清晰解说", "自然对话"].map((name, index) => <button key={name} disabled={locked} onClick={() => updateConfig({ control: ["温暖沉稳，娓娓道来，停顿从容自然", "清晰专业的解说音色，吐字准确，节奏平稳", "像朋友聊天一样自然放松，语气轻快，情绪真诚"][index] })}>{name}</button>)}</div></div>}

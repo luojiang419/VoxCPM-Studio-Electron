@@ -23,7 +23,7 @@ import soundfile as sf
 DEFAULT_CONFIG = {"mode": "声音设计", "control": "", "referenceAudio": "", "promptText": "",
                   "selectedLora": "不使用 LoRA", "cfgValue": 2.0, "normalize": False,
                   "denoise": False, "inferenceTimesteps": 10}
-COLORS = ["#9e8cff", "#5fc9b7", "#f2ba6b", "#e78eb0", "#7eb9f3"]
+COLORS = ["#f6a66d", "#a6b880", "#d6b66b", "#d59683", "#bd8d62", "#b9ae79"]
 
 
 def timestamp() -> str:

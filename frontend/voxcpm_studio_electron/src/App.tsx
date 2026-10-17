@@ -1009,6 +1009,7 @@ function App() {
             <button className="studio-theme-button" type="button" aria-label="切换界面主题" title="切换深色 / 浅色主题" onClick={() => setThemeMode(effectiveTheme === "dark" ? "light" : "dark")}>{effectiveTheme === "dark" ? "☀" : "☾"}</button>
           </div>
         </header>
+        {!["production", "voices", "history"].includes(page) && <header className="studio-page-heading"><h1>{NAV_ITEMS.find((item) => item.key === page)?.label}</h1><span>VOXCPM STUDIO</span></header>}
         {globalMessage ? <div className="notice-banner">{globalMessage}</div> : null}
         {updateNotice && page !== "settings" ? <div className="notice-banner">{updateNotice} <button type="button" className="ghost-button" onClick={() => setPage("settings")}>查看更新</button></div> : null}
 
