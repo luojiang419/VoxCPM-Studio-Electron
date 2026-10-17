@@ -1,6 +1,7 @@
 import { startTransition, useEffect, useState, type ReactNode } from "react";
 import UpdatePanel from "./UpdatePanel";
 import ProductionStudio from "./ProductionStudio";
+import WorkspacePlayer from "./WorkspacePlayer";
 
 type ThemeMode = "dark" | "light" | "system";
 type PageKey = "production" | "voices" | "history" | "workspace" | "control" | "overview" | "batch" | "training" | "settings";
@@ -1128,7 +1129,7 @@ function App() {
           ) : null}
 
           {page === "workspace" ? (
-            <div className="panel-grid workspace-grid">
+            <div className={`panel-grid workspace-grid ${singleForm.mode === "极致克隆" ? "workspace-clone-mode" : ""}`}>
               <section className="panel-card panel-card-workspace">
                 <div className="panel-head">
                   <div>
@@ -1140,7 +1141,7 @@ function App() {
                   </button>
                 </div>
                 <div className="workspace-form-scroll">
-                  <div className="form-grid">
+                  <div className="form-grid workspace-compose-form">
                     <Field label="生成模式">
                       <select value={singleForm.mode} onChange={(event) => setSingleForm({ ...singleForm, mode: event.target.value })}>
                         <option>声音设计</option>
@@ -1156,7 +1157,34 @@ function App() {
                         ))}
                       </select>
                     </Field>
-                    <Field label="添加音频参考" full>
+                    <Field label="输入文本" full>
+                      <textarea aria-label="合成文本" value={singleForm.text} onChange={(event) => setSingleForm({ ...singleForm, text: event.target.value })} rows={4} />
+                    </Field>
+                    <Field label={`CFG 引导强度 ${singleForm.cfgValue.toFixed(1)}`}>
+                      <input type="range" min={1} max={3} step={0.1} value={singleForm.cfgValue} onChange={(event) => setSingleForm({ ...singleForm, cfgValue: Number(event.target.value) })} />
+                    </Field>
+                    <Field label={`推理步数 ${singleForm.inferenceTimesteps}`}>
+                      <input type="range" min={1} max={50} step={1} value={singleForm.inferenceTimesteps} onChange={(event) => setSingleForm({ ...singleForm, inferenceTimesteps: Number(event.target.value) })} />
+                    </Field>
+                    <ToggleRow
+                      checked={singleForm.normalize}
+                      label="文本规范化"
+                      onChange={(checked) => setSingleForm({ ...singleForm, normalize: checked })}
+                    />
+                    <ToggleRow
+                      checked={singleForm.denoise}
+                      label="参考音频增强"
+                      onChange={(checked) => setSingleForm({ ...singleForm, denoise: checked })}
+                    />
+                  </div>
+                </div>
+              </section>
+
+              <div className="workspace-side-column">
+                <section className="panel-card workspace-reference-panel">
+                  <div className="panel-head"><h3>参考音频</h3><span className="field-label">{singleForm.mode === "声音设计" ? "可选" : "克隆必需"}</span></div>
+                  <div className="workspace-reference-body">
+                    <div className="workspace-reference-audio">
                       <div
                         className={`reference-audio-card ${singleForm.referenceAudio ? "reference-audio-card-filled" : "reference-audio-card-empty"}`}
                         role={!singleForm.referenceAudio ? "button" : undefined}
@@ -1200,72 +1228,13 @@ function App() {
                           </div>
                         )}
                       </div>
-                    </Field>
+                    </div>
                     <Field label="参考文本" full hidden={singleForm.mode !== "极致克隆"}>
                       <textarea value={singleForm.promptText} onChange={(event) => setSingleForm({ ...singleForm, promptText: event.target.value })} rows={2} />
                       <div className="inline-actions">
                         <button type="button" className="ghost-button" onClick={() => handleRecognizePrompt("workspace")}>识别参考文本</button>
                       </div>
                     </Field>
-                    <Field label="输入文本" full>
-                      <textarea value={singleForm.text} onChange={(event) => setSingleForm({ ...singleForm, text: event.target.value })} rows={4} />
-                    </Field>
-                    <Field label={`CFG 引导强度 ${singleForm.cfgValue.toFixed(1)}`}>
-                      <input type="range" min={1} max={3} step={0.1} value={singleForm.cfgValue} onChange={(event) => setSingleForm({ ...singleForm, cfgValue: Number(event.target.value) })} />
-                    </Field>
-                    <Field label={`推理步数 ${singleForm.inferenceTimesteps}`}>
-                      <input type="range" min={1} max={50} step={1} value={singleForm.inferenceTimesteps} onChange={(event) => setSingleForm({ ...singleForm, inferenceTimesteps: Number(event.target.value) })} />
-                    </Field>
-                    <ToggleRow
-                      checked={singleForm.normalize}
-                      label="文本规范化"
-                      onChange={(checked) => setSingleForm({ ...singleForm, normalize: checked })}
-                    />
-                    <ToggleRow
-                      checked={singleForm.denoise}
-                      label="参考音频增强"
-                      onChange={(checked) => setSingleForm({ ...singleForm, denoise: checked })}
-                    />
-                  </div>
-                </div>
-                <footer className="workspace-generation-footer">
-                  <div className="action-row workspace-action-bar">
-                    <button type="button" className="primary-button" onClick={handleGenerate} disabled={busy || !backendBaseUrl}>开始生成</button>
-                    <button type="button" className="ghost-button" onClick={handleSaveAudio} disabled={!workspaceOutputPath}>另存为音频</button>
-                    <button type="button" className="ghost-button" onClick={handleOpenWorkspaceOutputDirectory} disabled={!workspaceOutputPath}>打开输出目录</button>
-                  </div>
-                  <div role="status" aria-live="polite" className={`workspace-status-panel ${workspaceTaskActive ? "workspace-status-panel-active" : ""}`}>
-                    <p className="status-text">{workspaceStatusTitle}</p>
-                    {workspaceShouldShowProgress ? (
-                      <div className="workspace-status-meta">
-                        <span>{workspaceTaskActive ? "生成计时" : "总耗时"} {formatDuration(workspaceTaskElapsedSeconds)}</span>
-                        <strong>{workspaceTaskActive ? `进度 ${workspaceProgressPercent}%` : workspaceTask?.status === "succeeded" ? "进度 100%" : "任务已结束"}</strong>
-                      </div>
-                    ) : null}
-                    {workspaceTaskActive ? (
-                      <div className="workspace-progress-track" aria-hidden="true">
-                        <span className="workspace-progress-fill" style={{ width: `${workspaceProgressPercent}%` }} />
-                      </div>
-                    ) : null}
-                  </div>
-                </footer>
-              </section>
-
-              <div className="workspace-side-column">
-                <section className="panel-card panel-card-preview">
-                  <div className="panel-head">
-                    <div>
-                      <p className="panel-kicker">结果区</p>
-                      <h3>预览与输出</h3>
-                    </div>
-                    {workspaceTask ? <span className="tiny-pill">{workspaceTask.status}</span> : null}
-                  </div>
-                  <div className="preview-box">
-                    {workspacePreviewUrl ? (
-                      <audio controls src={`${backendBaseUrl}${workspacePreviewUrl}`} className="audio-player" />
-                    ) : (
-                      <div className="placeholder-box">生成完成后会在这里预听音频。</div>
-                    )}
                   </div>
                 </section>
 
@@ -1640,6 +1609,28 @@ function App() {
             </div>
           ) : null}
         </section>
+        {page === "workspace" && <WorkspacePlayer
+          src={workspacePreviewUrl ? `${backendBaseUrl}${workspacePreviewUrl}` : ""}
+          fileName={workspaceOutputPath ? pathTail(workspaceOutputPath) : ""}
+          canGenerate={!busy && !!backendBaseUrl} hasOutput={!!workspaceOutputPath} generating={workspaceTaskActive}
+          onGenerate={() => void handleGenerate()} onSave={() => void handleSaveAudio()} onOpenDirectory={() => void handleOpenWorkspaceOutputDirectory()}
+          status={workspaceShouldShowProgress || workspaceStatus !== "等待生成。" ? (
+            <div role="status" aria-live="polite" className={`workspace-status-panel ${workspaceTaskActive ? "workspace-status-panel-active" : ""}`}>
+              <p className="status-text">{workspaceStatusTitle}</p>
+              {workspaceShouldShowProgress ? (
+                <div className="workspace-status-meta">
+                  <span>{workspaceTaskActive ? "生成计时" : "总耗时"} {formatDuration(workspaceTaskElapsedSeconds)}</span>
+                  <strong>{workspaceTaskActive ? `进度 ${workspaceProgressPercent}%` : workspaceTask?.status === "succeeded" ? "进度 100%" : "任务已结束"}</strong>
+                </div>
+              ) : null}
+              {workspaceTaskActive ? (
+                <div className="workspace-progress-track" aria-hidden="true">
+                  <span className="workspace-progress-fill" style={{ width: `${workspaceProgressPercent}%` }} />
+                </div>
+              ) : null}
+            </div>
+          ) : undefined}
+        />}
       </main>
     </div>
   );
