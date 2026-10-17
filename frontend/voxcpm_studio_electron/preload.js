@@ -1,6 +1,12 @@
 const { contextBridge, ipcRenderer } = require("electron");
 
 contextBridge.exposeInMainWorld("voxcpmDesktop", {
+  rendererReady: () => ipcRenderer.invoke("runtime:renderer-ready"),
+  getUpdateState: () => ipcRenderer.invoke("update:state"),
+  checkUpdate: () => ipcRenderer.invoke("update:check"),
+  downloadUpdate: () => ipcRenderer.invoke("update:download"),
+  installUpdate: () => ipcRenderer.invoke("update:install"),
+  setAutoCheckUpdate: (enabled) => ipcRenderer.invoke("update:auto-check", enabled),
   getBootstrapState: () => ipcRenderer.invoke("runtime:get-bootstrap-state"),
   startBackend: () => ipcRenderer.invoke("runtime:start-backend"),
   stopBackend: () => ipcRenderer.invoke("runtime:stop-backend"),

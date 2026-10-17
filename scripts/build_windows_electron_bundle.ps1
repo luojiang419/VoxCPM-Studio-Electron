@@ -176,6 +176,9 @@ New-Item -ItemType Directory -Force -Path $resourcesAppRoot | Out-Null
 Copy-Item -LiteralPath (Join-Path $electronProject "main.js") -Destination (Join-Path $resourcesAppRoot "main.js") -Force
 Copy-Item -LiteralPath (Join-Path $electronProject "preload.js") -Destination (Join-Path $resourcesAppRoot "preload.js") -Force
 Copy-Item -LiteralPath (Join-Path $electronProject "package.json") -Destination (Join-Path $resourcesAppRoot "package.json") -Force
+foreach ($updateFile in @("update-service.js", "update-window.js", "update-config.json", "updater.py")) {
+    Copy-Item -LiteralPath (Join-Path $electronProject $updateFile) -Destination (Join-Path $resourcesAppRoot $updateFile) -Force
+}
 Invoke-Robocopy -Source (Join-Path $electronProject "dist") -Destination (Join-Path $resourcesAppRoot "dist")
 
 Write-Step "Copy Electron shell into bundle"

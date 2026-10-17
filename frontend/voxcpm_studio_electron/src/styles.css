@@ -712,6 +712,19 @@ body[data-theme="light"] .control-status-card {
   gap: 14px;
 }
 
+.update-auto-check {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+}
+
+.update-auto-check input {
+  width: 16px;
+  height: 16px;
+  margin: 0;
+  flex: none;
+}
+
 .settings-tool-section {
   display: grid;
   gap: 10px;

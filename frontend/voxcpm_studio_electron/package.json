@@ -1,10 +1,12 @@
 {
   "name": "voxcpm-studio-electron",
-  "version": "0.2.0",
+  "version": "2.0.2",
   "description": "Electron native desktop shell for VoxCPM Studio.",
   "main": "main.js",
   "private": true,
   "scripts": {
+    "test:update": "node --test tests/update-service.test.cjs",
+    "typecheck": "tsc --noEmit",
     "build": "vite build",
     "start": "npm run build && electron .",
     "dev": "npm run build && electron .",
@@ -34,6 +36,10 @@
       "dist/**/*",
       "main.js",
       "preload.js",
+      "update-service.js",
+      "update-window.js",
+      "update-config.json",
+      "updater.py",
       "package.json"
     ],
     "win": {

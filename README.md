@@ -203,6 +203,9 @@ VOXCPM_PYTHON_EXE=/path/to/python VOXCPM_MODEL_DIR=/path/to/model npm start
 
 ## Windows 便携打包
 
+桌面版已接入魔搭自动检查更新、签名校验、独立更新器和失败回滚。
+用户入口为「设置 → 软件更新」；维护者发布及旧包首次接入方法见 [自动更新说明](./docs/自动更新说明.md)。
+
 Windows 下推荐使用：
 
 ```powershell

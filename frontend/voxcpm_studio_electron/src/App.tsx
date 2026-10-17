@@ -1,4 +1,5 @@
 import { startTransition, useEffect, useState, type ReactNode } from "react";
+import UpdatePanel from "./UpdatePanel";
 
 type ThemeMode = "dark" | "light" | "system";
 type PageKey = "workspace" | "control" | "overview" | "batch" | "training" | "settings";
@@ -452,6 +453,7 @@ function App() {
   const [trainingOffset, setTrainingOffset] = useState(0);
   const [trainingMessage, setTrainingMessage] = useState("等待训练任务。");
   const [globalMessage, setGlobalMessage] = useState("");
+  const [updateNotice, setUpdateNotice] = useState("");
   const [busy, setBusy] = useState(false);
   const [workspaceTaskStartedAt, setWorkspaceTaskStartedAt] = useState(0);
   const [workspaceTaskElapsedSeconds, setWorkspaceTaskElapsedSeconds] = useState(0);
@@ -477,11 +479,12 @@ function App() {
   const effectiveTheme = themeMode === "system" ? (systemPrefersDark ? "dark" : "light") : themeMode;
   const workspaceControlPresets = [
     ...DEFAULT_WORKSPACE_CONTROL_PRESETS,
-    ...customWorkspacePresets.filter((item) => !DEFAULT_WORKSPACE_CONTROL_PRESETS.includes(item)),
+    ...customWorkspacePresets.filter((item) => !(DEFAULT_WORKSPACE_CONTROL_PRESETS as readonly string[]).includes(item)),
   ];
   const workspaceReferenceAudioUrl = toLocalFileUrl(singleForm.referenceAudio, bootstrap);
 
   useEffect(() => {
+    window.voxcpmDesktop.rendererReady();
     document.body.setAttribute("data-theme", effectiveTheme);
   }, [effectiveTheme]);
 
@@ -519,6 +522,13 @@ function App() {
       setThemeMode((current) => current || state.themeSource || "dark");
     });
     const unsubscribe = window.voxcpmDesktop.onRuntimeEvent((payload) => {
+      if (payload.type === "update-state") {
+        const update = payload.update;
+        if (update.status === "available") setUpdateNotice(`有可用更新：VoxCPM Studio ${update.latestVersion}`);
+        else if (update.status === "downloaded") setUpdateNotice("更新已下载，可前往设置重启安装。");
+        else if (update.status === "current") setUpdateNotice("");
+        return;
+      }
       startTransition(() => {
         setBootstrap(payload);
         setSystemPrefersDark(Boolean(payload.systemPrefersDark));
@@ -980,6 +990,7 @@ function App() {
 
       <main className="workspace">
         {globalMessage ? <div className="notice-banner">{globalMessage}</div> : null}
+        {updateNotice && page !== "settings" ? <div className="notice-banner">{updateNotice} <button type="button" className="ghost-button" onClick={() => setPage("settings")}>查看更新</button></div> : null}
 
         <section className="panel-shell">
           {page === "control" ? (
@@ -1568,6 +1579,7 @@ function App() {
                 </div>
               </section>
               <section className="panel-card settings-tools-card">
+                <UpdatePanel />
                 <div className="panel-head panel-head-compact">
                   <div>
                     <p className="panel-kicker">界面与工具</p>

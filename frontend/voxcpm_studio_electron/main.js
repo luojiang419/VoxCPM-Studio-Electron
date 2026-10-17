@@ -1,4 +1,8 @@
+if (process.argv.includes("--voxcpm-updater")) {
+  require("./update-window");
+} else {
 const { app, BrowserWindow, dialog, ipcMain, nativeTheme, shell } = require("electron");
+const { UpdateService, atomicJson } = require("./update-service");
 const fs = require("fs");
 const http = require("http");
 const net = require("net");
@@ -26,6 +30,10 @@ let backendStopRequested = false;
 let lastBackendExitCode = null;
 let previousCpuSample = null;
 let currentThemeSource = "dark";
+let updateService = null;
+let updateHealthWritten = false;
+let rendererReadyResolve;
+const rendererReady = new Promise((resolve) => { rendererReadyResolve = resolve; });
 let bootstrapState = {
   status: "booting",
   statusText: "正在准备 Electron 桌面壳。",
@@ -744,6 +752,22 @@ ipcMain.handle("runtime:get-bootstrap-state", () => {
   return summarizeBootstrapState();
 });
 
+ipcMain.handle("update:state", () => updateService?.state);
+ipcMain.handle("runtime:renderer-ready", () => { rendererReadyResolve(); return true; });
+ipcMain.handle("update:check", () => updateService.check());
+ipcMain.handle("update:download", () => updateService.download());
+ipcMain.handle("update:auto-check", (_event, enabled) => updateService.setAutoCheck(enabled));
+ipcMain.handle("update:install", async () => {
+  const answer = await dialog.showMessageBox(mainWindow, { type: "question", title: "重启并更新",
+    message: "安装更新需要关闭软件。请确认生成与训练任务已结束。",
+    detail: "安装完成后将自动重启，模型、配置与已有作品会保留。",
+    buttons: ["取消", "重启并安装"], defaultId: 0, cancelId: 0 });
+  if (answer.response !== 1) return false;
+  await updateService.launch();
+  app.quit();
+  return true;
+});
+
 ipcMain.handle("runtime:set-theme-source", (_event, themeSource) => {
   currentThemeSource = ["dark", "light", "system"].includes(themeSource) ? themeSource : "dark";
   nativeTheme.themeSource = currentThemeSource;
@@ -793,13 +817,40 @@ nativeTheme.on("updated", () => {
 });
 
 app.whenReady().then(async () => {
+  if (!app.requestSingleInstanceLock()) { app.quit(); return; }
+  const pendingPath = path.join(resolveProjectRoot(), "data", "cache", "updates", "pending.json");
+  if (fs.existsSync(pendingPath) && !process.env.VOXCPM_UPDATE_SESSION) {
+    try {
+      const pending = JSON.parse(fs.readFileSync(pendingPath, "utf8"));
+      let running = false;
+      try { process.kill(pending.pid, 0); running = true; } catch { /* 更新进程已退出。 */ }
+      if (running) {
+        dialog.showErrorBox("正在更新", "独立更新器正在安装，请等待更新完成。");
+        app.quit(); return;
+      }
+      const result = spawnSync(resolvePythonCommand(resolveAppRoot(), resolveProjectRoot()),
+        [path.join(__dirname, "updater.py"), pending.session, "--recover"], { windowsHide: true, encoding: "utf8" });
+      if (result.status !== 0) throw new Error(result.stdout || result.stderr || "更新恢复失败");
+    } catch (error) {
+      dialog.showErrorBox("更新恢复失败", String(error)); app.quit(); return;
+    }
+  }
+  updateService = new UpdateService({ root: resolveProjectRoot(), dataRoot: resolveDataRoot(), appDir: __dirname,
+    currentVersion: app.getVersion(), onState: (state) => sendRuntimeEvent("update-state", { update: state }) });
   nativeTheme.themeSource = currentThemeSource;
   setBootstrapState({});
   createWindow();
+  if (updateService.getAutoCheck()) setTimeout(() => updateService.check(), 5000).unref();
   previousCpuSample = null;
 
   try {
     await startBackend();
+    if (process.env.VOXCPM_UPDATE_HEALTH_FILE && !updateHealthWritten) {
+      await rendererReady;
+      atomicJson(process.env.VOXCPM_UPDATE_HEALTH_FILE, { version: app.getVersion(),
+        releaseId: updateService.config.releaseId || "00000000000000", pid: process.pid });
+      updateHealthWritten = true;
+    }
   } catch (error) {
     setBootstrapState({
       status: "error",
@@ -825,3 +876,7 @@ app.on("activate", () => {
     createWindow();
   }
 });
+app.on("second-instance", () => {
+  if (mainWindow) { if (mainWindow.isMinimized()) mainWindow.restore(); mainWindow.focus(); }
+});
+}

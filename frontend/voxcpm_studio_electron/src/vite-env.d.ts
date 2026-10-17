@@ -3,6 +3,12 @@
 declare global {
   interface Window {
     voxcpmDesktop: {
+      rendererReady: () => Promise<boolean>;
+      getUpdateState: () => Promise<any>;
+      checkUpdate: () => Promise<any>;
+      downloadUpdate: () => Promise<any>;
+      installUpdate: () => Promise<boolean>;
+      setAutoCheckUpdate: (enabled: boolean) => Promise<any>;
       getBootstrapState: () => Promise<any>;
       startBackend: () => Promise<any>;
       stopBackend: () => Promise<any>;
