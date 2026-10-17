@@ -11,10 +11,10 @@ const path = require("path");
 const { spawn, spawnSync } = require("child_process");
 
 const WINDOW_BOUNDS = {
-  width: 1680,
+  width: 1560,
   height: 980,
-  minWidth: 1360,
-  minHeight: 900,
+  minWidth: 1180,
+  minHeight: 760,
 };
 
 const SERVICE_PORT_START = 8808;

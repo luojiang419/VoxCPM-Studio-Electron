@@ -2,7 +2,11 @@
 
 这是 `VoxCPM Studio` 的 Electron 原生桌面版源码仓库目录，包含：
 
-![VoxCPM Studio Electron 首页预览](./docs/screenshots/homepage-hero.png)
+![VoxCPM Studio 多角色配音工作台](./docs/screenshots/production-studio.png)
+
+现已支持多角色配音工程、角色文案识别、音色库、逐段重做、作品记录、背景音乐混音，以及整片 WAV / SRT / 分角色音频导出。新界面以台词编排为中心，保留声音设计、克隆、LoRA 训练和自动更新。
+
+使用方法与 EVOX 调研依据见 [配音工作台说明](./docs/EVOX调研与配音工作台.md)。
 
 一个面向中文本地工作流优化的 `Electron + React + TypeScript + Vite` 桌面前端，连接本地 `Python HTTP API`，覆盖：
 

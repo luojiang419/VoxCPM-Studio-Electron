@@ -58,7 +58,12 @@ def sources():
     for directory in ("src/voxcpm", "conf", "assets"):
         for file in sorted((PROJECT / directory).rglob("*")):
             if file.is_file() and "__pycache__" not in file.parts and file.suffix not in (".pyc", ".pyo"):
-                yield file, "app/" + file.relative_to(PROJECT).as_posix()
+                overlay = ROOT / "backend" / file.relative_to(PROJECT / "src") if directory == "src/voxcpm" else None
+                yield overlay if overlay and overlay.is_file() else file, "app/" + file.relative_to(PROJECT).as_posix()
+    # 新增后端文件也必须进入发布包，不能依赖父目录已有副本。
+    for file in sorted((ROOT / "backend/voxcpm").rglob("*.py")):
+        if not (PROJECT / "src" / file.relative_to(ROOT / "backend")).exists():
+            yield file, "app/src/" + file.relative_to(ROOT / "backend").as_posix()
     for name in ("download_bundle_model.py", "portable_self_check.py", "train_voxcpm_finetune.py", "test_voxcpm_ft_infer.py", "test_voxcpm_lora_infer.py"):
         yield PROJECT / "scripts" / name, "app/scripts/" + name
 

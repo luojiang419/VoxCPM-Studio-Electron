@@ -1,8 +1,9 @@
 import { startTransition, useEffect, useState, type ReactNode } from "react";
 import UpdatePanel from "./UpdatePanel";
+import ProductionStudio from "./ProductionStudio";
 
 type ThemeMode = "dark" | "light" | "system";
-type PageKey = "workspace" | "control" | "overview" | "batch" | "training" | "settings";
+type PageKey = "production" | "voices" | "history" | "workspace" | "control" | "overview" | "batch" | "training" | "settings";
 
 type BootstrapState = {
   status: string;
@@ -160,11 +161,14 @@ type TrainingForm = {
 };
 
 const NAV_ITEMS: Array<{ key: PageKey; label: string }> = [
-  { key: "workspace", label: "工作台" },
+  { key: "production", label: "配音工作台" },
+  { key: "workspace", label: "声音设计与克隆" },
+  { key: "voices", label: "音色库" },
+  { key: "history", label: "作品记录" },
+  { key: "batch", label: "批量生成" },
+  { key: "training", label: "LoRA 训练" },
   { key: "control", label: "运行控制" },
-  { key: "overview", label: "概览" },
-  { key: "batch", label: "批量" },
-  { key: "training", label: "训练" },
+  { key: "overview", label: "资源概览" },
   { key: "settings", label: "设置" },
 ];
 
@@ -423,7 +427,7 @@ async function apiJson(baseUrl: string, path: string, options?: RequestInit) {
 }
 
 function App() {
-  const [page, setPage] = useState<PageKey>("workspace");
+  const [page, setPage] = useState<PageKey>("production");
   const [themeMode, setThemeMode] = useState<ThemeMode>(() => {
     const stored = localStorage.getItem("voxcpm-electron-theme-mode");
     if (stored === "light" || stored === "system") {
@@ -952,9 +956,10 @@ function App() {
     .join(" ");
 
   return (
-    <div className="app-shell">
+    <div className={`app-shell studio-shell ${["production", "voices", "history"].includes(page) ? "studio-creative-page" : ""}`}>
       <aside className="sidebar">
         <div className="sidebar-top">
+          <div className="studio-brand">
           <button
             type="button"
             className={brandMarkClassName}
@@ -963,12 +968,14 @@ function App() {
             title={bootstrap?.backendRunning ? "本地服务运行中" : "点击启动本地服务"}
             aria-label={bootstrap?.backendRunning ? "本地服务运行中" : "点击启动本地服务"}
           >
-            VC
+            V
           </button>
           <div className="brand-copy">
             <strong>VoxCPM</strong>
-            <span>Studio</span>
+            <span>STUDIO · 本地配音</span>
           </div>
+          </div>
+          <div className="studio-nav-caption">创作空间</div>
           <div className="nav-list">
             {NAV_ITEMS.map((item) => (
               <button
@@ -986,13 +993,31 @@ function App() {
             ))}
           </div>
         </div>
+        <div className="studio-sidebar-foot">
+          <div><span className={`studio-service-dot ${bootstrap?.backendRunning ? "is-ready" : ""}`} /><strong>{bootstrap?.backendRunning ? "本地引擎已连接" : "本地引擎准备中"}</strong></div>
+          <p>{runtime?.cuda_available ? (runtime.gpu_names[0] || "CUDA GPU") : "VoxCPM 2 · 本地运行"}</p>
+          <span>声音，让创作发生。</span>
+        </div>
       </aside>
 
       <main className="workspace">
+        <header className="studio-topbar">
+          <div className="studio-breadcrumb"><span>创作空间</span><span>/</span><strong>{NAV_ITEMS.find((item) => item.key === page)?.label}</strong></div>
+          <div className="studio-topbar-actions">
+            <span className="studio-engine-tag"><span className={`studio-service-dot ${bootstrap?.backendRunning ? "is-ready" : ""}`} />{bootstrap?.backendRunning ? "引擎就绪" : "连接引擎中"}</span>
+            {resourceStats?.gpuMemorySupported && <span className="studio-vram">显存 {(resourceStats.gpuMemoryUsedMB / 1024).toFixed(1)} / {(resourceStats.gpuMemoryTotalMB / 1024).toFixed(0)} GB</span>}
+            <button className="studio-theme-button" type="button" aria-label="切换界面主题" title="切换深色 / 浅色主题" onClick={() => setThemeMode(effectiveTheme === "dark" ? "light" : "dark")}>{effectiveTheme === "dark" ? "☀" : "☾"}</button>
+          </div>
+        </header>
         {globalMessage ? <div className="notice-banner">{globalMessage}</div> : null}
         {updateNotice && page !== "settings" ? <div className="notice-banner">{updateNotice} <button type="button" className="ghost-button" onClick={() => setPage("settings")}>查看更新</button></div> : null}
 
         <section className="panel-shell">
+          {["production", "voices", "history"].includes(page) ? <ProductionStudio
+            backendBaseUrl={backendBaseUrl}
+            view={page === "voices" ? "voices" : page === "history" ? "history" : "editor"}
+            onNavigate={(view) => setPage(view === "editor" ? "production" : view)}
+          /> : null}
           {page === "control" ? (
             <div className="control-layout">
               <section className="panel-card control-service-section">
@@ -1707,6 +1732,12 @@ function NavIcon(props: { page: PageKey }) {
   };
 
   switch (props.page) {
+    case "production":
+      return <svg viewBox="0 0 24 24" aria-hidden="true"><rect {...common} x="4" y="3" width="16" height="18" rx="3"/><path {...common} d="M8 7h8M8 11h5M8 15h4"/><path {...common} d="m15 14 4 3-4 3z"/></svg>;
+    case "voices":
+      return <svg viewBox="0 0 24 24" aria-hidden="true"><rect {...common} x="9" y="3" width="6" height="12" rx="3"/><path {...common} d="M6 10v2a6 6 0 0 0 12 0v-2M12 18v3M8 21h8"/></svg>;
+    case "history":
+      return <svg viewBox="0 0 24 24" aria-hidden="true"><path {...common} d="M4 10a8 8 0 1 1 0 5M4 4v6h6M12 7v5l3 2"/></svg>;
     case "workspace":
       return (
         <svg viewBox="0 0 24 24" aria-hidden="true">

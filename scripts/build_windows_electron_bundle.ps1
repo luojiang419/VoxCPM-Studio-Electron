@@ -145,6 +145,14 @@ if ($SkipModelDownload) {
 }
 Invoke-Checked -FilePath "powershell.exe" -Arguments $portableArgs
 
+Write-Step "Apply maintained desktop backend modules"
+$backendOverlay = Join-Path $electronRoot "backend\voxcpm"
+if (Test-Path -LiteralPath $backendOverlay) {
+    $backendDestination = Join-Path $bundleRoot "app\src\voxcpm"
+    New-Item -ItemType Directory -Force -Path $backendDestination | Out-Null
+    Copy-Item -Path (Join-Path $backendOverlay "*.py") -Destination $backendDestination -Force
+}
+
 Write-Step "Install Electron renderer dependencies"
 $previousElectronMirror = $env:ELECTRON_MIRROR
 if (-not [string]::IsNullOrWhiteSpace($ElectronMirror)) {
