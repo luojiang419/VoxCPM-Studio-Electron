@@ -1,0 +1,174 @@
+/* 声音工作区：卡片占满可用高度，仅表单和预设列表滚动。 */
+.studio-shell .voice-workspace-shell {
+  display: flex;
+  overflow: hidden;
+  padding: 18px 24px;
+}
+
+.voice-workspace-shell .workspace-grid {
+  flex: 1;
+  min-width: 0;
+  min-height: 0;
+  grid-template-columns: minmax(0, 1.15fr) minmax(320px, .85fr);
+  grid-template-rows: minmax(0, 1fr);
+  align-items: stretch;
+}
+
+.voice-workspace-shell .panel-card {
+  min-width: 0;
+  padding: 16px;
+  gap: 14px;
+  overflow: hidden;
+}
+
+.voice-workspace-shell .panel-card-workspace {
+  display: flex;
+  flex-direction: column;
+}
+
+.studio-shell .voice-workspace-shell .panel-head {
+  position: static;
+  flex: none;
+  flex-direction: row;
+  align-items: center;
+  padding: 0;
+  gap: 12px;
+}
+
+.voice-workspace-shell .panel-head h3 { font-size: 18px; }
+.voice-workspace-shell .panel-kicker { margin-bottom: 4px; font-size: 11px; }
+.voice-workspace-shell .ghost-button { font-size: 12px; }
+
+.voice-workspace-shell .workspace-form-scroll {
+  flex: 1;
+  min-height: 0;
+  overflow: auto;
+  overscroll-behavior: contain;
+  scrollbar-gutter: stable;
+  padding: 0 4px 2px 0;
+}
+
+.voice-workspace-shell .form-grid {
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: 12px;
+}
+
+.voice-workspace-shell .field { min-width: 0; align-content: start; }
+.voice-workspace-shell .field-label { font-size: 12px; font-weight: 500; }
+.voice-workspace-shell input,
+.voice-workspace-shell select,
+.voice-workspace-shell textarea { font-size: 13px; padding: 9px 10px; }
+.voice-workspace-shell textarea { min-height: 64px; resize: vertical; line-height: 1.6; }
+.voice-workspace-shell input[type="range"] { height: 26px; margin: 0; padding: 0; }
+
+.voice-workspace-shell .reference-audio-card { border-radius: 8px; gap: 8px; padding: 12px; }
+.voice-workspace-shell .reference-audio-card-empty { min-height: 82px; }
+.voice-workspace-shell .reference-audio-empty-state { gap: 5px; }
+.voice-workspace-shell .reference-audio-empty-state strong { font-size: 13px; font-weight: 500; }
+.voice-workspace-shell .reference-audio-empty-state span { font-size: 11px; }
+.voice-workspace-shell .reference-audio-meta { min-width: 0; }
+.voice-workspace-shell .reference-audio-meta strong { font-size: 12px; overflow-wrap: anywhere; }
+.voice-workspace-shell .reference-audio-meta span { font-size: 11px; }
+.voice-workspace-shell .audio-player { display: block; width: 100%; height: 40px; min-width: 0; }
+.voice-workspace-shell .toggle-row { min-height: 40px; padding: 8px 10px; border-radius: 8px; font-size: 12px; }
+
+.workspace-generation-footer {
+  flex: none;
+  display: grid;
+  gap: 10px;
+  padding-top: 12px;
+  border-top: 1px solid var(--line);
+}
+
+.voice-workspace-shell .workspace-action-bar {
+  position: static;
+  display: grid;
+  grid-template-columns: 1.15fr 1fr 1fr;
+  margin: 0;
+  padding: 0;
+  border: 0;
+  border-radius: 0;
+  box-shadow: none;
+  background: transparent;
+  gap: 8px;
+}
+
+.voice-workspace-shell .workspace-action-bar button {
+  min-height: 42px;
+  min-width: 0;
+  padding: 8px;
+  font-size: 13px;
+  font-weight: 600;
+}
+
+.voice-workspace-shell .primary-button { color: var(--bg-deep); }
+.voice-workspace-shell .workspace-status-panel { gap: 6px; }
+.voice-workspace-shell .status-text { margin: 0; font-size: 12px; overflow-wrap: anywhere; max-height: 58px; overflow: auto; }
+.voice-workspace-shell .workspace-progress-track { height: 5px; }
+
+.voice-workspace-shell .workspace-side-column {
+  position: static;
+  min-width: 0;
+  align-self: stretch;
+  grid-template-rows: auto minmax(0, 1fr);
+  align-content: stretch;
+}
+
+.voice-workspace-shell .panel-card-preview { align-self: stretch; }
+.voice-workspace-shell .preview-box {
+  min-height: 88px;
+  padding: 14px;
+  border-radius: 8px;
+  background: var(--panel-soft);
+}
+
+.voice-workspace-shell .placeholder-box {
+  min-height: 0;
+  padding: 0;
+  border: 0;
+  border-radius: 0;
+  background: transparent;
+  font-size: 12px;
+}
+
+.voice-workspace-shell .panel-card-control-presets {
+  align-self: stretch;
+  max-height: none;
+  grid-template-rows: auto auto minmax(0, 1fr);
+}
+
+.voice-workspace-shell .control-preset-add .ghost-button { min-height: 32px; }
+.voice-workspace-shell .preset-module { grid-template-rows: auto minmax(0, 1fr); }
+.voice-workspace-shell .preset-chip-grid {
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  max-height: none;
+  overscroll-behavior: contain;
+  scrollbar-gutter: stable;
+  padding-right: 4px;
+}
+
+.voice-workspace-shell .preset-chip {
+  min-height: 58px;
+  padding: 10px;
+  border-radius: 8px;
+  font-size: 12px;
+  line-height: 1.65;
+  overflow-wrap: anywhere;
+}
+
+@media (max-height: 820px) {
+  .studio-shell .voice-workspace-shell { padding: 12px 20px; }
+  .voice-workspace-shell .panel-card { padding: 14px; gap: 10px; }
+  .voice-workspace-shell .form-grid { gap: 10px; }
+  .voice-workspace-shell .reference-audio-card-empty { min-height: 66px; padding: 8px; }
+  .voice-workspace-shell .preview-box { min-height: 64px; padding: 10px; }
+}
+
+/* 小窗口使用单一外层滚动，避免被压缩到无法操作的内层区域。 */
+@media (max-width: 1000px), (max-height: 620px) {
+  .studio-shell .voice-workspace-shell { display: block; overflow: auto; }
+  .voice-workspace-shell .workspace-grid { grid-template-columns: minmax(0, 1fr); grid-template-rows: auto auto; }
+  .voice-workspace-shell .workspace-form-scroll { flex: none; overflow: visible; }
+  .voice-workspace-shell .workspace-side-column { grid-template-rows: auto auto; }
+  .voice-workspace-shell .preset-chip-grid { max-height: 360px; }
+}

@@ -1013,7 +1013,7 @@ function App() {
         {globalMessage ? <div className="notice-banner">{globalMessage}</div> : null}
         {updateNotice && page !== "settings" ? <div className="notice-banner">{updateNotice} <button type="button" className="ghost-button" onClick={() => setPage("settings")}>查看更新</button></div> : null}
 
-        <section className="panel-shell">
+        <section className={`panel-shell ${page === "workspace" ? "voice-workspace-shell" : ""}`}>
           {["production", "voices", "history"].includes(page) ? <ProductionStudio
             backendBaseUrl={backendBaseUrl}
             view={page === "voices" ? "voices" : page === "history" ? "history" : "editor"}
@@ -1127,7 +1127,7 @@ function App() {
             </>
           ) : null}
 
-                  {page === "workspace" ? (
+          {page === "workspace" ? (
             <div className="panel-grid workspace-grid">
               <section className="panel-card panel-card-workspace">
                 <div className="panel-head">
@@ -1228,25 +1228,27 @@ function App() {
                     />
                   </div>
                 </div>
-                <div className="action-row workspace-action-bar">
-                  <button type="button" className="primary-button" onClick={handleGenerate} disabled={busy || !backendBaseUrl}>开始生成</button>
-                  <button type="button" className="ghost-button" onClick={handleSaveAudio} disabled={!workspaceOutputPath}>另存为音频</button>
-                  <button type="button" className="ghost-button" onClick={handleOpenWorkspaceOutputDirectory} disabled={!workspaceOutputPath}>打开输出目录</button>
-                </div>
-                <div className={`workspace-status-panel ${workspaceTaskActive ? "workspace-status-panel-active" : ""}`}>
-                  <p className="status-text">{workspaceStatusTitle}</p>
-                  {workspaceShouldShowProgress ? (
-                    <div className="workspace-status-meta">
-                      <span>{workspaceTaskActive ? "生成计时" : "总耗时"} {formatDuration(workspaceTaskElapsedSeconds)}</span>
-                      <strong>{workspaceTaskActive ? `进度 ${workspaceProgressPercent}%` : workspaceTask?.status === "succeeded" ? "进度 100%" : "任务已结束"}</strong>
-                    </div>
-                  ) : null}
-                  {workspaceTaskActive ? (
-                    <div className="workspace-progress-track" aria-hidden="true">
-                      <span className="workspace-progress-fill" style={{ width: `${workspaceProgressPercent}%` }} />
-                    </div>
-                  ) : null}
-                </div>
+                <footer className="workspace-generation-footer">
+                  <div className="action-row workspace-action-bar">
+                    <button type="button" className="primary-button" onClick={handleGenerate} disabled={busy || !backendBaseUrl}>开始生成</button>
+                    <button type="button" className="ghost-button" onClick={handleSaveAudio} disabled={!workspaceOutputPath}>另存为音频</button>
+                    <button type="button" className="ghost-button" onClick={handleOpenWorkspaceOutputDirectory} disabled={!workspaceOutputPath}>打开输出目录</button>
+                  </div>
+                  <div role="status" aria-live="polite" className={`workspace-status-panel ${workspaceTaskActive ? "workspace-status-panel-active" : ""}`}>
+                    <p className="status-text">{workspaceStatusTitle}</p>
+                    {workspaceShouldShowProgress ? (
+                      <div className="workspace-status-meta">
+                        <span>{workspaceTaskActive ? "生成计时" : "总耗时"} {formatDuration(workspaceTaskElapsedSeconds)}</span>
+                        <strong>{workspaceTaskActive ? `进度 ${workspaceProgressPercent}%` : workspaceTask?.status === "succeeded" ? "进度 100%" : "任务已结束"}</strong>
+                      </div>
+                    ) : null}
+                    {workspaceTaskActive ? (
+                      <div className="workspace-progress-track" aria-hidden="true">
+                        <span className="workspace-progress-fill" style={{ width: `${workspaceProgressPercent}%` }} />
+                      </div>
+                    ) : null}
+                  </div>
+                </footer>
               </section>
 
               <div className="workspace-side-column">
@@ -1273,7 +1275,7 @@ function App() {
                       <h3>控制指令</h3>
                     </div>
                     <Field label="控制指令" full>
-                      <textarea value={singleForm.control} onChange={(event) => setSingleForm({ ...singleForm, control: event.target.value })} rows={2} />
+                      <textarea placeholder="描述音色、语气与情绪，或选择下方预设" value={singleForm.control} onChange={(event) => setSingleForm({ ...singleForm, control: event.target.value })} rows={2} />
                       <div className="control-preset-add">
                         <button type="button" className="ghost-button" onClick={handleAddWorkspacePreset}>添加为预设</button>
                       </div>
