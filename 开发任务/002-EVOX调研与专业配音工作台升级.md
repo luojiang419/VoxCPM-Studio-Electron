@@ -2,11 +2,11 @@
 
 [CODEX_LONG_TASK_CONTINUE_V3]
 
-- 当前状态：功能、源码与便携版实测全部完成；待本地Git提交记录。
+- 当前状态：全部完成，功能实现与验收记录已本地提交。
 - 下一步：用户直接运行现有便携目录的 VoxCPM Studio.exe；后续发布可复用已生成签名包。
-- TODO：功能项全部完成，正在收尾Git交付。
+- TODO：无未完成项。
 - 最近验证：49项自动化检查通过；真实CUDA两角色、单段重做、极致克隆、整片/字幕/ZIP通过；源码与便携版界面、保存和重启恢复通过。
-- branch：feat/dubbing-production-studio；起点 2274c47。
+- branch：feat/dubbing-production-studio；起点 2274c47；实现提交 df949ac。
 - 阻塞：暂无；作者公开演示可访问，未取得EVOX本体，不宣称测试其桌面内部实现。
 
 ## 目标与范围
