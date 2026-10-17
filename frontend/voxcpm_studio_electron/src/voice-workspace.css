@@ -61,6 +61,16 @@
 .workspace-generation-footer .workspace-status-meta, .workspace-generation-footer .workspace-status-meta strong { font-size: 10px; }
 .workspace-generation-footer .workspace-progress-track { flex-basis: 100%; height: 3px; border: 0; background: var(--line); }
 .workspace-playback-error { margin: 0; padding: 10px 24px 0; color: var(--danger); font-size: 12px; line-height: 1.6; }
+.save-voice-dialog { width: min(460px, calc(100vw - 40px)); max-height: calc(100dvh - 40px); overflow: auto; margin: auto; padding: 24px; border: 1px solid var(--line-strong); border-radius: 12px; background: var(--panel); color: var(--text); box-shadow: 0 20px 70px #0003; }
+.save-voice-dialog::backdrop { background: #0007; backdrop-filter: blur(3px); }
+.save-voice-dialog h2 { margin: 0; font-size: 20px; font-weight: 550; }
+.save-voice-dialog p { margin: 12px 0 20px; font-size: 12px; line-height: 1.8; color: var(--muted); }
+.save-voice-dialog label { display: block; margin: 16px 0 8px; font-size: 12px; }
+.save-voice-dialog input { font-size: 13px; }
+.save-voice-dialog .save-voice-error { color: var(--danger); margin-bottom: 0; }
+.save-voice-actions { display: flex; justify-content: flex-end; gap: 10px; margin-top: 24px; }
+.save-voice-actions button { min-height: 36px; padding: 8px 12px; font-size: 12px; }
+.save-voice-actions button:disabled { opacity: .4; cursor: not-allowed; }
 body[data-theme="light"] .workspace-play-button:not(:disabled) { background: var(--panel); box-shadow: var(--button-shadow); }
 
 @media (max-height: 820px) {

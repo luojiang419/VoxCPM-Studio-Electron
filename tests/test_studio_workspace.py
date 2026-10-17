@@ -201,6 +201,78 @@ def test_voice_copies_reference_and_detects_reference_changes(setup, tmp_path):
     assert client.get("/api/workspace/voices").json() == {"items": []}
 
 
+def test_designed_voice_preserves_sample_and_applies_as_fixed_reference(setup, tmp_path):
+    client, studio, store = setup
+    preview = tmp_path / "designed.wav"
+    sf.write(preview, np.full(2400, .12), 24000)
+    original = preview.read_bytes()
+    config = {**DEFAULT_CONFIG, "control": "温暖自然", "cfgValue": 2.3}
+    response = client.post("/api/workspace/voices", json={"name": "设计叙述", "tags": ["旁白"],
+        "config": config, "previewAudio": str(preview), "sampleText": "这是试听文案。"})
+    assert response.status_code == 200, response.text
+    voice = response.json()
+    saved = Path(voice["previewAudio"])
+    assert saved != preview and saved.read_bytes() == original
+    assert voice["sourceMode"] == "声音设计"
+    assert voice["designConfig"] == config
+    assert voice["sampleText"] == "这是试听文案。"
+    assert voice["config"]["mode"] == "可控克隆"
+    assert voice["config"]["referenceAudio"] == str(saved)
+    preview.unlink()
+    assert client.get(voice["previewUrl"]).content == original
+    restarted = WorkspaceStore(store.root, studio)
+    assert restarted.voices()["items"][0] == voice
+    project = prepared(client)
+    project["roles"][1]["config"] = voice["config"]
+    project = client.put(f"/api/workspace/projects/{project['id']}", json=project).json()
+    assert generate(client, project)["status"] == "succeeded"
+    assert studio.calls[0]["mode"] == "可控克隆"
+    assert studio.calls[0]["reference_audio"] == str(saved)
+    client.delete(f"/api/workspace/voices/{voice['id']}")
+    assert saved.is_file()  # 已应用到角色的参考继续可用。
+
+
+@pytest.mark.parametrize("mode", ["可控克隆", "极致克隆"])
+def test_saved_clone_keeps_mode_and_owns_reference_and_preview(setup, tmp_path, mode):
+    client, studio, store = setup
+    reference, preview = tmp_path / "reference.wav", tmp_path / "preview.wav"
+    sf.write(reference, np.zeros(1000), 24000)
+    sf.write(preview, np.ones(2000) * .1, 24000)
+    config = {**DEFAULT_CONFIG, "mode": mode, "referenceAudio": str(reference), "promptText": "参考文案"}
+    voice = client.post("/api/workspace/voices", json={"name": mode, "config": config, "previewAudio": str(preview)}).json()
+    saved_reference, saved_preview = Path(voice["config"]["referenceAudio"]), Path(voice["previewAudio"])
+    assert saved_reference != reference and saved_preview != preview and saved_reference != saved_preview
+    assert saved_reference.read_bytes() == reference.read_bytes()
+    assert saved_preview.read_bytes() == preview.read_bytes()
+    assert voice["config"]["mode"] == voice["sourceMode"] == voice["designConfig"]["mode"] == mode
+    assert voice["designConfig"]["referenceAudio"] == str(saved_reference)
+    reference.unlink(); preview.unlink()
+    assert saved_reference.is_file() and client.get(voice["previewUrl"]).status_code == 200
+
+
+def test_voice_save_rejects_missing_sample_without_creating_entry(setup, tmp_path):
+    client, studio, store = setup
+    response = client.post("/api/workspace/voices", json={"name": "无效", "config": DEFAULT_CONFIG,
+        "previewAudio": str(tmp_path / "missing.wav")})
+    assert response.status_code == 400
+    assert store.voices() == {"items": []}
+    assert not (store.root / "voices").exists()
+
+
+def test_voice_save_rolls_back_files_and_entry_on_write_failure(setup, tmp_path, monkeypatch):
+    client, studio, store = setup
+    preview = tmp_path / "preview.wav"
+    sf.write(preview, np.zeros(100), 24000)
+    def fail_save():
+        raise OSError("模拟写入失败")
+    monkeypatch.setattr(store, "_save", fail_save)
+    with pytest.raises(OSError, match="模拟写入失败"):
+        store.add_voice({"name": "失败", "config": DEFAULT_CONFIG, "previewAudio": str(preview)})
+    assert store.voices() == {"items": []}
+    assert list((store.root / "voices").iterdir()) == []
+    assert preview.is_file()
+
+
 def test_bgm_resamples_loops_and_export_rejects_invalid_settings(setup, tmp_path):
     client, studio, store = setup
     project = prepared(client)

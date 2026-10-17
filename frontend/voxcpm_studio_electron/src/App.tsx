@@ -2,6 +2,8 @@ import { startTransition, useEffect, useState, type ReactNode } from "react";
 import UpdatePanel from "./UpdatePanel";
 import ProductionStudio from "./ProductionStudio";
 import WorkspacePlayer from "./WorkspacePlayer";
+import SaveVoiceDialog from "./SaveVoiceDialog";
+import type { GenerationConfig, StudioVoice } from "./production-types";
 
 type ThemeMode = "dark" | "light" | "system";
 type PageKey = "production" | "voices" | "history" | "workspace" | "control" | "overview" | "batch" | "training" | "settings";
@@ -104,18 +106,8 @@ type SettingsPayload = {
   disable_optimize: boolean;
 };
 
-type SingleForm = {
-  mode: string;
-  text: string;
-  control: string;
-  referenceAudio: string;
-  promptText: string;
-  selectedLora: string;
-  cfgValue: number;
-  normalize: boolean;
-  denoise: boolean;
-  inferenceTimesteps: number;
-};
+type SingleForm = GenerationConfig & { text: string };
+type DesignedVoice = { form: SingleForm; outputPath: string; previewUrl: string };
 
 type BatchForm = {
   mode: string;
@@ -344,6 +336,11 @@ function toLocalFileUrl(targetPath: string, bootstrap: BootstrapState | null) {
   return encodeURI(`file://${normalized}`);
 }
 
+function voiceDesignSignature(form: SingleForm) {
+  return JSON.stringify([form.mode, form.text, form.control, form.referenceAudio, form.promptText, form.selectedLora,
+    form.cfgValue, form.normalize, form.denoise, form.inferenceTimesteps]);
+}
+
 function formatDuration(totalSeconds: number) {
   const safeSeconds = Math.max(0, Math.floor(totalSeconds));
   const minutes = Math.floor(safeSeconds / 60);
@@ -448,6 +445,10 @@ function App() {
   const [batchTask, setBatchTask] = useState<TaskPayload | null>(null);
   const [workspacePreviewUrl, setWorkspacePreviewUrl] = useState("");
   const [workspaceOutputPath, setWorkspaceOutputPath] = useState("");
+  const [designedVoice, setDesignedVoice] = useState<DesignedVoice | null>(null);
+  const [saveVoiceOpen, setSaveVoiceOpen] = useState(false);
+  const [voiceInitialName, setVoiceInitialName] = useState("");
+  const [voiceInitialTags, setVoiceInitialTags] = useState<string[]>([]);
   const [workspaceStatus, setWorkspaceStatus] = useState("等待生成。");
   const [batchStatus, setBatchStatus] = useState("等待批量任务。");
   const [batchLog, setBatchLog] = useState("");
@@ -662,12 +663,13 @@ function App() {
       setWorkspaceStatus(validationMessage);
       return;
     }
+    const submittedForm = { ...singleForm };
     setBusy(true);
     setWorkspaceStatus("已提交生成任务，正在排队。");
     try {
       const task = await apiJson(backendBaseUrl, "/api/tasks/generate-single", {
         method: "POST",
-        body: JSON.stringify(singleForm),
+        body: JSON.stringify(submittedForm),
       });
       setWorkspaceTaskStartedAt(Date.now());
       setWorkspaceTaskElapsedSeconds(0);
@@ -679,6 +681,9 @@ function App() {
       setWorkspaceStatus(finalTask.statusText);
       setWorkspacePreviewUrl(finalTask.result?.previewUrl || "");
       setWorkspaceOutputPath(finalTask.result?.output_path || "");
+      setDesignedVoice(finalTask.result?.output_path && finalTask.result?.previewUrl ? {
+        form: submittedForm, outputPath: finalTask.result.output_path, previewUrl: finalTask.result.previewUrl,
+      } : null);
       await refreshAll();
     } catch (error) {
       setWorkspaceStatus(String(error));
@@ -767,6 +772,33 @@ function App() {
     } catch (error) {
       setWorkspaceStatus(String(error));
     }
+  }
+
+  function openVoiceDesigner(voice?: StudioVoice) {
+    if (busy) return;
+    const config = voice?.designConfig || voice?.config;
+    const form: SingleForm = config ? { ...config, text: voice?.sampleText || DEFAULT_SINGLE_FORM.text } : { ...DEFAULT_SINGLE_FORM };
+    setSingleForm(form);
+    setWorkspacePreviewUrl(voice?.previewUrl || "");
+    setWorkspaceOutputPath(voice?.previewAudio || "");
+    setDesignedVoice(voice?.previewUrl && voice.previewAudio && voice.sampleText?.trim() ? { form, outputPath: voice.previewAudio, previewUrl: voice.previewUrl } : null);
+    setWorkspaceTask(null); setWorkspaceTaskStartedAt(0); setWorkspaceTaskElapsedSeconds(0);
+    setWorkspaceStatus(voice ? `已载入「${voice.name}」，可试听或调整后保存为新音色。` : "等待生成。");
+    setVoiceInitialName(voice ? `${voice.name.slice(0, 55)}（新版本）` : "");
+    setVoiceInitialTags(voice?.tags || []);
+    setPage("workspace");
+  }
+
+  async function saveDesignedVoice(name: string, tags: string[]) {
+    if (!designedVoice || busy || voiceDesignSignature(designedVoice.form) !== voiceDesignSignature(singleForm)) {
+      throw new Error("设置或文案已修改，请重新生成后保存音色。");
+    }
+    const { text, ...config } = designedVoice.form;
+    await apiJson(backendBaseUrl, "/api/workspace/voices", {
+      method: "POST", body: JSON.stringify({ name, tags, config, previewAudio: designedVoice.outputPath, sampleText: text }),
+    });
+    setSaveVoiceOpen(false);
+    setPage("voices");
   }
 
   async function handlePickWorkspaceReferenceAudio() {
@@ -947,6 +979,8 @@ function App() {
     : workspaceTask?.status === "running"
       ? "正在根据输入文本进行合成。"
       : workspaceStatus;
+  const designMatchesPreview = !!designedVoice && voiceDesignSignature(designedVoice.form) === voiceDesignSignature(singleForm);
+  const canSaveDesignedVoice = !!backendBaseUrl && !busy && designMatchesPreview;
   const workspaceShouldShowProgress = workspaceTaskStartedAt > 0 && (workspaceTaskActive || workspaceTask?.status === "succeeded" || workspaceTask?.status === "failed");
   const brandMarkClassName = [
     "brand-mark",
@@ -1018,6 +1052,8 @@ function App() {
             backendBaseUrl={backendBaseUrl}
             view={page === "voices" ? "voices" : page === "history" ? "history" : "editor"}
             headerTools={headerTools}
+            onOpenVoiceDesigner={openVoiceDesigner}
+            designerBusy={busy}
             onNavigate={(view) => setPage(view === "editor" ? "production" : view)}
           /> : null}
           {page === "control" ? (
@@ -1143,7 +1179,7 @@ function App() {
                 <div className="workspace-form-scroll">
                   <div className="form-grid workspace-compose-form">
                     <Field label="生成模式">
-                      <select value={singleForm.mode} onChange={(event) => setSingleForm({ ...singleForm, mode: event.target.value })}>
+                      <select value={singleForm.mode} onChange={(event) => setSingleForm({ ...singleForm, mode: event.target.value as GenerationConfig["mode"] })}>
                         <option>声音设计</option>
                         <option>可控克隆</option>
                         <option>极致克隆</option>
@@ -1613,10 +1649,12 @@ function App() {
           src={workspacePreviewUrl ? `${backendBaseUrl}${workspacePreviewUrl}` : ""}
           fileName={workspaceOutputPath ? pathTail(workspaceOutputPath) : ""}
           canGenerate={!busy && !!backendBaseUrl} hasOutput={!!workspaceOutputPath} generating={workspaceTaskActive}
+          canSaveVoice={canSaveDesignedVoice} onSaveVoice={() => setSaveVoiceOpen(true)}
+          saveVoiceHint={designedVoice && !designMatchesPreview ? "设置或文案已修改，请重新生成后保存音色" : "生成并试听后，保存到音色库"}
           onGenerate={() => void handleGenerate()} onSave={() => void handleSaveAudio()} onOpenDirectory={() => void handleOpenWorkspaceOutputDirectory()}
           status={workspaceShouldShowProgress || workspaceStatus !== "等待生成。" ? (
             <div role="status" aria-live="polite" className={`workspace-status-panel ${workspaceTaskActive ? "workspace-status-panel-active" : ""}`}>
-              <p className="status-text">{workspaceStatusTitle}</p>
+              <p className="status-text">{workspaceStatusTitle}{designedVoice && !designMatchesPreview ? "（设置或文案已修改，请重新生成后保存音色）" : ""}</p>
               {workspaceShouldShowProgress ? (
                 <div className="workspace-status-meta">
                   <span>{workspaceTaskActive ? "生成计时" : "总耗时"} {formatDuration(workspaceTaskElapsedSeconds)}</span>
@@ -1632,6 +1670,8 @@ function App() {
           ) : undefined}
         />}
       </main>
+      {saveVoiceOpen && designedVoice && <SaveVoiceDialog initialName={voiceInitialName} initialTags={voiceInitialTags}
+        mode={designedVoice.form.mode} onCancel={() => setSaveVoiceOpen(false)} onSave={saveDesignedVoice} />}
     </div>
   );
 }

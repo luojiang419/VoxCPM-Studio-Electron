@@ -184,10 +184,6 @@ body[data-theme="light"] .production-studio select { color-scheme: light; }
 .production-studio .ps-voice-quick > select { width: 100%; font-size: 10px; }
 .production-studio summary { list-style: none; cursor: pointer; }
 .production-studio summary::-webkit-details-marker { display: none; }
-.ps-save-voice > summary { display: flex; align-items: center; justify-content: space-between; color: var(--ps-muted); font-size: 10px; padding: 7px 0; }
-.ps-save-voice[open] > summary { color: var(--ps-accent); }
-.ps-save-voice-form { display: grid; gap: 8px; padding-top: 7px; }
-.production-studio .ps-save-voice-form > input { font-size: 10px; width: 100%; }
 .ps-advanced { border-top: 1px solid var(--ps-border); padding-top: 14px; margin-top: -5px; }
 .ps-advanced > summary { display: flex; justify-content: space-between; align-items: center; gap: 7px; font-size: 11px; color: var(--ps-muted); }
 .ps-advanced > summary > span { display: flex; align-items: center; gap: 5px; font-size: 8px; color: var(--ps-soft); }
@@ -308,6 +304,11 @@ body[data-theme="light"] .production-studio select { color-scheme: light; }
 .ps-voice-tags > span { border-radius: 3px; background: var(--ps-input); padding: 2px 6px; font-size: 9px; color: var(--ps-muted); }
 .ps-voice-card-footer { display: flex; align-items: center; justify-content: space-between; gap: 10px; padding-top: 15px; border-top: 1px solid var(--ps-border); margin-top: auto; }
 .ps-voice-card-footer > span { font-size: 8px; color: var(--ps-soft); }
+.ps-library-tools { display: flex; flex-wrap: wrap; align-items: center; justify-content: flex-end; gap: 12px; }
+.ps-voice-card-actions { display: flex; justify-content: flex-end; flex-wrap: wrap; gap: 7px; min-width: 0; max-width: 100%; }
+.production-studio .ps-voice-card-actions .ps-button { max-width: 100%; white-space: normal; overflow-wrap: anywhere; }
+.ps-voice-card-footer { flex-wrap: wrap; }
+.production-studio .ps-open-voice-designer { margin-top: 12px; align-self: flex-start; }
 .ps-library-empty { min-height: 400px; gap: 5px; color: var(--ps-muted); }
 .ps-library-empty .ps-button { margin-top: 22px; }
 .ps-history-list { display: grid; }

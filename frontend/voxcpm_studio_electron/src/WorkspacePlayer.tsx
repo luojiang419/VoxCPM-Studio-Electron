@@ -10,6 +10,9 @@ type Props = {
   onGenerate: () => void;
   onSave: () => void;
   onOpenDirectory: () => void;
+  canSaveVoice?: boolean;
+  saveVoiceHint?: string;
+  onSaveVoice?: () => void;
 };
 
 function timeLabel(value: number) {
@@ -30,7 +33,7 @@ function PlayerIcon({ name }: { name: "play" | "pause" | "folder" | "download" |
   return <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.65" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true">{paths[name]}</svg>;
 }
 
-export default function WorkspacePlayer({ src, fileName, canGenerate, hasOutput, generating, status, onGenerate, onSave, onOpenDirectory }: Props) {
+export default function WorkspacePlayer({ src, fileName, canGenerate, hasOutput, generating, status, onGenerate, onSave, onOpenDirectory, canSaveVoice, saveVoiceHint, onSaveVoice }: Props) {
   const audioRef = useRef<HTMLAudioElement>(null);
   const playRequest = useRef(0);
   const [playing, setPlaying] = useState(false);
@@ -93,6 +96,7 @@ export default function WorkspacePlayer({ src, fileName, canGenerate, hasOutput,
       <div className="workspace-action-bar">
         <button type="button" className="ghost-button" onClick={onOpenDirectory} disabled={!hasOutput}><PlayerIcon name="folder" /><span>输出目录</span></button>
         <button type="button" className="ghost-button" onClick={onSave} disabled={!hasOutput}><PlayerIcon name="download" /><span>另存音频</span></button>
+        <button type="button" className="ghost-button workspace-save-voice" onClick={onSaveVoice} disabled={!canSaveVoice} title={saveVoiceHint}><span>保存音色</span></button>
         <button type="button" className="primary-button" onClick={onGenerate} disabled={!canGenerate}><PlayerIcon name="spark" /><span>{generating ? "正在生成…" : "开始生成"}</span></button>
       </div>
     </div>

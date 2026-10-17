@@ -61,6 +61,11 @@ export type StudioVoice = {
   tags: string[];
   config: GenerationConfig;
   createdAt: string;
+  sourceMode?: GenerationConfig["mode"];
+  designConfig?: GenerationConfig;
+  sampleText?: string;
+  previewAudio?: string;
+  previewUrl?: string;
 };
 
 export type StudioHistory = {

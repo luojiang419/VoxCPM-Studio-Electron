@@ -278,26 +278,67 @@ class WorkspaceStore:
 
     def voices(self) -> dict:
         with self.lock:
-            return {"items": copy.deepcopy(self.db["voices"])}
+            return {"items": [self._voice_view(voice) for voice in self.db["voices"]]}
+
+    @staticmethod
+    def _voice_view(voice: dict) -> dict:
+        result = copy.deepcopy(voice)
+        preview = result.get("previewAudio", "")
+        if preview:
+            result["previewUrl"] = media_url(preview) if Path(preview).is_file() else ""
+        return result
 
     def add_voice(self, payload: dict) -> dict:
         config = clean_config(payload.get("config"))
+        design_config = copy.deepcopy(config)
+        reference = Path(config["referenceAudio"]) if config["referenceAudio"] else None
+        preview = Path(str(payload.get("previewAudio") or "")) if payload.get("previewAudio") else None
+        if reference and not reference.is_file():
+            raise ValueError("参考音频文件不存在。")
+        if preview and not preview.is_file():
+            raise ValueError("试听音频文件不存在，请重新生成后保存。")
         voice_id = uid()
-        if config["referenceAudio"]:
-            source = Path(config["referenceAudio"])
-            if not source.is_file():
-                raise ValueError("参考音频文件不存在。")
-            folder = self.root / "voices" / voice_id
-            folder.mkdir(parents=True, exist_ok=True)
-            target = folder / f"reference{source.suffix}"
-            shutil.copy2(source, target)
-            config["referenceAudio"] = str(target)
-        voice = {"id": voice_id, "name": str(payload.get("name", "")).strip()[:100] or "新音色",
-                 "tags": [str(t)[:40] for t in payload.get("tags", [])][:20], "config": config, "createdAt": timestamp()}
-        with self.lock:
-            self.db["voices"].insert(0, voice)
-            self._save()
-        return copy.deepcopy(voice)
+        folder = self.root / "voices" / voice_id
+        written: list[Path] = []
+        created_folder = False
+        try:
+            if reference or preview:
+                folder.mkdir(parents=True)
+                created_folder = True
+            preview_target = None
+            if preview:
+                preview_target = folder / f"preview{preview.suffix}"
+                written.append(preview_target)
+                shutil.copy2(preview, preview_target)
+            if reference:
+                target = preview_target if preview and reference.resolve() == preview.resolve() else folder / f"reference{reference.suffix}"
+                if target != preview_target:
+                    written.append(target)
+                    shutil.copy2(reference, target)
+                config["referenceAudio"] = design_config["referenceAudio"] = str(target)
+            voice = {"id": voice_id, "name": str(payload.get("name", "")).strip()[:100] or "新音色",
+                     "tags": [str(t)[:40] for t in payload.get("tags", [])][:20], "config": config, "createdAt": timestamp()}
+            if preview_target:
+                voice.update(previewAudio=str(preview_target), sampleText=str(payload.get("sampleText") or "")[:50000],
+                             sourceMode=design_config["mode"], designConfig=design_config)
+                if config["mode"] == "声音设计":
+                    # 设计出的声音成为固定参考，配音应用时不再随机重新设计音色。
+                    config["mode"] = "可控克隆"
+                    config["referenceAudio"] = str(preview_target)
+            with self.lock:
+                self.db["voices"].insert(0, voice)
+                try:
+                    self._save()
+                except BaseException:
+                    self.db["voices"] = [item for item in self.db["voices"] if item["id"] != voice_id]
+                    raise
+            return self._voice_view(voice)
+        except BaseException:
+            for target in written:
+                target.unlink(missing_ok=True)
+            if created_folder:
+                folder.rmdir()
+            raise
 
     def delete_voice(self, voice_id: str) -> dict:
         with self.lock:
