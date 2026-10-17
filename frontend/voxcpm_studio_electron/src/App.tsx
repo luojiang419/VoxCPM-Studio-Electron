@@ -566,7 +566,7 @@ function App() {
   }, [backendBaseUrl]);
 
   useEffect(() => {
-    if (page !== "control") {
+    if (page !== "control" && page !== "overview") {
       return;
     }
 
@@ -971,7 +971,6 @@ function App() {
         : "pending";
 
   const summaryStatusTitle = bootstrap?.statusText || "准备中";
-  const summaryOutputLabel = runtime?.output_dir ? pathTail(runtime.output_dir) : "待配置";
   const workspaceTaskActive = isPendingTask(workspaceTask);
   const workspaceProgressPercent = inferWorkspaceProgressPercent(workspaceTask, workspaceTaskElapsedSeconds);
   const workspaceStatusTitle = workspaceTask?.status === "queued"
@@ -1047,7 +1046,7 @@ function App() {
         {globalMessage ? <div className="notice-banner">{globalMessage}</div> : null}
         {updateNotice && page !== "settings" ? <div className="notice-banner">{updateNotice} <button type="button" className="ghost-button" onClick={() => setPage("settings")}>查看更新</button></div> : null}
 
-        <section className={`panel-shell ${page === "workspace" ? "voice-workspace-shell" : page === "batch" ? "batch-workspace-shell" : ""}`}>
+        <section className={`panel-shell ${page === "workspace" ? "voice-workspace-shell" : page === "batch" ? "batch-workspace-shell" : page === "overview" ? "overview-shell" : ""}`}>
           {["production", "voices", "history"].includes(page) ? <ProductionStudio
             backendBaseUrl={backendBaseUrl}
             view={page === "voices" ? "voices" : page === "history" ? "history" : "editor"}
@@ -1139,29 +1138,81 @@ function App() {
           ) : null}
 
           {page === "overview" ? (
-            <>
-              <div className={`notice-banner notice-banner-${statusTone}`}>
-                <strong>{summaryStatusTitle}</strong>
-                <span>{bootstrap?.detail || "正在等待本地服务启动。"}</span>
-              </div>
-              <section className="summary-grid">
-                <article className="summary-card summary-card-primary">
-                  <p className="card-kicker">运行状态</p>
-                  <h2>{summaryStatusTitle}</h2>
-                  <p>{bootstrap?.detail || "等待本地 API 返回模型信息。"}</p>
+            <div className="overview-dashboard">
+              <section className={`overview-status overview-status-${statusTone}`} aria-label="运行状态">
+                <div className="overview-status-copy">
+                  <span className="overview-status-dot" aria-hidden="true" />
+                  <div>
+                    <h2>{summaryStatusTitle}</h2>
+                    <p>{bootstrap?.detail || "正在等待本地服务启动。"}</p>
+                  </div>
+                </div>
+                <button type="button" className="primary-button" onClick={handleWarmup} disabled={busy || !backendBaseUrl}>模型预热</button>
+              </section>
+
+              <section className="overview-metrics" aria-label="模型与资源摘要">
+                <article className="overview-metric">
+                  <p className="card-kicker">当前模型</p>
+                  <h2 title={runtime?.current_model_source}>{runtime?.current_model_source ? pathTail(runtime.current_model_source) : "等待连接"}</h2>
+                  <p>推理设备 · {runtime?.device || "待检测"}</p>
                 </article>
-                <article className="summary-card">
-                  <p className="card-kicker">LoRA</p>
-                  <h2>{runtime?.lora_count ?? 0}</h2>
-                  <p>{runtime?.loaded_lora || "当前使用基础模型"}</p>
+                <article className="overview-metric">
+                  <p className="card-kicker">LoRA 适配器</p>
+                  <h2>{runtime?.lora_count ?? "—"}<small>个可用</small></h2>
+                  <p title={runtime?.loaded_lora}>{runtime?.loaded_lora || "当前使用基础模型"}</p>
                 </article>
-                <article className="summary-card">
-                  <p className="card-kicker">输出目录</p>
-                  <h2>{summaryOutputLabel}</h2>
-                  <p>{runtime?.output_dir || "可在设置页选择输出目录。"}</p>
+                <article className="overview-metric">
+                  <p className="card-kicker">GPU 显存</p>
+                  <h2>{resourceStats?.gpuMemorySupported ? `${(resourceStats.gpuMemoryUsedMB / 1024).toFixed(1)}` : "—"}
+                    <small>{resourceStats?.gpuMemorySupported ? `/ ${(resourceStats.gpuMemoryTotalMB / 1024).toFixed(0)} GB` : resourceStats ? "未检测到显存" : "待检测"}</small>
+                  </h2>
+                  <div className="overview-meter" role="meter" aria-label="GPU 显存占用" aria-valuemin={0} aria-valuemax={100} aria-valuenow={resourceStats?.gpuMemorySupported ? resourceStats.gpuMemoryUsagePercent : 0} aria-valuetext={resourceStats?.gpuMemorySupported ? undefined : "未检测到显存"}>
+                    <span style={{ width: `${Math.max(0, Math.min(100, resourceStats?.gpuMemoryUsagePercent ?? 0))}%` }} />
+                  </div>
                 </article>
               </section>
-            </>
+
+              <div className="overview-details-grid">
+                <section className="panel-card overview-environment">
+                  <div className="overview-section-heading"><h3>运行环境</h3><span>本地部署</span></div>
+                  <dl className="overview-hardware">
+                    {[
+                      ["GPU", runtime ? (runtime.cuda_available ? runtime.gpu_names.join(" / ") : "不可用") : "待检测"],
+                      ["推理设备", runtime?.device || "待检测"],
+                      ["PyTorch", runtime?.torch_version || "待检测"],
+                      ["CUDA 构建", runtime?.torch_cuda_build || "未检测到"],
+                    ].map(([label, value]) => <div key={label}><dt>{label}</dt><dd>{value}</dd></div>)}
+                  </dl>
+                  <div className="overview-shortcuts">
+                    <p className="card-kicker">快捷入口</p>
+                    <div className="action-row">
+                      <button type="button" className="ghost-button" disabled={!backendBaseUrl} onClick={() => backendBaseUrl && window.voxcpmDesktop.openExternal(backendBaseUrl)}>打开 API 地址 <span aria-hidden="true">↗</span></button>
+                      <button type="button" className="ghost-button" disabled={!bootstrap?.backendLogPath} onClick={() => bootstrap?.backendLogPath && window.voxcpmDesktop.openPath(bootstrap.backendLogPath)}>后台日志 <span aria-hidden="true">↗</span></button>
+                    </div>
+                  </div>
+                </section>
+
+                <section className="panel-card overview-directories">
+                  <div className="overview-section-heading"><h3>模型与文件目录</h3><span>点击展开完整路径</span></div>
+                  <div className="overview-path-list" aria-label="文件路径">
+                    {[
+                      ["当前模型", runtime?.current_model_source],
+                      ["输出目录", runtime?.output_dir],
+                      ["LoRA 目录", runtime?.lora_root],
+                      ["数据目录", runtime?.data_root],
+                      ["配置文件", runtime?.config_path],
+                      ["缓存目录", runtime?.cache_dir],
+                      ["FFmpeg", runtime?.ffmpeg_path],
+                    ].map(([label, value]) => (
+                      <details className="overview-path" key={label}>
+                        <summary><span>{label}</span><strong title={value || "未检测到"}>{value || "未检测到"}</strong><span className="overview-path-chevron" aria-hidden="true">›</span></summary>
+                        <code tabIndex={0} aria-label={`${label}完整路径`}>{value || "未检测到"}</code>
+                      </details>
+                    ))}
+                  </div>
+                </section>
+              </div>
+            </div>
           ) : null}
 
           {page === "workspace" ? (
@@ -1306,33 +1357,6 @@ function App() {
                   </section>
                 ) : null}
               </div>
-            </div>
-          ) : null}
-
-          {page === "overview" ? (
-            <div className="panel-grid">
-              <section className="panel-card">
-                <div className="panel-head">
-                  <div>
-                    <p className="panel-kicker">项目概览</p>
-                    <h3>运行环境与部署状态</h3>
-                  </div>
-                  <button type="button" className="primary-button" onClick={handleWarmup} disabled={busy || !backendBaseUrl}>模型预热</button>
-                </div>
-                <RuntimeList runtime={runtime} large />
-              </section>
-              <section className="panel-card overview-info-card">
-                <p className="panel-kicker">当前说明</p>
-                <h3>本地专业工作台</h3>
-                <div className="overview-info-copy">
-                  <p className="paragraph">这一版已经切到 Electron 原生桌面结构，左侧保持紧凑导航，右侧承载主要创作、批量、训练和设置操作。</p>
-                  <p className="paragraph">本地 API 仅绑定到 127.0.0.1，默认深灰暗黑风格，同时保留浅色与跟随系统三种主题模式。</p>
-                </div>
-                <div className="action-row overview-info-actions">
-                  <button type="button" className="ghost-button" onClick={() => backendBaseUrl && window.voxcpmDesktop.openExternal(backendBaseUrl)}>打开 API 地址</button>
-                  <button type="button" className="ghost-button" onClick={() => bootstrap?.backendLogPath && window.voxcpmDesktop.openPath(bootstrap.backendLogPath)}>打开后台日志</button>
-                </div>
-              </section>
             </div>
           ) : null}
 

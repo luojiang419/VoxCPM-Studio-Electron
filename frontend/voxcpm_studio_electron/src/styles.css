@@ -518,29 +518,6 @@ body[data-theme="light"] .workspace-action-bar {
   overflow: hidden;
 }
 
-.overview-info-card {
-  align-self: start;
-  gap: 12px;
-}
-
-.overview-info-copy {
-  display: grid;
-  gap: 8px;
-}
-
-.overview-info-copy .paragraph {
-  margin: 0;
-}
-
-.overview-info-actions {
-  gap: 8px;
-}
-
-.overview-info-actions .ghost-button {
-  min-height: 40px;
-  padding: 0 14px;
-}
-
 .reference-audio-card {
   border-radius: 18px;
   border: 1px solid var(--line);
