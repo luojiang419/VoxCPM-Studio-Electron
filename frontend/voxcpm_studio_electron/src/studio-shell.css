@@ -14,20 +14,6 @@
   --shadow: 0 10px 32px #00000012;
   --sidebar-width: 206px;
 }
-body[data-theme="light"] {
-  --bg: #f4f2ed;
-  --bg-deep: #eeece7;
-  --panel: #ffffff;
-  --panel-soft: #f7f5f0;
-  --line: #27251f0c;
-  --line-strong: #27251f24;
-  --text: #302d27;
-  --muted: #817b71;
-  --accent: #a65724;
-  --accent-strong: #a65724;
-  --accent-soft: #c6793612;
-  --success: #5e793b;
-}
 html, body, #root { height: 100%; overflow: hidden; background: var(--bg); font-family: "Segoe UI", "Microsoft YaHei UI", sans-serif; accent-color: var(--accent); }
 * { scrollbar-color: #62605b transparent; scrollbar-width: thin; }
 ::selection { color: var(--text); background: var(--accent-soft); }
