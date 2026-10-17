@@ -7,7 +7,7 @@ import "./production-studio.css";
 import RoleAvatar from "./RoleAvatar";
 import { getRoleAppearance, ROLE_APPEARANCES } from "./role-appearance";
 
-type Props = { backendBaseUrl: string; view?: StudioView; onNavigate?: (view: StudioView) => void };
+type Props = { backendBaseUrl: string; view?: StudioView; onNavigate?: (view: StudioView) => void; headerTools?: ReactNode };
 type IconName = "play" | "pause" | "plus" | "upload" | "download" | "check" | "chevron" | "copy" | "up" | "down" | "trash" | "spark" | "close" | "search" | "folder" | "music" | "mic" | "refresh" | "stop";
 const PATHS: Record<IconName, ReactNode> = {
   play: <path d="m9 5 10 7-10 7Z" />,
@@ -80,7 +80,7 @@ function newSegment(roleId: string, text = ""): StudioSegment {
   return { id: uid(), roleId, text, pauseAfterMs: 300, audioPath: "", duration: 0, status: "pending", error: "", fingerprint: "", previewUrl: "", stale: false };
 }
 
-export default function ProductionStudio({ backendBaseUrl, view = "editor", onNavigate }: Props) {
+export default function ProductionStudio({ backendBaseUrl, view = "editor", onNavigate, headerTools }: Props) {
   const [project, setProject] = useState<StudioProject | null>(null);
   const projectRef = useRef<StudioProject | null>(null);
   const [projects, setProjects] = useState<StudioProject[]>([]);
@@ -432,8 +432,8 @@ export default function ProductionStudio({ backendBaseUrl, view = "editor", onNa
 
   return <div className={`production-studio ps-view-${view}`}>
     <header className="ps-header">
-      <div className="ps-title-group"><span className="ps-eyebrow">VOXCPM STUDIO / CREATIVE SUITE</span><h1>{pageTitle}<span className="ps-version">LOCAL AI</span></h1></div>
-      <div className="ps-header-actions"><span className={`ps-save-state ${saveState}`}><i />{saveState === "saved" ? "所有更改已保存" : saveState === "saving" ? "正在保存…" : saveState === "error" ? "保存失败" : "等待保存"}</span>{saveState === "error" && <button className="ps-button ps-small" onClick={() => void run("保存项目", async () => { await flushProject(); setError(""); })} disabled={locked}>重试保存</button>}<button className="ps-button" onClick={() => void createProject()} disabled={locked}><Icon name="plus" />新建项目</button></div>
+      <div className="ps-title-group"><h1>{pageTitle}</h1></div>
+      <div className="ps-header-actions"><span className={`ps-save-state ${saveState}`}><i />{saveState === "saved" ? "所有更改已保存" : saveState === "saving" ? "正在保存…" : saveState === "error" ? "保存失败" : "等待保存"}</span>{saveState === "error" && <button className="ps-button ps-small" onClick={() => void run("保存项目", async () => { await flushProject(); setError(""); })} disabled={locked}>重试保存</button>}<button className="ps-button" onClick={() => void createProject()} disabled={locked}><Icon name="plus" />新建项目</button>{headerTools}</div>
     </header>
 
     {(error || pollError) && <div className="ps-alert ps-alert-error" role="alert"><span>{error || pollError}</span><div>{!project && <button onClick={() => void initialize()} disabled={loading}>重新连接</button>}<IconButton icon="close" label="关闭提示" onClick={() => { setError(""); setPollError(""); }} /></div></div>}

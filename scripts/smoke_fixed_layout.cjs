@@ -23,7 +23,7 @@ async function shot(name) {
   fs.writeFileSync(path.join(output, name + ".png"), Buffer.from(result.data, "base64"));
 }
 async function rects() {
-  return client.evaluate(`Object.fromEntries(['.studio-topbar','.ps-header','.ps-project-bar','.ps-pane-heading','.ps-inspector-heading','.ps-production-footer','.studio-page-heading'].map(selector=>{const e=document.querySelector(selector);return [selector,e?{top:e.getBoundingClientRect().top,bottom:e.getBoundingClientRect().bottom}:null]}))`);
+  return client.evaluate(`Object.fromEntries(['.studio-page-tools','.ps-header','.ps-project-bar','.ps-pane-heading','.ps-inspector-heading','.ps-production-footer','.studio-page-heading'].map(selector=>{const e=document.querySelector(selector);return [selector,e?{top:e.getBoundingClientRect().top,bottom:e.getBoundingClientRect().bottom}:null]}))`);
 }
 function unchanged(before, after) {
   for (const name of Object.keys(before)) if (before[name]) {

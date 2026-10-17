@@ -954,6 +954,13 @@ function App() {
   ]
     .filter(Boolean)
     .join(" ");
+  const headerTools = (
+    <div className="studio-page-tools">
+      <span className="studio-engine-tag"><span className={`studio-service-dot ${bootstrap?.backendRunning ? "is-ready" : ""}`} />{bootstrap?.backendRunning ? "引擎就绪" : "连接引擎中"}</span>
+      {resourceStats?.gpuMemorySupported && <span className="studio-vram">显存 {(resourceStats.gpuMemoryUsedMB / 1024).toFixed(1)} / {(resourceStats.gpuMemoryTotalMB / 1024).toFixed(0)} GB</span>}
+      <button className="studio-theme-button" type="button" aria-label="切换界面主题" title="切换深色 / 浅色主题" onClick={() => setThemeMode(effectiveTheme === "dark" ? "light" : "dark")}>{effectiveTheme === "dark" ? "☀" : "☾"}</button>
+    </div>
+  );
 
   return (
     <div className={`app-shell studio-shell ${["production", "voices", "history"].includes(page) ? "studio-creative-page" : ""}`}>
@@ -1001,15 +1008,7 @@ function App() {
       </aside>
 
       <main className="workspace">
-        <header className="studio-topbar">
-          <div className="studio-breadcrumb"><span>创作空间</span><span>/</span><strong>{NAV_ITEMS.find((item) => item.key === page)?.label}</strong></div>
-          <div className="studio-topbar-actions">
-            <span className="studio-engine-tag"><span className={`studio-service-dot ${bootstrap?.backendRunning ? "is-ready" : ""}`} />{bootstrap?.backendRunning ? "引擎就绪" : "连接引擎中"}</span>
-            {resourceStats?.gpuMemorySupported && <span className="studio-vram">显存 {(resourceStats.gpuMemoryUsedMB / 1024).toFixed(1)} / {(resourceStats.gpuMemoryTotalMB / 1024).toFixed(0)} GB</span>}
-            <button className="studio-theme-button" type="button" aria-label="切换界面主题" title="切换深色 / 浅色主题" onClick={() => setThemeMode(effectiveTheme === "dark" ? "light" : "dark")}>{effectiveTheme === "dark" ? "☀" : "☾"}</button>
-          </div>
-        </header>
-        {!["production", "voices", "history"].includes(page) && <header className="studio-page-heading"><h1>{NAV_ITEMS.find((item) => item.key === page)?.label}</h1><span>VOXCPM STUDIO</span></header>}
+        {!["production", "voices", "history"].includes(page) && <header className="studio-page-heading"><h1>{NAV_ITEMS.find((item) => item.key === page)?.label}</h1>{headerTools}</header>}
         {globalMessage ? <div className="notice-banner">{globalMessage}</div> : null}
         {updateNotice && page !== "settings" ? <div className="notice-banner">{updateNotice} <button type="button" className="ghost-button" onClick={() => setPage("settings")}>查看更新</button></div> : null}
 
@@ -1017,6 +1016,7 @@ function App() {
           {["production", "voices", "history"].includes(page) ? <ProductionStudio
             backendBaseUrl={backendBaseUrl}
             view={page === "voices" ? "voices" : page === "history" ? "history" : "editor"}
+            headerTools={headerTools}
             onNavigate={(view) => setPage(view === "editor" ? "production" : view)}
           /> : null}
           {page === "control" ? (

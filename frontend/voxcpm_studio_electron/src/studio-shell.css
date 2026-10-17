@@ -43,13 +43,9 @@ html, body, #root { height: 100%; overflow: hidden; background: var(--bg); font-
 .studio-service-dot { display: inline-block; width: 6px; height: 6px; border-radius: 50%; background: var(--accent); flex-shrink: 0; }
 .studio-service-dot.is-ready { background: var(--success); }
 .studio-shell > .workspace { padding: 0; min-width: 0; min-height: 0; overflow: hidden; gap: 0; display: flex; flex-direction: column; }
-.studio-topbar { height: 60px; flex-shrink: 0; border-bottom: 1px solid var(--line); display: flex; align-items: center; justify-content: space-between; padding: 0 30px; gap: 16px; }
-.studio-page-heading { flex: none; display: flex; align-items: center; justify-content: space-between; padding: 24px 28px 20px; border-bottom: 1px solid var(--line); }
+.studio-page-heading { flex: none; min-height: 76px; display: flex; align-items: center; justify-content: space-between; gap: 16px; padding: 18px 28px; border-bottom: 1px solid var(--line); }
 .studio-page-heading h1 { margin: 0; font-size: 23px; font-weight: 600; }
-.studio-page-heading > span { font-size: 9px; letter-spacing: 1.5px; color: var(--muted); }
-.studio-breadcrumb, .studio-topbar-actions { display: flex; align-items: center; gap: 14px; font-size: 11px; color: var(--muted); }
-.studio-breadcrumb strong { color: var(--text); font-weight: 500; }
-.studio-breadcrumb > span:nth-child(2) { opacity: .4; }
+.studio-page-tools { display: flex; align-items: center; gap: 14px; flex-shrink: 0; font-size: 11px; color: var(--muted); white-space: nowrap; }
 .studio-engine-tag { display: flex; align-items: center; gap: 7px; font-size: 10px; }
 .studio-vram { font-size: 10px; font-variant-numeric: tabular-nums; }
 .studio-theme-button { border: 1px solid var(--line-strong); background: transparent; color: var(--muted); width: 29px; height: 29px; border-radius: 7px; font-size: 16px; }
@@ -73,7 +69,7 @@ html, body, #root { height: 100%; overflow: hidden; background: var(--bg); font-
   .studio-brand { gap: 8px; padding-left: 4px; }
   .studio-brand .brand-copy strong { font-size: 16px; }
   .studio-brand .brand-copy span { font-size: 8px; }
-  .studio-topbar { padding: 0 22px; }
+  .studio-page-heading { padding-left: 20px; padding-right: 20px; }
   .studio-shell .panel-shell { padding: 20px; }
   .studio-creative-page .panel-shell { padding: 0; }
 }

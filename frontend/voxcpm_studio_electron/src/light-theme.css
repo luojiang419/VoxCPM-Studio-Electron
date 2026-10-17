@@ -2,7 +2,7 @@
 body[data-theme="light"] { background: var(--bg); }
 body[data-theme="light"] * { scrollbar-color: #b8b8b8 transparent; }
 
-body[data-theme="light"] .studio-shell :is(.sidebar, .studio-topbar, .studio-page-heading) {
+body[data-theme="light"] .studio-shell :is(.sidebar, .studio-page-heading) {
   background: var(--panel);
 }
 
@@ -100,11 +100,6 @@ body[data-theme="light"] .studio-shell .workspace-progress-fill {
 
 body[data-theme="light"] .studio-shell .reference-audio-card-empty:hover {
   background: #fafafa;
-}
-
-body[data-theme="light"] .production-studio .ps-version {
-  background: var(--panel-soft);
-  border-color: var(--line);
 }
 
 body[data-theme="light"] .production-studio :is(input, textarea, select):focus {

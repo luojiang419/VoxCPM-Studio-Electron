@@ -19,7 +19,7 @@ delete env.ELECTRON_RUN_AS_NODE;
 async function launch() {
   child = spawn(exe, [...(portable ? [] : [project]), "--remote-debugging-port=19231"], { cwd: path.dirname(exe), env, windowsHide: true, stdio: "ignore" });
   client = await connect(19231);
-  await until(() => client.evaluate("Boolean(window.voxcpmDesktop && document.querySelector('.studio-topbar'))"));
+  await until(() => client.evaluate("Boolean(window.voxcpmDesktop && document.querySelector('.studio-page-tools'))"));
   const boot = await until(async () => {
     const state = await client.evaluate("window.voxcpmDesktop.getBootstrapState()");
     if (state.status === "error") throw new Error(state.detail);
