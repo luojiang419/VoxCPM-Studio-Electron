@@ -1,0 +1,102 @@
+{
+  "provider": "imgx / shiying",
+  "model": "gemini-3-pro-image-preview",
+  "mode": "text-to-image",
+  "aspectRatio": "1:1",
+  "resolution": "1K",
+  "succeeded": 6,
+  "failed": 0,
+  "note": "陶土首轮 HTTP 500，单独重试成功；原始 manifest 保留首轮失败记录。",
+  "avatars": [
+    {
+      "key": "warm-orange",
+      "label": "暖橙",
+      "file": "warm-orange.webp",
+      "original": "frontend/voxcpm_studio_electron/src/assets/role-avatars/originals/warm-orange.jpg",
+      "prompt": "为配音软件创作一张精致人物插画头像。暖橙风格：温暖亲切的叙述者，柔和微笑，橙色衣着点缀。白色背景，清晰面部，居中头肩像，统一细腻柔和的半写实插画画风，小尺寸清楚，完整保留头发与下巴，无文字、无水印、无边框。",
+      "originalSize": [
+        1024,
+        1024
+      ],
+      "displaySize": [
+        512,
+        512
+      ]
+    },
+    {
+      "key": "moss-green",
+      "label": "苔绿",
+      "file": "moss-green.webp",
+      "original": "frontend/voxcpm_studio_electron/src/assets/role-avatars/originals/moss-green.jpg",
+      "prompt": "为配音软件创作一张精致人物插画头像。苔绿风格：温柔知性的叙述者，安静亲和，苔绿色衣着点缀。白色背景，清晰面部，居中头肩像，统一细腻柔和的半写实插画画风，小尺寸清楚，完整保留头发与下巴，无文字、无水印、无边框。",
+      "originalSize": [
+        1024,
+        1024
+      ],
+      "displaySize": [
+        512,
+        512
+      ]
+    },
+    {
+      "key": "ochre-gold",
+      "label": "赭金",
+      "file": "ochre-gold.webp",
+      "original": "frontend/voxcpm_studio_electron/src/assets/role-avatars/originals/ochre-gold.jpg",
+      "prompt": "为配音软件创作一张精致人物插画头像。赭金风格：沉稳专业的叙述者，自信从容，赭金色衣着点缀。白色背景，清晰面部，居中头肩像，统一细腻柔和的半写实插画画风，小尺寸清楚，完整保留头发与下巴，无文字、无水印、无边框。",
+      "originalSize": [
+        1024,
+        1024
+      ],
+      "displaySize": [
+        512,
+        512
+      ]
+    },
+    {
+      "key": "rose",
+      "label": "玫瑰",
+      "file": "rose.webp",
+      "original": "frontend/voxcpm_studio_electron/src/assets/role-avatars/originals/rose.jpg",
+      "prompt": "为配音软件创作一张精致人物插画头像。玫瑰风格：清新灵动的叙述者，明朗细腻，柔和玫瑰色衣着点缀。白色背景，清晰面部，居中头肩像，统一细腻柔和的半写实插画画风，小尺寸清楚，完整保留头发与下巴，无文字、无水印、无边框。",
+      "originalSize": [
+        1024,
+        1024
+      ],
+      "displaySize": [
+        512,
+        512
+      ]
+    },
+    {
+      "key": "terracotta",
+      "label": "陶土",
+      "file": "terracotta.webp",
+      "original": "frontend/voxcpm_studio_electron/src/assets/role-avatars/originals/terracotta.jpg",
+      "prompt": "为配音软件创作一张精致人物插画头像。陶土风格：成熟厚重的叙述者，平和可靠，陶土色衣着点缀。白色背景，清晰面部，居中头肩像，统一细腻柔和的半写实插画画风，小尺寸清楚，完整保留头发与下巴，无文字、无水印、无边框。",
+      "originalSize": [
+        1024,
+        1024
+      ],
+      "displaySize": [
+        512,
+        512
+      ]
+    },
+    {
+      "key": "olive",
+      "label": "橄榄",
+      "file": "olive.webp",
+      "original": "frontend/voxcpm_studio_electron/src/assets/role-avatars/originals/olive.jpg",
+      "prompt": "为配音软件创作一张精致人物插画头像。橄榄风格：自然文艺的叙述者，清爽松弛，橄榄色衣着点缀。白色背景，清晰面部，居中头肩像，统一细腻柔和的半写实插画画风，小尺寸清楚，完整保留头发与下巴，无文字、无水印、无边框。",
+      "originalSize": [
+        1024,
+        1024
+      ],
+      "displaySize": [
+        512,
+        512
+      ]
+    }
+  ]
+}

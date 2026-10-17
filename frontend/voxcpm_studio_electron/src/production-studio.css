@@ -146,6 +146,9 @@ body[data-theme="light"] .production-studio select { color-scheme: light; }
 .ps-inspector-body > * { flex-shrink: 0; }
 .ps-selected-role { display: flex; align-items: center; gap: 11px; }
 .ps-role-avatar { display: grid; place-items: center; width: 42px; height: 42px; border-radius: 9px; color: var(--ps-role); background: color-mix(in srgb, var(--ps-role) 8%, transparent); border: 1px solid color-mix(in srgb, var(--ps-role) 15%, transparent); }
+.ps-role-avatar, .ps-voice-avatar { overflow: hidden; flex-shrink: 0; }
+.ps-avatar-image { display: block; width: 100%; height: 100%; object-fit: cover; background: #fff; }
+.ps-role-tab-avatar { display: block; width: 20px; height: 20px; flex-shrink: 0; border-radius: 5px; object-fit: cover; background: #fff; }
 .ps-selected-role > div:nth-child(2) { display: grid; gap: 1px; flex: 1; min-width: 0; }
 .ps-selected-role label { font-size: 9px; color: var(--ps-soft); }
 .production-studio .ps-color-palette { width: 72px; flex: none; padding: 4px 6px; font-size: 10px; color: var(--ps-role); }
