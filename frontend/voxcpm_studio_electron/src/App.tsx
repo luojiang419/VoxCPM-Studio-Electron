@@ -1047,7 +1047,7 @@ function App() {
         {globalMessage ? <div className="notice-banner">{globalMessage}</div> : null}
         {updateNotice && page !== "settings" ? <div className="notice-banner">{updateNotice} <button type="button" className="ghost-button" onClick={() => setPage("settings")}>查看更新</button></div> : null}
 
-        <section className={`panel-shell ${page === "workspace" ? "voice-workspace-shell" : ""}`}>
+        <section className={`panel-shell ${page === "workspace" ? "voice-workspace-shell" : page === "batch" ? "batch-workspace-shell" : ""}`}>
           {["production", "voices", "history"].includes(page) ? <ProductionStudio
             backendBaseUrl={backendBaseUrl}
             view={page === "voices" ? "voices" : page === "history" ? "history" : "editor"}
@@ -1337,88 +1337,92 @@ function App() {
           ) : null}
 
           {page === "batch" ? (
-            <div className="panel-grid">
-              <section className="panel-card">
+            <div className="panel-grid batch-grid">
+              <section className="panel-card batch-form-card">
                 <div className="panel-head">
                   <div>
                     <p className="panel-kicker">批量生成</p>
                     <h3>整批文本生成</h3>
                   </div>
                 </div>
-                <div className="form-grid">
-                  <Field label="批量模式">
-                    <select value={batchForm.mode} onChange={(event) => setBatchForm({ ...batchForm, mode: event.target.value })}>
-                      <option>声音设计</option>
-                      <option>可控克隆</option>
-                      <option>极致克隆</option>
-                    </select>
-                  </Field>
-                  <Field label="LoRA">
-                    <select value={batchForm.selectedLora} onChange={(event) => setBatchForm({ ...batchForm, selectedLora: event.target.value })}>
-                      <option value="不使用 LoRA">不使用 LoRA</option>
-                      {loraItems.map((item) => (
-                        <option key={item.id} value={item.id}>{item.label}</option>
-                      ))}
-                    </select>
-                  </Field>
-                  <Field label="批量参考音频" full>
-                    <PathRow
-                      value={batchForm.referenceAudio}
-                      placeholder={BATCH_REFERENCE_AUDIO_PLACEHOLDER}
-                      onChange={(value) => setBatchForm({ ...batchForm, referenceAudio: value })}
-                      onPick={async () => {
-                        const selected = await choosePath("file", [{ name: "音频文件", extensions: ["wav", "mp3", "flac", "ogg"] }]);
-                        if (selected) {
-                          setBatchForm({ ...batchForm, referenceAudio: selected });
-                        }
-                      }}
-                    />
-                  </Field>
-                  <Field label="批量控制指令" full hidden={batchForm.mode === "极致克隆"}>
-                    <textarea value={batchForm.control} placeholder={BATCH_CONTROL_PLACEHOLDER} onChange={(event) => setBatchForm({ ...batchForm, control: event.target.value })} rows={3} />
-                  </Field>
-                  <Field label="批量参考文本" full hidden={batchForm.mode !== "极致克隆"}>
-                    <textarea value={batchForm.promptText} placeholder={BATCH_PROMPT_TEXT_PLACEHOLDER} onChange={(event) => setBatchForm({ ...batchForm, promptText: event.target.value })} rows={3} />
-                    <div className="inline-actions">
-                      <button type="button" className="ghost-button" onClick={() => handleRecognizePrompt("batch")}>识别参考文本</button>
-                    </div>
-                  </Field>
-                  <Field label="批量文本" full>
-                    <textarea value={batchForm.batchText} placeholder={BATCH_TEXT_PLACEHOLDER} onChange={(event) => setBatchForm({ ...batchForm, batchText: event.target.value })} rows={8} />
-                  </Field>
-                  <Field label="文本文件" full>
-                    <PathRow
-                      value={batchForm.batchFile}
-                      placeholder={BATCH_FILE_PLACEHOLDER}
-                      onChange={(value) => setBatchForm({ ...batchForm, batchFile: value })}
-                      onPick={async () => {
-                        const selected = await choosePath("file", [{ name: "文本文件", extensions: ["txt"] }]);
-                        if (selected) {
-                          setBatchForm({ ...batchForm, batchFile: selected });
-                        }
-                      }}
-                    />
-                  </Field>
-                  <Field label="输出前缀">
-                    <input value={batchForm.outputPrefix} placeholder={BATCH_OUTPUT_PREFIX_PLACEHOLDER} onChange={(event) => setBatchForm({ ...batchForm, outputPrefix: event.target.value })} />
-                  </Field>
-                  <Field label={`CFG 引导强度 ${batchForm.cfgValue.toFixed(1)}`}>
-                    <input type="range" min={1} max={3} step={0.1} value={batchForm.cfgValue} onChange={(event) => setBatchForm({ ...batchForm, cfgValue: Number(event.target.value) })} />
-                  </Field>
-                  <Field label={`推理步数 ${batchForm.inferenceTimesteps}`}>
-                    <input type="range" min={1} max={50} step={1} value={batchForm.inferenceTimesteps} onChange={(event) => setBatchForm({ ...batchForm, inferenceTimesteps: Number(event.target.value) })} />
-                  </Field>
-                  <ToggleRow checked={batchForm.normalize} label="文本规范化" onChange={(checked) => setBatchForm({ ...batchForm, normalize: checked })} />
-                  <ToggleRow checked={batchForm.denoise} label="参考音频增强" onChange={(checked) => setBatchForm({ ...batchForm, denoise: checked })} />
+                <div className="batch-form-scroll" aria-label="批量生成参数">
+                  <div className="form-grid">
+                    <Field label="批量模式">
+                      <select value={batchForm.mode} onChange={(event) => setBatchForm({ ...batchForm, mode: event.target.value })}>
+                        <option>声音设计</option>
+                        <option>可控克隆</option>
+                        <option>极致克隆</option>
+                      </select>
+                    </Field>
+                    <Field label="LoRA">
+                      <select value={batchForm.selectedLora} onChange={(event) => setBatchForm({ ...batchForm, selectedLora: event.target.value })}>
+                        <option value="不使用 LoRA">不使用 LoRA</option>
+                        {loraItems.map((item) => (
+                          <option key={item.id} value={item.id}>{item.label}</option>
+                        ))}
+                      </select>
+                    </Field>
+                    <Field label="批量参考音频" full>
+                      <PathRow
+                        value={batchForm.referenceAudio}
+                        placeholder={BATCH_REFERENCE_AUDIO_PLACEHOLDER}
+                        onChange={(value) => setBatchForm({ ...batchForm, referenceAudio: value })}
+                        onPick={async () => {
+                          const selected = await choosePath("file", [{ name: "音频文件", extensions: ["wav", "mp3", "flac", "ogg"] }]);
+                          if (selected) {
+                            setBatchForm({ ...batchForm, referenceAudio: selected });
+                          }
+                        }}
+                      />
+                    </Field>
+                    <Field label="批量控制指令" full hidden={batchForm.mode === "极致克隆"}>
+                      <textarea value={batchForm.control} placeholder={BATCH_CONTROL_PLACEHOLDER} onChange={(event) => setBatchForm({ ...batchForm, control: event.target.value })} rows={3} />
+                    </Field>
+                    <Field label="批量参考文本" full hidden={batchForm.mode !== "极致克隆"}>
+                      <textarea value={batchForm.promptText} placeholder={BATCH_PROMPT_TEXT_PLACEHOLDER} onChange={(event) => setBatchForm({ ...batchForm, promptText: event.target.value })} rows={3} />
+                      <div className="inline-actions">
+                        <button type="button" className="ghost-button" onClick={() => handleRecognizePrompt("batch")}>识别参考文本</button>
+                      </div>
+                    </Field>
+                    <Field label="批量文本" full>
+                      <textarea aria-label="批量文本" value={batchForm.batchText} placeholder={BATCH_TEXT_PLACEHOLDER} onChange={(event) => setBatchForm({ ...batchForm, batchText: event.target.value })} rows={8} />
+                    </Field>
+                    <Field label="文本文件" full>
+                      <PathRow
+                        value={batchForm.batchFile}
+                        placeholder={BATCH_FILE_PLACEHOLDER}
+                        onChange={(value) => setBatchForm({ ...batchForm, batchFile: value })}
+                        onPick={async () => {
+                          const selected = await choosePath("file", [{ name: "文本文件", extensions: ["txt"] }]);
+                          if (selected) {
+                            setBatchForm({ ...batchForm, batchFile: selected });
+                          }
+                        }}
+                      />
+                    </Field>
+                    <Field label="输出前缀">
+                      <input value={batchForm.outputPrefix} placeholder={BATCH_OUTPUT_PREFIX_PLACEHOLDER} onChange={(event) => setBatchForm({ ...batchForm, outputPrefix: event.target.value })} />
+                    </Field>
+                    <Field label={`CFG 引导强度 ${batchForm.cfgValue.toFixed(1)}`}>
+                      <input type="range" min={1} max={3} step={0.1} value={batchForm.cfgValue} onChange={(event) => setBatchForm({ ...batchForm, cfgValue: Number(event.target.value) })} />
+                    </Field>
+                    <Field label={`推理步数 ${batchForm.inferenceTimesteps}`}>
+                      <input type="range" min={1} max={50} step={1} value={batchForm.inferenceTimesteps} onChange={(event) => setBatchForm({ ...batchForm, inferenceTimesteps: Number(event.target.value) })} />
+                    </Field>
+                    <ToggleRow checked={batchForm.normalize} label="文本规范化" onChange={(checked) => setBatchForm({ ...batchForm, normalize: checked })} />
+                    <ToggleRow checked={batchForm.denoise} label="参考音频增强" onChange={(checked) => setBatchForm({ ...batchForm, denoise: checked })} />
+                  </div>
                 </div>
-                <div className="action-row">
-                  <button type="button" className="primary-button" onClick={handleBatchGenerate} disabled={busy || !backendBaseUrl}>执行批量生成</button>
-                  <button type="button" className="ghost-button" onClick={() => batchArchivePath && window.voxcpmDesktop.showItemInFolder(batchArchivePath)} disabled={!batchArchivePath}>打开归档位置</button>
-                </div>
-                <p className="status-text">{batchStatus}</p>
+                <footer className="batch-actions">
+                  <div className="action-row">
+                    <button type="button" className="primary-button" onClick={handleBatchGenerate} disabled={busy || !backendBaseUrl}>执行批量生成</button>
+                    <button type="button" className="ghost-button" onClick={() => batchArchivePath && window.voxcpmDesktop.showItemInFolder(batchArchivePath)} disabled={!batchArchivePath}>打开归档位置</button>
+                  </div>
+                  <p className="status-text" role="status" aria-live="polite">{batchStatus}</p>
+                </footer>
               </section>
 
-              <section className="panel-card">
+              <section className="panel-card batch-result-card">
                 <div className="panel-head">
                   <div>
                     <p className="panel-kicker">批量结果</p>
@@ -1430,7 +1434,7 @@ function App() {
                   <input value={batchArchivePath} readOnly />
                 </Field>
                 <Field label="批量日志" full>
-                  <textarea value={batchLog} readOnly rows={16} />
+                  <textarea aria-label="批量日志" value={batchLog} readOnly rows={16} />
                 </Field>
               </section>
             </div>
