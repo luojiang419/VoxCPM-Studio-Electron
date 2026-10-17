@@ -5,6 +5,7 @@ import {
 } from "./production-types";
 import "./production-studio.css";
 import RoleAvatar from "./RoleAvatar";
+import RoleDeleteDialog from "./RoleDeleteDialog";
 import { getRoleAppearance, ROLE_APPEARANCES } from "./role-appearance";
 
 type Props = { backendBaseUrl: string; view?: StudioView; onNavigate?: (view: StudioView) => void; headerTools?: ReactNode };
@@ -33,8 +34,8 @@ const PATHS: Record<IconName, ReactNode> = {
 function Icon({ name, size = 17 }: { name: IconName; size?: number }) {
   return <svg width={size} height={size} viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.65" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true">{PATHS[name]}</svg>;
 }
-function IconButton({ icon, label, onClick, disabled, className = "" }: { icon: IconName; label: string; onClick: () => void; disabled?: boolean; className?: string }) {
-  return <button type="button" className={`ps-icon-button ${className}`} title={label} aria-label={label} onClick={onClick} disabled={disabled}><Icon name={icon} /></button>;
+function IconButton({ icon, label, onClick, disabled, className = "", title }: { icon: IconName; label: string; onClick: () => void; disabled?: boolean; className?: string; title?: string }) {
+  return <button type="button" className={`ps-icon-button ${className}`} title={title || label} aria-label={label} onClick={onClick} disabled={disabled}><Icon name={icon} /></button>;
 }
 const COLORS = ROLE_APPEARANCES.map(appearance => appearance.color);
 const COLOR_NAMES = ROLE_APPEARANCES.map(appearance => appearance.label);
@@ -88,6 +89,7 @@ export default function ProductionStudio({ backendBaseUrl, view = "editor", onNa
   const [history, setHistory] = useState<StudioHistory[]>([]);
   const [loras, setLoras] = useState<Array<{ id: string; label: string }>>([]);
   const [selectedRoleId, setSelectedRoleId] = useState("");
+  const [deleteRoleRequest, setDeleteRoleRequest] = useState<{ projectId: string; roleId: string } | null>(null);
   const [revision, setRevision] = useState(0);
   const revisionRef = useRef(0);
   const savedRevision = useRef(0);
@@ -119,6 +121,7 @@ export default function ProductionStudio({ backendBaseUrl, view = "editor", onNa
   const taskRunning = task?.status === "running" || task?.status === "queued";
   const locked = !!busy || taskRunning || loading;
   const selectedRole = project?.roles.find(role => role.id === selectedRoleId) || project?.roles[0];
+  const roleToDelete = project?.id === deleteRoleRequest?.projectId ? project?.roles.find(role => role.id === deleteRoleRequest?.roleId) : undefined;
   const completed = project?.segments.filter(ready).length || 0;
   const segments = project?.segments || [];
   const totalCharacters = segments.reduce((sum, item) => sum + item.text.length, 0);
@@ -289,6 +292,41 @@ export default function ProductionStudio({ backendBaseUrl, view = "editor", onNa
 
   function updateConfig(changes: Partial<GenerationConfig>) {
     if (selectedRole) updateRole({ config: { ...selectedRole.config, ...changes } }, true);
+  }
+
+  function removeRole(roleId: string, replacementId: string) {
+    const current = projectRef.current;
+    if (!current || locked || current.roles.length <= 1 || roleId === replacementId) return;
+    const removedRole = current.roles.find(role => role.id === roleId);
+    const replacement = current.roles.find(role => role.id === replacementId);
+    if (!removedRole || !replacement) return;
+    const affectedCount = current.segments.filter(segment => segment.roleId === roleId).length;
+    const configChanged = (Object.keys(DEFAULT_GENERATION_CONFIG) as Array<keyof GenerationConfig>).some(key => removedRole.config[key] !== replacement.config[key]);
+    const reassign = (segment: StudioSegment): StudioSegment => segment.roleId === roleId ? {
+      ...segment, roleId: replacementId, stale: !!segment.audioPath && (segment.stale || configChanged),
+      status: segment.audioPath ? segment.status : "pending", error: "",
+    } : segment;
+    updateProject(value => ({ ...value, roles: value.roles.filter(role => role.id !== roleId), segments: value.segments.map(reassign) }));
+    // 尚可撤销的台词也要指向有效角色，避免撤销后保存被后端拒绝。
+    setDeletedSegment(value => value ? { ...value, segment: reassign(value.segment) } : null);
+    setSelectedRoleId(value => value === roleId || !current.roles.some(role => role.id === value) ? replacementId : value);
+    setDeleteRoleRequest(null);
+    if (affectedCount) {
+      audioRef.current?.pause();
+      audioRef.current?.removeAttribute("src");
+      audioRef.current?.load();
+      setAudioName(""); setAudioTime(0); setAudioDuration(0);
+    }
+    setNotice(affectedCount ? `已删除「${removedRole.name}」，${affectedCount} 段台词已转给「${replacement.name}」。` : `已删除角色「${removedRole.name}」。`);
+  }
+
+  function requestRemoveRole(roleId: string) {
+    const current = projectRef.current;
+    if (!current || locked || current.roles.length <= 1) return;
+    const replacement = current.roles.find(role => role.id !== roleId);
+    if (!replacement || !current.roles.some(role => role.id === roleId)) return;
+    if (current.segments.some(segment => segment.roleId === roleId)) setDeleteRoleRequest({ projectId: current.id, roleId });
+    else removeRole(roleId, replacement.id);
   }
 
   function addSegment() {
@@ -470,7 +508,7 @@ export default function ProductionStudio({ backendBaseUrl, view = "editor", onNa
 
         <aside className="ps-inspector" aria-label="角色与声音设置">
           <div className="ps-inspector-heading"><h2>角色与声音</h2><span>VOICE DIRECTION</span></div>
-          <div className="ps-role-tabs">{project.roles.map(role => <button className={`ps-role-tab ${selectedRole?.id === role.id ? "active" : ""}`} key={role.id} style={roleStyle(role.color)} onClick={() => setSelectedRoleId(role.id)} disabled={locked}><RoleAvatar color={role.color} name={role.name} className="ps-role-tab-avatar" />{role.name}<span>{segments.filter(item => item.roleId === role.id).length}</span></button>)}<button className="ps-add-role" title="添加角色" aria-label="添加角色" disabled={locked} onClick={() => { const role: StudioRole = { id: uid(), name: `角色 ${project.roles.length + 1}`, color: COLORS[project.roles.length % COLORS.length], config: { ...DEFAULT_GENERATION_CONFIG }, volume: 1, pan: 0 }; updateProject(current => ({ ...current, roles: [...current.roles, role] })); setSelectedRoleId(role.id); }}><Icon name="plus" size={15} /></button></div>
+          <div className="ps-role-tabs">{project.roles.map(role => <div className={`ps-role-tab-group ${selectedRole?.id === role.id ? "active" : ""}`} key={role.id} style={roleStyle(role.color)}><button className={`ps-role-tab ${selectedRole?.id === role.id ? "active" : ""}`} onClick={() => setSelectedRoleId(role.id)} disabled={locked}><RoleAvatar color={role.color} name={role.name} className="ps-role-tab-avatar" />{role.name}<span>{segments.filter(item => item.roleId === role.id).length}</span></button><IconButton icon="trash" label={`删除角色 ${role.name}`} title={project.roles.length <= 1 ? "至少保留一个角色" : `删除角色 ${role.name}`} className="ps-delete-role" disabled={locked || project.roles.length <= 1} onClick={() => requestRemoveRole(role.id)} /></div>)}<button className="ps-add-role" title="添加角色" aria-label="添加角色" disabled={locked} onClick={() => { const role: StudioRole = { id: uid(), name: `角色 ${project.roles.length + 1}`, color: COLORS[project.roles.length % COLORS.length], config: { ...DEFAULT_GENERATION_CONFIG }, volume: 1, pan: 0 }; updateProject(current => ({ ...current, roles: [...current.roles, role] })); setSelectedRoleId(role.id); }}><Icon name="plus" size={15} /></button></div>
           {selectedRole && <div className="ps-inspector-body">
             <div className="ps-selected-role" style={roleStyle(selectedRole.color)}><div className="ps-role-avatar"><RoleAvatar color={selectedRole.color} name={selectedRole.name} /></div><div><label htmlFor="ps-role-name">当前角色</label><input id="ps-role-name" aria-label="角色名称" value={selectedRole.name} onChange={event => updateRole({ name: event.target.value })} disabled={locked} maxLength={32} /></div><select aria-label="角色颜色" className="ps-color-palette" value={warmRoleColor(selectedRole.color)} onChange={event => updateRole({ color: event.target.value })} disabled={locked}>{COLORS.map((color, index) => <option key={color} value={color}>{COLOR_NAMES[index]}</option>)}</select></div>
             <div className="ps-field"><label>生成模式</label><div className="ps-mode-switch">{(["声音设计", "可控克隆", "极致克隆"] as const).map(mode => <button key={mode} className={selectedRole.config.mode === mode ? "active" : ""} onClick={() => updateConfig({ mode })} disabled={locked}>{mode}</button>)}</div><p className="ps-hint">{selectedRole.config.mode === "声音设计" ? "用自然语言描述音色、情绪和表达方式。" : selectedRole.config.mode === "可控克隆" ? "以参考音色为基础，自由控制表达风格。" : "参考音频与逐字文本配合，还原声音特征。"}</p></div>
@@ -496,6 +534,11 @@ export default function ProductionStudio({ backendBaseUrl, view = "editor", onNa
     </>}
 
     <audio ref={audioRef} onPlay={() => setPlaying(true)} onPause={() => setPlaying(false)} onEnded={() => setPlaying(false)} onTimeUpdate={() => setAudioTime(audioRef.current?.currentTime || 0)} onLoadedMetadata={() => setAudioDuration(audioRef.current?.duration || 0)} onError={() => { if (audioRef.current?.src) { setPlaying(false); setError("无法读取试听音频，请检查文件或重新生成。"); } }} />
+    {roleToDelete && project && <RoleDeleteDialog key={`${project.id}:${roleToDelete.id}`} role={roleToDelete}
+      replacements={project.roles.filter(role => role.id !== roleToDelete.id)} segmentCount={segments.filter(segment => segment.roleId === roleToDelete.id).length}
+      locked={locked} onCancel={() => setDeleteRoleRequest(null)} onConfirm={replacementId => {
+        if (deleteRoleRequest?.projectId === projectRef.current?.id) removeRole(roleToDelete.id, replacementId);
+      }} />}
     {importOpen && <div className="ps-modal-backdrop" onClick={event => { if (event.target === event.currentTarget && !locked) setImportOpen(false); }}><section className="ps-import-modal" role="dialog" aria-modal="true" aria-labelledby="ps-import-title"><div className="ps-modal-heading"><div><span className="ps-eyebrow">SCRIPT IMPORT</span><h2 id="ps-import-title">让故事进入工作台</h2></div><IconButton icon="close" label="关闭导入" onClick={() => setImportOpen(false)} disabled={locked} /></div><p>识别 <code>{"{角色}台词"}</code>、<code>角色：台词</code> 与 SRT 字幕，自动分段并分配角色。</p><div className="ps-import-tools"><button className="ps-button ps-small" onClick={() => importRef.current?.click()} disabled={locked}><Icon name="folder" size={14} />选择 TXT / SRT 文件</button><select aria-label="文案格式" value={importFormat} onChange={event => setImportFormat(event.target.value as "auto" | "txt" | "srt")} disabled={locked}><option value="auto">自动识别格式</option><option value="txt">TXT 文本</option><option value="srt">SRT 字幕</option></select><input ref={importRef} type="file" accept=".txt,.srt,text/plain" hidden onChange={event => { const file = event.target.files?.[0]; if (!file) return; if (file.size > 5 * 1024 * 1024) { setError("文案文件过大，请使用 5 MB 以内的 TXT 或 SRT 文件。"); event.target.value = ""; return; } void readScriptFile(file).then(text => { setImportText(text.replace(/^\uFEFF/, "")); setImportFormat(file.name.toLowerCase().endsWith(".srt") ? "srt" : "txt"); }).catch(() => setError("读取文件失败，请使用 UTF-8 编码的文本文件。")); event.target.value = ""; }} /></div><textarea autoFocus aria-label="待导入文案" placeholder={"{旁白}故事，从一句话开始。\n{主角}你好，很高兴在这里遇见你。"} value={importText} onChange={event => setImportText(event.target.value)} disabled={locked} />{error && <div className="ps-modal-error" role="alert">{error}</div>}<div className="ps-import-footer"><span>{segments.length ? "导入将替换当前项目中的台词，请先确认文案。" : "长段落将自动整理为适合合成的短句。"}</span><button className="ps-button ps-primary" onClick={() => void parseScript(importText)} disabled={locked || !importText.trim()}><Icon name="spark" size={15} />{busy || "整理并导入"}</button></div></section></div>}
   </div>;
 }

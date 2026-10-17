@@ -140,6 +140,12 @@ body[data-theme="light"] .production-studio select { color-scheme: light; }
 .ps-role-tab > i { width: 5px; height: 5px; border-radius: 50%; background: var(--ps-role); }
 .ps-role-tab > span { color: var(--ps-soft); margin-left: 3px; font-size: 8px; }
 .production-studio .ps-role-tab.active { color: var(--ps-role); border-color: color-mix(in srgb, var(--ps-role) 32%, transparent); background: color-mix(in srgb, var(--ps-role) 7%, transparent); }
+.ps-role-tab-group { display: inline-flex; align-items: center; min-width: 0; max-width: 100%; border: 1px solid var(--ps-border-strong); border-radius: 5px; }
+.ps-role-tab-group.active { border-color: color-mix(in srgb, var(--ps-role) 32%, transparent); background: color-mix(in srgb, var(--ps-role) 7%, transparent); }
+.production-studio .ps-role-tab-group .ps-role-tab { min-width: 0; max-width: calc(100% - 25px); border: 0; background: transparent; overflow-wrap: anywhere; text-align: left; }
+.production-studio .ps-delete-role { width: 24px; height: 28px; margin-right: 2px; flex-shrink: 0; color: var(--ps-muted); }
+.production-studio .ps-delete-role svg { width: 13px; height: 13px; }
+.production-studio .ps-delete-role:not(:disabled):hover { color: var(--ps-danger); background: var(--ps-surface-raised); }
 .production-studio .ps-add-role { display: flex; align-items: center; justify-content: center; width: 28px; height: 28px; padding: 0; border: 1px dashed var(--ps-border-strong); background: transparent; border-radius: 5px; color: var(--ps-muted); }
 .ps-inspector-body { display: flex; flex-direction: column; gap: 20px; min-height: 0; flex: 1; overflow-y: auto; overscroll-behavior: contain; padding: 0 10px 20px 0; }
 .ps-inspector-body > * { flex-shrink: 0; }
@@ -253,6 +259,15 @@ body[data-theme="light"] .production-studio select { color-scheme: light; }
 .production-studio .ps-export-ready > button:not(.ps-icon-button) { background: transparent; padding: 0; border: none; color: var(--ps-muted); font-size: 10px; }
 .production-studio .ps-export-ready > button:not(:disabled):hover { color: var(--ps-text); }
 .ps-modal-backdrop { position: fixed; inset: 0; z-index: 90; display: grid; place-items: center; padding: 30px; background: #0009; backdrop-filter: blur(6px); }
+.ps-role-delete-dialog { width: min(440px, calc(100vw - 40px)); max-height: calc(100dvh - 40px); overflow: auto; padding: 24px; border: 1px solid var(--ps-border-strong); border-radius: 12px; background: var(--ps-surface); color: var(--ps-text); box-shadow: 0 20px 70px #0003; }
+.ps-role-delete-dialog::backdrop { background: #0007; backdrop-filter: blur(3px); }
+.production-studio .ps-role-delete-dialog h2 { font-size: 18px; font-weight: 550; overflow-wrap: anywhere; }
+.production-studio .ps-role-delete-dialog p { margin: 14px 0 20px; color: var(--ps-muted); font-size: 12px; line-height: 1.8; }
+.ps-role-delete-dialog label { display: block; margin-bottom: 8px; font-size: 12px; }
+.production-studio .ps-role-delete-dialog select { width: 100%; }
+.ps-role-delete-actions { display: flex; justify-content: flex-end; gap: 10px; margin-top: 24px; }
+.production-studio .ps-role-delete-dialog .ps-button.ps-delete-role-confirm { color: var(--ps-danger); border-color: var(--ps-danger); }
+.production-studio .ps-role-delete-dialog .ps-button.ps-delete-role-confirm:not(:disabled):hover { background: color-mix(in srgb, var(--ps-danger) 8%, var(--ps-surface)); color: var(--ps-danger); border-color: var(--ps-danger); }
 .ps-import-modal { width: min(750px, 100%); max-height: 85vh; overflow: auto; border: 1px solid var(--ps-border-strong); background: var(--ps-surface); border-radius: 13px; padding: 27px; box-shadow: 0 24px 100px #0005; }
 .ps-modal-heading { display: flex; align-items: center; justify-content: space-between; }
 .production-studio .ps-modal-heading h2 { font-size: 22px; font-weight: 500; margin-top: 7px; }
