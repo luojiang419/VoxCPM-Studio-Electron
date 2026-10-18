@@ -44,6 +44,9 @@
       "runtime-service.js",
       "runtime-config.json",
       "runtime-requirements.txt",
+      "install-protocol.js",
+      "app.ico",
+      "app-icon.png",
       "package.json"
     ],
     "win": {

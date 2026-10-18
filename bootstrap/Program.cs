@@ -212,13 +212,28 @@ namespace VoxBootstrap {
 
     public sealed class Launcher : Form {
         readonly SoftButton run = new SoftButton { Primary = true }, pause = new SoftButton(), close = new SoftButton(), minimize = new SoftButton();
+        readonly SoftButton browse = new SoftButton(), detect = new SoftButton();
+        readonly Func<string> rootDetector;
+        readonly Func<InstallDrive[]> driveSurvey;
+        readonly DiskStrip diskPanel;
+        readonly ToolTip driveTips = new ToolTip();
+        InstallDrive[] drives = new InstallDrive[0];
+        Bitmap diskIcon;
+        readonly TextBox installPath = new TextBox();
+        readonly CheckBox desktopShortcut = new CheckBox(), startMenuShortcut = new CheckBox();
+        Bitmap brandMark;
         readonly Manifest manifest;
         readonly bool preview, dark;
-        readonly System.Windows.Forms.Timer animation = new System.Windows.Forms.Timer { Interval = 70 };
+        readonly System.Windows.Forms.Timer animation = new System.Windows.Forms.Timer { Interval = 16 };
+        readonly Stopwatch animationClock = new Stopwatch();
+        double demoStart;
         CancellationTokenSource cancellation;
-        string view = "idle", statusTitle = "一切准备，交给我们。", statusDetail = "点击运行，自动从魔搭准备桌面环境。";
+        string view = "idle", statusTitle = "一切准备，交给我们。", statusDetail = "选好位置后开始，自动补齐应用、依赖和模型。";
         double fraction, pulse;
         long downloaded, total;
+        int installPhase;
+        string completedRoot;
+        bool destinationBlocked;
         public static GraphicsPath Round(RectangleF r, float radius) {
             var p = new GraphicsPath(); float d = Math.Min(radius * 2, Math.Min(r.Width, r.Height));
             p.AddArc(r.X, r.Y, d, d, 180, 90); p.AddArc(r.Right - d, r.Y, d, d, 270, 90);
@@ -232,31 +247,113 @@ namespace VoxBootstrap {
         Color Ink { get { return dark ? Color.FromArgb(235, 233, 225) : Color.FromArgb(40, 43, 39); } }
         Color Muted { get { return dark ? Color.FromArgb(158, 161, 150) : Color.FromArgb(124, 128, 116); } }
         Color Accent { get { return dark ? Color.FromArgb(218, 166, 121) : Color.FromArgb(181, 123, 83); } }
-        public Launcher(Manifest value, bool demonstration = false, bool? darkMode = null) {
+        public Launcher(Manifest value, bool demonstration = false, bool? darkMode = null, Func<string> detectRoot = null, Func<InstallDrive[]> survey = null) {
             manifest = value; preview = demonstration; dark = darkMode ?? SystemDark();
-            Text = "VoxCPM Studio" + (preview ? " · 界面演示" : " 启动器"); ClientSize = new Size(720, 540);
+            diskPanel=new DiskStrip(dark) { Name="local-disks", TabIndex=0 };
+            rootDetector = detectRoot ?? (() => Installer.DefaultRoot(!preview));
+            driveSurvey = survey ?? Installer.SurveyDrives;
+            Text = "VoxCPM Studio" + (preview ? " · 安装演示" : " 安装程序"); ClientSize = new Size(720, 830);
             AutoScaleMode = AutoScaleMode.None; Font = new Font("Microsoft YaHei UI", 10); BackColor = Paper;
             StartPosition = FormStartPosition.CenterScreen; FormBorderStyle = FormBorderStyle.None; DoubleBuffered = true;
             AccessibleName = "VoxCPM Studio 启动器"; MaximizeBox = false;
-            run.Text = "运行  →"; run.AccessibleName = "运行并准备工作台"; run.TabIndex = 0;
+            run.Text = "安装并运行  →"; run.AccessibleName = "安装并准备工作台"; run.TabIndex = 3;
             pause.Text = "暂停"; pause.AccessibleName = "暂停准备"; pause.Visible = false; pause.TabIndex = 1;
             close.Text = "×"; close.AccessibleName = "关闭启动器"; close.TabIndex = 3;
             minimize.Text = "−"; minimize.AccessibleName = "最小化"; minimize.TabIndex = 2;
-            foreach (var button in new[] { run, pause, close, minimize }) { button.Dark = dark; button.BackColor = Paper; Controls.Add(button); }
-            run.Click += async (sender, args) => { if (preview) StartDemo(); else await Start(); };
+            foreach (var button in new[] { run, pause, close, minimize, browse, detect }) { button.Dark = dark; button.BackColor = Paper; Controls.Add(button); }
+            run.Name = "install"; detect.Name = "detect"; installPath.Name = "destination";
+            installPath.BorderStyle = BorderStyle.None; installPath.BackColor = Paper; installPath.ForeColor = Ink;
+            installPath.AccessibleName = "安装目录"; installPath.TabIndex = 0;
+            browse.Text = "更改"; browse.AccessibleName = "选择安装目录"; browse.TabIndex = 1;
+            detect.Text = "重新检测"; detect.AccessibleName = "重新检测分区空间和权限"; detect.TabIndex = 4;
+            detect.Click += (sender, args) => DetectDestination();
+            installPath.TextChanged += (sender, args) => {
+                if (cancellation != null || completedRoot != null) return;
+                if (!String.IsNullOrWhiteSpace(installPath.Text)) { destinationBlocked = false; SetPreview("idle", 0); }
+                run.Enabled = !String.IsNullOrWhiteSpace(installPath.Text);
+                SyncDriveSelection();
+            };
+            desktopShortcut.Text = "创建桌面快捷方式"; desktopShortcut.Checked = true; desktopShortcut.AutoSize = true; desktopShortcut.ForeColor = Muted; desktopShortcut.BackColor = Paper; desktopShortcut.TabIndex = 2;
+            startMenuShortcut.Text = "添加到开始菜单"; startMenuShortcut.Checked = true; startMenuShortcut.AutoSize = true; startMenuShortcut.ForeColor = Muted; startMenuShortcut.BackColor = Paper; startMenuShortcut.TabIndex = 2;
+            Controls.AddRange(new Control[] { installPath, desktopShortcut, startMenuShortcut });
+            diskPanel.BackColor = Paper; Controls.Add(diskPanel);
+            browse.Click += (sender, args) => {
+                using (var picker = new FolderBrowserDialog { Description = "选择安装位置，将在其中创建专用 VoxCPMStudio 文件夹", ShowNewFolderButton = true }) {
+                    if (Directory.Exists(installPath.Text)) picker.SelectedPath = installPath.Text;
+                    if (picker.ShowDialog(this) == DialogResult.OK) installPath.Text = Path.GetFileName(picker.SelectedPath).Equals("VoxCPMStudio", StringComparison.OrdinalIgnoreCase) ? picker.SelectedPath : Path.Combine(picker.SelectedPath, "VoxCPMStudio");
+                }
+            };
+            try {
+                using (var stream = Assembly.GetExecutingAssembly().GetManifestResourceStream("app-mark.png")) if (stream != null) using (var image = Image.FromStream(stream)) brandMark = new Bitmap(image);
+                using (var stream = Assembly.GetExecutingAssembly().GetManifestResourceStream("installer.ico")) if (stream != null) Icon = new Icon(stream);
+                using (var stream = Assembly.GetExecutingAssembly().GetManifestResourceStream("disk-local.png")) if (stream != null) using (var image = Image.FromStream(stream)) diskIcon = new Bitmap(image);
+            } catch { }
+            run.Click += async (sender, args) => {
+                if (preview) StartDemo();
+                else if (completedRoot != null) { OpenWorkspace(completedRoot); Close(); }
+                else await Start();
+            };
             pause.Click += (sender, args) => { if (preview) SetPreview("paused", fraction); else if (cancellation != null) cancellation.Cancel(); };
             close.Click += (sender, args) => Close(); minimize.Click += (sender, args) => WindowState = FormWindowState.Minimized;
             AcceptButton = run; CancelButton = pause;
             animation.Tick += (sender, args) => {
-                pulse += .075;
+                double time = animationClock.Elapsed.TotalSeconds;
+                double phase = (time % 2.8) / 1.4; pulse = BezierMotion.Ease(phase < 1 ? phase : 2-phase);
                 if (preview && view == "downloading") {
-                    fraction = Math.Min(1, fraction + .009); downloaded = (long)(fraction * 111063687); total = 111063687;
-                    if (fraction >= 1) SetPreview("ready", 1);
+                    fraction = demoStart + (1-demoStart)*BezierMotion.Ease(time / 8); downloaded = (long)(fraction * 111063687); total = 111063687;
+                    installPhase = fraction > .55 ? 1 : 0;
+                    if (time >= 8) SetPreview("ready", 1);
                 }
                 Invalidate();
             };
             FormClosing += (sender, args) => { animation.Stop(); if (cancellation != null) cancellation.Cancel(); };
-            Resize += (sender, args) => LayoutButtons(); LayoutButtons();
+            Resize += (sender, args) => LayoutButtons(); LayoutButtons(); DetectDestination();
+        }
+        void DetectDestination() {
+            drives = driveSurvey();
+            try { installPath.Text = rootDetector(); destinationBlocked = false; SetPreview("idle", 0); }
+            catch (Exception error) {
+                installPath.Clear(); destinationBlocked = true; view = "error"; fraction = 0; total = 0;
+                string[] lines = error.Message.Split(new[] { '\n' }, 2);
+                statusTitle = lines[0]; statusDetail = lines.Length > 1 ? lines[1] : "请调整安装位置或分区条件后重新检测。";
+                run.Enabled = false; pause.Visible = false; animation.Stop();
+                AccessibleDescription = error.Message; Invalidate();
+            }
+            BuildDriveCards();
+        }
+        void BuildDriveCards() {
+            diskPanel.SuspendLayout();
+            while (diskPanel.Controls.Count > 0) { var old = diskPanel.Controls[0]; diskPanel.Controls.RemoveAt(0); old.Dispose(); }
+            int width = drives.Length > 4 ? 150 : (636 - Math.Max(0, drives.Length-1)*12) / Math.Max(1, drives.Length);
+            foreach (var drive in drives) {
+                string problem = Installer.DriveProblem(drive, drives);
+                bool current = false;
+                try { current = !String.IsNullOrWhiteSpace(installPath.Text) && String.Equals(Path.GetPathRoot(installPath.Text), drive.root, StringComparison.OrdinalIgnoreCase) && File.Exists(Path.Combine(installPath.Text, Installer.Marker)) && Installer.ReadState(installPath.Text).state != "uninstalled"; } catch { }
+                string space = drive.ready ? (drive.free / 1073741824.0).ToString("0.#") + " GiB 可用" : "暂不可用";
+                string detail = current ? "继续安装 · " + space : problem == null ? space : !drive.ready ? "暂不可用" : drive.root.StartsWith("C:", StringComparison.OrdinalIgnoreCase) && drives.Length > 1 ? "系统盘 · 优先其他分区" : "空间不足 · " + space;
+                string resumableRoot = current ? installPath.Text : null;
+                var card = new DiskCard(drive, diskIcon, dark, detail) { Size = new Size(width,132), Margin = new Padding(0,0,drive == drives.Last() ? 0 : 12,0), Enabled = current || problem == null };
+                driveTips.SetToolTip(card, drive.root + "\n" + space + "\n" + (current ? "继续当前安装" : problem ?? "点击选择，应用将安装到专用 VoxCPMStudio 文件夹"));
+                card.Click += (sender, args) => {
+                    try {
+                        installPath.Text = resumableRoot ?? Installer.RootOnDrive(card.Drive, drives, !preview);
+                        destinationBlocked = false; SetPreview("idle",0); SyncDriveSelection();
+                    } catch (Exception error) {
+                        view = "error"; statusTitle = "这个磁盘暂时无法安装。"; statusDetail = error.Message;
+                        AccessibleDescription = statusTitle + statusDetail; Invalidate();
+                    }
+                };
+                diskPanel.Controls.Add(card);
+            }
+            diskPanel.ResumeLayout(); SyncDriveSelection();
+        }
+        void SyncDriveSelection() {
+            string root = null;
+            try { if (!String.IsNullOrWhiteSpace(installPath.Text)) root = Path.GetPathRoot(Path.GetFullPath(installPath.Text)); } catch { }
+            foreach (DiskCard card in diskPanel.Controls) {
+                bool selected = String.Equals(root,card.Drive.root,StringComparison.OrdinalIgnoreCase);
+                if (card.Selected != selected) card.SetSelected(selected);
+            }
         }
         protected override CreateParams CreateParams { get { var p = base.CreateParams; p.ClassStyle |= 0x20000; return p; } }
         [System.Runtime.InteropServices.DllImport("user32.dll")] static extern bool ReleaseCapture();
@@ -266,9 +363,15 @@ namespace VoxBootstrap {
             if (e.Button == MouseButtons.Left && e.Y < Height * .16 && e.X < Width * .82) { ReleaseCapture(); SendMessage(Handle, 0xA1, new IntPtr(2), IntPtr.Zero); }
         }
         void LayoutButtons() {
-            float sx = ClientSize.Width / 720f, sy = ClientSize.Height / 540f;
-            run.SetBounds((int)(510 * sx), (int)(472 * sy), (int)(168 * sx), (int)(46 * sy));
-            pause.SetBounds((int)(404 * sx), (int)(472 * sy), (int)(92 * sx), (int)(46 * sy));
+            float sx = ClientSize.Width / 720f, sy = ClientSize.Height / 830f;
+            run.SetBounds((int)(498 * sx), (int)(764 * sy), (int)(180 * sx), (int)(46 * sy));
+            pause.SetBounds((int)(392 * sx), (int)(764 * sy), (int)(92 * sx), (int)(46 * sy));
+            detect.SetBounds((int)(44 * sx), (int)(764 * sy), (int)(120 * sx), (int)(46 * sy));
+            diskPanel.SetBounds((int)(42*sx),(int)(262*sy),(int)(636*sx),(int)(150*sy));
+            installPath.SetBounds((int)(59 * sx), (int)(444 * sy), (int)(507 * sx), (int)(23 * sy));
+            browse.SetBounds((int)(588 * sx), (int)(436 * sy), (int)(80 * sx), (int)(35 * sy));
+            desktopShortcut.SetBounds((int)(44 * sx), (int)(490 * sy), (int)(220 * sx), (int)(25 * sy));
+            startMenuShortcut.SetBounds((int)(266 * sx), (int)(490 * sy), (int)(205 * sx), (int)(25 * sy));
             close.SetBounds((int)(666 * sx), (int)(27 * sy), (int)(28 * sx), (int)(28 * sy));
             minimize.SetBounds((int)(630 * sx), (int)(27 * sy), (int)(28 * sx), (int)(28 * sy));
             using (var shape = Round(new RectangleF(0, 0, ClientSize.Width, ClientSize.Height), 22)) { var old = Region; Region = new Region(shape); if (old != null) old.Dispose(); }
@@ -281,87 +384,119 @@ namespace VoxBootstrap {
         protected override void OnPaint(PaintEventArgs e) {
             base.OnPaint(e); var g = e.Graphics; g.SmoothingMode = SmoothingMode.AntiAlias;
             g.TextRenderingHint = System.Drawing.Text.TextRenderingHint.AntiAliasGridFit;
-            g.ScaleTransform(ClientSize.Width / 720f, ClientSize.Height / 540f);
-            using (var shape = Round(new RectangleF(0.5f, .5f, 719, 539), 22)) using (var border = new Pen(dark ? Color.FromArgb(58, 61, 55) : Color.FromArgb(224, 225, 216))) g.DrawPath(border, shape);
-            using (var shape = Round(new RectangleF(42, 34, 38, 38), 12)) using (var brush = new SolidBrush(Ink)) g.FillPath(brush, shape);
-            TextAt(g, "V", 26, Paper, 49, 36, 30, true);
-            using (var brush = new SolidBrush(Accent)) g.FillEllipse(brush, 69, 41, 5, 5);
+            g.ScaleTransform(ClientSize.Width / 720f, ClientSize.Height / 830f);
+            using (var shape = Round(new RectangleF(0.5f, .5f, 719, 829), 22)) using (var border = new Pen(dark ? Color.FromArgb(58, 61, 55) : Color.FromArgb(224, 225, 216))) g.DrawPath(border, shape);
+            if (brandMark != null) g.DrawImage(brandMark, new Rectangle(36, 28, 50, 50));
+            else TextAt(g, "V", 28, Accent, 48, 36, 32, true);
             TextAt(g, "VOXCPM", 14, Ink, 92, 35, 160, true); TextAt(g, "STUDIO", 10, Muted, 93, 57, 140);
             TextAt(g, "本地 AI 配音工作台", 11, Muted, 475, 43, 150);
             TextAt(g, "好声音，从这里开始。", 31, Ink, 40, 133, 420);
-            TextAt(g, "让灵感发声，让准备更简单。", 14, Muted, 43, 183, 400);
+            TextAt(g, "选择安装位置，剩下的交给我们。", 14, Muted, 43, 183, 400);
             // 波形用向量绘制，不携带图片或网页运行时。
             using (var pen = new Pen(dark ? Color.FromArgb(48, 52, 46) : Color.FromArgb(234, 232, 221), 1)) { g.DrawEllipse(pen, 470, 109, 150, 150); g.DrawEllipse(pen, 493, 132, 104, 104); }
             for (int i = 0; i < 37; i++) {
                 double envelope = Math.Pow(Math.Sin((i + 1) * Math.PI / 38), 1.8);
-                float h = (float)(8 + envelope * (20 + 42 * Math.Abs(Math.Sin(i * .69 + ((view == "working" || view == "downloading") ? pulse : 0)))));
+                float h = (float)(8 + envelope * (20 + 42 * Math.Abs(Math.Sin(i * .69)) * ((view == "working" || view == "downloading") ? .6 + pulse*.4 : 1)));
                 float x = 444 + i * 5.7f;
                 using (var pen = new Pen(i > 14 && i < 24 ? Accent : (dark ? Color.FromArgb(115, 120, 108) : Color.FromArgb(181, 186, 171)), 2.8f)) { pen.StartCap = LineCap.Round; pen.EndCap = LineCap.Round; g.DrawLine(pen, x, 184 - h / 2, x, 184 + h / 2); }
             }
+            TextAt(g, "安装位置", 12, Muted, 43, 240, 130);
+            TextAt(g, "非 C 盘优先 · 至少 25 GiB", 11, Muted, 480, 242, 210);
+            TextAt(g, "安装到专用应用文件夹", 11, Muted, 44, 411, 400);
+            using (var shape = Round(new RectangleF(42, 430, 636, 48), 12)) using (var pen = new Pen(dark ? Color.FromArgb(65, 70, 60) : Color.FromArgb(218, 222, 209))) g.DrawPath(pen, shape);
+            g.TranslateTransform(0, 280);
             using (var shape = Round(new RectangleF(42, 268, 636, 128), 18)) using (var brush = new SolidBrush(dark ? Color.FromArgb(38, 41, 36) : Color.FromArgb(242, 242, 235))) g.FillPath(brush, shape);
             TextAt(g, statusTitle, 16, Ink, 62, 289, 455, true);
-            string amount = total > 0 ? Math.Round(fraction * 100) + "%" : (view == "idle" ? "等待开始" : view == "ready" ? "已就绪" : view == "paused" ? "已暂停" : "准备中");
+            string amount = destinationBlocked ? "需处理" : total > 0 ? Math.Round(fraction * 100) + "%" : (view == "idle" ? "等待开始" : view == "ready" ? "已就绪" : view == "paused" ? "已暂停" : "准备中");
             TextAt(g, amount, 12, Muted, 596, 292, 70);
+            if (destinationBlocked || view == "error") {
+                using (var font = new Font("Microsoft YaHei UI", 12, GraphicsUnit.Pixel))
+                using (var brush = new SolidBrush(Muted)) g.DrawString(statusDetail, font, brush, new RectangleF(63, 321, 590, 69));
+            } else {
             TextAt(g, statusDetail, 12, Muted, 63, 321, 590);
             using (var shape = Round(new RectangleF(63, 361, 594, 5), 2.5f)) using (var brush = new SolidBrush(dark ? Color.FromArgb(61, 66, 55) : Color.FromArgb(223, 226, 213))) g.FillPath(brush, shape);
             float filled = (float)(594 * fraction);
             if (filled > 2) using (var shape = Round(new RectangleF(63, 361, filled, 5), 2.5f)) using (var brush = new SolidBrush(Accent)) g.FillPath(brush, shape);
-            if (total == 0 && view == "working") using (var brush = new SolidBrush(Accent)) g.FillRectangle(brush, 63 + (float)((Math.Sin(pulse) + 1) * 232), 361, 130, 5);
+            if (total == 0 && view == "working") using (var brush = new SolidBrush(Accent)) g.FillRectangle(brush, 63 + (float)(pulse * 464), 361, 130, 5);
             TextAt(g, total > 0 ? String.Format("{0:F1} MB / {1:F1} MB", downloaded / 1048576.0, total / 1048576.0) : "首次联网准备 · 已有资源自动复用", 10, Muted, 63, 376, 570);
-            string[] steps = { "桌面环境", "进入工作台", "准备模型" };
+            }
+            string[] steps = { "安装应用", "准备环境", "完成安装" };
             for (int i = 0; i < 3; i++) {
-                int x = 44 + i * 211; bool active = view == "ready" ? i == 1 : i == 0;
+                int x = 44 + i * 211; bool active = i == installPhase;
                 using (var brush = new SolidBrush(active ? Accent : (dark ? Color.FromArgb(58, 62, 53) : Color.FromArgb(232, 234, 225)))) g.FillEllipse(brush, x, 422, 20, 20);
-                TextAt(g, i == 0 && view == "ready" ? "✓" : (i + 1).ToString(), 10, active ? Paper : Muted, x + 5, 425, 20);
+                TextAt(g, i < installPhase ? "✓" : (i + 1).ToString(), 10, active ? Paper : Muted, x + 5, 425, 20);
                 TextAt(g, steps[i], 11, active ? Ink : Muted, x + 29, 424, 125);
                 if (i < 2) using (var pen = new Pen(dark ? Color.FromArgb(55, 60, 49) : Color.FromArgb(226, 229, 217))) g.DrawLine(pen, x + 126, 432, x + 190, 432);
             }
-            using (var brush = new SolidBrush(Accent)) g.FillEllipse(brush, 44, 486, 5, 5);
-            TextAt(g, preview ? "界面演示 · 不会下载或安装文件" : "魔搭直连 · 下载可暂停，文件会保留", 11, Muted, 56, 480, 345);
+            using (var brush = new SolidBrush(Accent)) g.FillEllipse(brush, 44, 455, 5, 5);
+            TextAt(g, preview ? "安装演示 · 不会下载或修改系统" : "当前用户安装 · 无需管理员权限", 11, Muted, 56, 449, 325);
         }
         public void SetPreview(string state, double value) {
             view = state; fraction = Math.Max(0, Math.Min(1, value)); downloaded = (long)(fraction * 111063687); total = state == "idle" ? 0 : 111063687;
-            if (state == "idle") { statusTitle = "一切准备，交给我们。"; statusDetail = "点击运行，自动从魔搭准备桌面环境。"; run.Text = "运行  →"; }
+            if (state == "idle") { installPhase = 0; statusTitle = "一切准备，交给我们。"; statusDetail = "选好位置后开始，自动补齐应用、依赖和模型。"; run.Text = "安装并运行  →"; }
             else if (state == "paused") { statusTitle = "稍作停留，进度还在。"; statusDetail = "已保留下载内容，随时可以继续。"; run.Text = "继续准备  →"; }
-            else if (state == "ready") { statusTitle = "桌面已准备好。"; statusDetail = "接下来进入工作台，继续准备模型与依赖。"; run.Text = preview ? "重新演示  ↻" : "即将打开  →"; }
+            else if (state == "ready") { installPhase = 2; statusTitle = "安装完成，开始创作。"; statusDetail = "已准备运行环境，并按你的选择创建快捷方式。"; run.Text = preview ? "重新演示  ↻" : "开始创作  →"; }
             else { statusTitle = "正在准备你的创作空间。"; statusDetail = "从魔搭补齐桌面环境，完成后自动打开工作台。"; run.Text = "正在准备…"; }
             run.Enabled = state != "downloading" && state != "working"; pause.Visible = state == "downloading" || state == "working";
-            if (state == "downloading" || state == "working") animation.Start(); else animation.Stop();
+            if (state == "downloading" || state == "working") { animationClock.Restart(); animation.Start(); } else { animation.Stop(); animationClock.Stop(); }
             AccessibleDescription = statusTitle + statusDetail; Invalidate();
         }
-        void StartDemo() { if (view == "ready") fraction = 0; SetPreview("downloading", fraction); }
+        void StartDemo() { if (view == "ready") fraction = 0; demoStart = fraction; installPhase = fraction > .55 ? 1 : 0; SetPreview("downloading", fraction); }
+        static void OpenWorkspace(string root) {
+            var start = new ProcessStartInfo(Path.Combine(root, "VoxCPM Studio.exe"), "--voxcpm-run --voxcpm-show") { WorkingDirectory = root, UseShellExecute = false };
+            start.EnvironmentVariables.Remove("ELECTRON_RUN_AS_NODE"); start.EnvironmentVariables["VOXCPM_DATA_ROOT"] = Path.Combine(root, "data"); Process.Start(start);
+        }
         async Task Start() {
             SetPreview("working", fraction); total = 0; cancellation = new CancellationTokenSource();
-            string root = Path.Combine(AppDomain.CurrentDomain.BaseDirectory, "VoxCPMStudio");
+            string root = installPath.Text.Trim(); Process child = null; FileStream lease = null; bool complete = false, owned = false;
+            installPath.Enabled = browse.Enabled = detect.Enabled = diskPanel.Enabled = desktopShortcut.Enabled = startMenuShortcut.Enabled = false;
             var reporter = new Progress<Status>(status => {
                 if (IsDisposed) return;
-                statusTitle = status.text; statusDetail = "完成后自动打开工作台，继续准备模型与依赖。";
+                statusTitle = status.text; statusDetail = installPhase == 0 ? "正在安装应用，下载内容会自动保存。" : "正在补齐依赖和模型，完成后自动登记安装。";
                 downloaded = status.done; total = status.total;
                 if (total > 0) fraction = Math.Max(0, Math.Min(1, (double)downloaded / total));
                 AccessibleDescription = statusTitle; Invalidate();
             });
             try {
-                string executable = await Task.Run(() => Core.Prepare(root, manifest, cancellation.Token, reporter));
-                SetPreview("ready", 1); run.Enabled = false; await Task.Delay(350, cancellation.Token);
+                root = Installer.Canonical(root); installPath.Text = root;
+                Installer.ValidateDestinationCapacity(root);
+                lease = Installer.AcquireRoot(root);
+                Installer.Begin(root, manifest, lockHeld: true);
+                owned = true;
+                await Task.Run(() => Core.Prepare(root, manifest, cancellation.Token, reporter));
+                string uninstaller = Path.Combine(root, "uninstall.exe");
+                if (!Installer.SamePath(Assembly.GetExecutingAssembly().Location, uninstaller)) File.Copy(Assembly.GetExecutingAssembly().Location, uninstaller, true);
+                Installer.ExtractResource("app.ico", Path.Combine(root, "voxcpm.ico"));
+                Installer.ExtractResource("installer.ico", Path.Combine(root, "voxcpm-installer.ico"));
+                installPhase = 1; fraction = 0; total = 0; Invalidate();
+                string session = Guid.NewGuid().ToString("N"), report = Path.Combine(root, "data", "cache", "install", session + ".json");
+                Directory.CreateDirectory(Path.GetDirectoryName(report));
+                child = Installer.StartPreparation(root, report, session);
+                await Installer.WaitForReady(root, report, session, child, cancellation.Token, reporter);
+                Installer.Complete(root, manifest, desktopShortcut.Checked, startMenuShortcut.Checked, readyReport: report, session: session);
+                complete = true; completedRoot = root; SetPreview("ready", 1); run.Enabled = false; await Task.Delay(350, cancellation.Token);
                 cancellation.Token.ThrowIfCancellationRequested();
-                var start = new ProcessStartInfo(executable, "--voxcpm-run") { WorkingDirectory = root, UseShellExecute = false };
-                start.EnvironmentVariables.Remove("ELECTRON_RUN_AS_NODE"); Process.Start(start); Close();
+                OpenWorkspace(root); Close();
             } catch (OperationCanceledException) { if (!IsDisposed) SetPreview("paused", fraction); }
             catch (Exception error) {
                 if (!IsDisposed) { view = "error"; statusTitle = "暂时未能完成准备。"; statusDetail = error.Message; animation.Stop(); run.Text = "重试  →"; Invalidate(); }
-                try { Directory.CreateDirectory(root); File.AppendAllText(Path.Combine(root, "bootstrap.log"), DateTimeOffset.Now + " " + error + Environment.NewLine); } catch { }
+                if (owned) try { File.AppendAllText(Path.Combine(root, "bootstrap.log"), DateTimeOffset.Now + " " + error + Environment.NewLine); } catch { }
             } finally {
+                if (!complete) Installer.StopChild(child);
+                if (child != null) child.Dispose();
+                if (lease != null) lease.Dispose();
                 cancellation.Dispose(); cancellation = null;
-                if (!IsDisposed) { run.Enabled = true; pause.Visible = false; }
+                if (!IsDisposed) { run.Enabled = !String.IsNullOrWhiteSpace(installPath.Text); pause.Visible = false; installPath.Enabled = browse.Enabled = detect.Enabled = diskPanel.Enabled = desktopShortcut.Enabled = startMenuShortcut.Enabled = !complete; }
             }
         }
-        protected override void Dispose(bool disposing) { if (disposing) animation.Dispose(); base.Dispose(disposing); }
+        protected override void Dispose(bool disposing) { if (disposing) { animation.Dispose(); driveTips.Dispose(); if (brandMark != null) brandMark.Dispose(); if (diskIcon != null) diskIcon.Dispose(); } base.Dispose(disposing); }
     }
     public static class Program {
         [STAThread] public static void Main(string[] args) {
             ServicePointManager.SecurityProtocol = SecurityProtocolType.Tls12;
             Application.EnableVisualStyles(); Application.SetCompatibleTextRenderingDefault(false);
             try {
+                if (Installer.RouteUninstall(args)) return;
                 Manifest manifest;
                 using (var stream = Assembly.GetExecutingAssembly().GetManifestResourceStream("bootstrap-manifest.json"))
                 using (var reader = new StreamReader(stream)) manifest = new JavaScriptSerializer().Deserialize<Manifest>(reader.ReadToEnd());

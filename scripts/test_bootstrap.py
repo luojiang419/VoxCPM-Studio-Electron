@@ -7,7 +7,7 @@ ROOT = Path(__file__).resolve().parents[1]
 executable = ROOT / "builds/modelscope-distribution/BootstrapTests.exe"
 compiler = "C:/Windows/Microsoft.NET/Framework64/v4.0.30319/csc.exe"
 subprocess.run([compiler, "/nologo", "/target:exe", "/main:BootstrapTests", "/out:" + str(executable),
-                "/reference:System.Windows.Forms.dll", "/reference:System.Drawing.dll", "/reference:System.Web.Extensions.dll",
+                "/reference:System.Windows.Forms.dll", "/reference:System.Drawing.dll", "/reference:Accessibility.dll", "/reference:System.Web.Extensions.dll",
                 "/reference:System.IO.Compression.dll", "/reference:System.IO.Compression.FileSystem.dll",
-                str(ROOT / "bootstrap/Program.cs"), str(ROOT / "bootstrap/Tests.cs")], check=True)
+                str(ROOT / "bootstrap/Program.cs"), str(ROOT / "bootstrap/Installation.cs"), str(ROOT / "bootstrap/DiskCard.cs"), str(ROOT / "bootstrap/Tests.cs")], check=True)
 subprocess.run([str(executable), *sys.argv[1:]], check=True)

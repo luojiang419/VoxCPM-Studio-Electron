@@ -4,6 +4,7 @@ if (process.argv.includes("--voxcpm-updater")) {
 const { app, BrowserWindow, dialog, ipcMain, nativeTheme, shell } = require("electron");
 const { UpdateService, atomicJson } = require("./update-service");
 const { RuntimeService, resolveManagedPython } = require("./runtime-service");
+const { installationSession } = require("./install-protocol");
 const fs = require("fs");
 const http = require("http");
 const net = require("net");
@@ -33,6 +34,8 @@ let previousCpuSample = null;
 let currentThemeSource = "dark";
 let updateService = null;
 let runtimeService = null;
+let installSession = null;
+const preparingInstallation = process.argv.includes("--voxcpm-install");
 let updateHealthWritten = false;
 let rendererReadyResolve;
 const rendererReady = new Promise((resolve) => { rendererReadyResolve = resolve; });
@@ -333,6 +336,8 @@ function loadFallbackHtml(message) {
 function createWindow() {
   mainWindow = new BrowserWindow({
     title: "VoxCPM Studio Electron",
+    icon: path.join(__dirname, "app.ico"),
+    show: !preparingInstallation,
     width: WINDOW_BOUNDS.width,
     height: WINDOW_BOUNDS.height,
     minWidth: WINDOW_BOUNDS.minWidth,
@@ -845,8 +850,18 @@ nativeTheme.on("updated", () => {
   sendRuntimeEvent("theme-updated", summarizeBootstrapState());
 });
 
+if (preparingInstallation || fs.existsSync(path.join(resolveProjectRoot(), ".voxcpm-install.json"))) {
+  const profile = path.join(resolveDataRoot(), "cache", "electron-profile");
+  fs.mkdirSync(profile, { recursive: true }); app.setPath("userData", profile);
+}
 app.whenReady().then(async () => {
   if (!app.requestSingleInstanceLock()) { app.quit(); return; }
+  app.setAppUserModelId("VoxCPM.Studio");
+  try {
+    if (preparingInstallation) installSession = installationSession({ root: resolveProjectRoot(), dataRoot: resolveDataRoot(),
+      report: process.env.VOXCPM_INSTALL_REPORT, session: process.env.VOXCPM_INSTALL_SESSION });
+    if (preparingInstallation && !installSession) throw new Error("缺少安装会话");
+  } catch (error) { dialog.showErrorBox("安装会话无效", String(error)); app.quit(); return; }
   const pendingPath = path.join(resolveProjectRoot(), "data", "cache", "updates", "pending.json");
   if (fs.existsSync(pendingPath) && !process.env.VOXCPM_UPDATE_SESSION) {
     try {
@@ -867,11 +882,11 @@ app.whenReady().then(async () => {
   updateService = new UpdateService({ root: resolveProjectRoot(), dataRoot: resolveDataRoot(), appDir: __dirname,
     currentVersion: app.getVersion(), onState: (state) => sendRuntimeEvent("update-state", { update: state }) });
   runtimeService = new RuntimeService({ root: resolveProjectRoot(), appRoot: resolveAppRoot(), dataRoot: resolveDataRoot(), appDir: __dirname,
-    onState: (preparation) => sendRuntimeEvent("runtime-preparation", { preparation }) });
+    onState: (preparation) => { installSession?.progress(preparation); sendRuntimeEvent("runtime-preparation", { preparation }); } });
   nativeTheme.themeSource = currentThemeSource;
   setBootstrapState({});
   createWindow();
-  if (updateService.getAutoCheck()) setTimeout(() => updateService.check(), 5000).unref();
+  if (!preparingInstallation && updateService.getAutoCheck()) setTimeout(() => updateService.check(), 5000).unref();
   previousCpuSample = null;
 
   // 轻量壳打开即用，首次下载由用户点击运行触发。
@@ -883,6 +898,13 @@ app.whenReady().then(async () => {
 
   try {
     await startBackend();
+    if (installSession) {
+      await new Promise((resolve, reject) => {
+        const deadline = setTimeout(() => reject(new Error("工作台界面初始化超时，请重新运行安装器")), 60000);
+        rendererReady.then(() => { clearTimeout(deadline); resolve(); });
+      });
+      installSession.ready();
+    }
     if (process.env.VOXCPM_UPDATE_HEALTH_FILE && !updateHealthWritten) {
       await rendererReady;
       atomicJson(process.env.VOXCPM_UPDATE_HEALTH_FILE, { version: app.getVersion(),
@@ -890,6 +912,7 @@ app.whenReady().then(async () => {
       updateHealthWritten = true;
     }
   } catch (error) {
+    installSession?.fail(error);
     setBootstrapState({
       status: "error",
       statusText: "桌面壳启动失败",
@@ -916,6 +939,6 @@ app.on("activate", () => {
   }
 });
 app.on("second-instance", () => {
-  if (mainWindow) { if (mainWindow.isMinimized()) mainWindow.restore(); mainWindow.focus(); }
+  if (mainWindow) { mainWindow.show(); if (mainWindow.isMinimized()) mainWindow.restore(); mainWindow.focus(); }
 });
 }

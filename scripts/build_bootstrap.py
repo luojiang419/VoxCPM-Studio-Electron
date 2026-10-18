@@ -40,17 +40,24 @@ def build(payload: Path, output: Path, release_id: str, payload_url: str | None 
         manifest["appReleaseId"] = json.loads(archive.read(root + "/resources/app/update-config.json"))["releaseId"]
     source_manifest = output.parent / (output.name + "-manifest.json")
     source_manifest.write_text(json.dumps(manifest, ensure_ascii=False, separators=(",", ":")), encoding="utf-8")
-    executable = output / ("VoxCPM启动器-界面演示.exe" if demo else "VoxCPM启动器.exe")
+    executable = output / ("VoxCPM安装器-界面演示.exe" if demo else "VoxCPM安装器.exe")
     compiler = Path("C:/Windows/Microsoft.NET/Framework64/v4.0.30319/csc.exe")
     subprocess.run([str(compiler), "/nologo", "/target:winexe", "/platform:anycpu", "/optimize+", *(["/define:DEMO"] if demo else []), "/out:" + str(executable),
-                    "/resource:" + str(source_manifest) + ",bootstrap-manifest.json", "/reference:System.Windows.Forms.dll",
-                    "/reference:System.Drawing.dll", "/reference:System.Web.Extensions.dll", "/reference:System.IO.Compression.dll",
-                    "/reference:System.IO.Compression.FileSystem.dll", str(ROOT / "bootstrap/Program.cs")], check=True)
+                    "/win32icon:" + str(ROOT / "assets/brand/voxcpm-installer.ico"),
+                    "/resource:" + str(ROOT / "assets/brand/voxcpm-app.ico") + ",app.ico",
+                    "/resource:" + str(ROOT / "assets/brand/voxcpm-installer.ico") + ",installer.ico",
+                    "/resource:" + str(ROOT / "assets/brand/voxcpm-app-256.png") + ",app-mark.png",
+                    "/resource:" + str(source_manifest) + ",bootstrap-manifest.json", "/resource:" + str(ROOT / "assets/brand/disk-local-256.png") + ",disk-local.png", "/reference:System.Windows.Forms.dll",
+                    "/reference:System.Drawing.dll", "/reference:Accessibility.dll", "/reference:System.Web.Extensions.dll", "/reference:System.IO.Compression.dll",
+                    "/reference:System.IO.Compression.FileSystem.dll", str(ROOT / "bootstrap/Program.cs"), str(ROOT / "bootstrap/Installation.cs"), str(ROOT / "bootstrap/DiskCard.cs")], check=True)
     (output / "使用说明.txt").write_text("界面演示：点击运行可观看准备进度，并可暂停、继续和重新演示。\n此版本不会下载、安装或打开工作台。\n" if demo else
-        "双击 VoxCPM启动器.exe，点击运行。\n"
-        "启动器会从魔搭补齐桌面环境，然后自动打开工作台并补齐依赖和模型。\n"
+        "双击 VoxCPM安装器.exe，选择独立安装目录并点击安装并运行。\n"
+        "安装器会从魔搭补齐应用、依赖和模型，服务就绪后创建快捷方式并登记 Windows 卸载入口。\n"
         "不需要预先安装 Python；Windows 10/11 自带的 .NET Framework 可运行启动器。\n"
-        "将启动器放在可写目录，预留至少 25GB 空间。环境保存在同级 VoxCPMStudio 文件夹。\n"
+        "自动选择至少有 25 GiB 可用空间且可读写的非 C 盘目录，也可手动更改。\n"
+        "仅有 C 盘时才使用 C 盘用户目录；其他分区均不满足条件时会提示，释放空间后可重新检测。\n"
+        "采用当前用户安装，无需管理员权限。\n"
+        "可在 Windows 设置的应用列表或开始菜单卸载；默认保留个人数据，可勾选删除。\n"
         "已下载资源会校验复用；暂停或网络中断后可继续。RTX 50 系自动选择 CUDA 12.8。\n"
         "首次下载的桌面、依赖和模型体积不会消失，只是改由魔搭按需补齐。\n", encoding="utf-8")
     archive = output.parent / (output.name + ".zip")

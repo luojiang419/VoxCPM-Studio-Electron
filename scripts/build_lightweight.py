@@ -3,6 +3,7 @@ from __future__ import annotations
 
 import argparse
 import json
+import os
 from pathlib import Path
 import shutil
 import subprocess
@@ -11,7 +12,7 @@ import zipfile
 ROOT = Path(__file__).resolve().parents[1]
 PROJECT = ROOT.parent
 FRONTEND = ROOT / "frontend/voxcpm_studio_electron"
-RUNTIME_FILES = ("runtime-service.js", "runtime-config.json", "runtime-requirements.txt")
+RUNTIME_FILES = ("runtime-service.js", "runtime-config.json", "runtime-requirements.txt", "install-protocol.js")
 SHELL_FILES = ("main.js", "preload.js", "package.json", "update-service.js", "update-window.js", "update-config.json", "updater.py", *RUNTIME_FILES)
 
 
@@ -27,10 +28,19 @@ def build(output: Path, skip_build: bool = False, skip_zip: bool = False) -> Pat
         raise ValueError("请先在前端目录执行 npm ci（可配置 ELECTRON_MIRROR 国内镜像）")
     shutil.copytree(electron, output, ignore=lambda directory, names: [n for n in names if Path(directory).name == "locales" and n not in ("en-US.pak", "zh-CN.pak")])
     (output / "electron.exe").rename(output / "VoxCPM Studio.exe")
+    icon = ROOT / "assets/brand/voxcpm-app.ico"
+    if not icon.is_file():
+        raise ValueError("缺少品牌图标，请先执行 scripts/build_brand_icons.py")
+    environment = dict(os.environ)
+    environment["PATH"] = str(FRONTEND / "node_modules/7zip-bin/win/x64") + os.pathsep + environment.get("PATH", "")
+    subprocess.run([str(FRONTEND / "node_modules/app-builder-bin/win/x64/app-builder.exe"), "rcedit", "--args",
+                    json.dumps([str(output / "VoxCPM Studio.exe"), "--set-icon", str(icon)])], env=environment, check=True)
     app = output / "resources/app"
     app.mkdir(parents=True, exist_ok=True)
     for name in SHELL_FILES:
         shutil.copy2(FRONTEND / name, app / name)
+    shutil.copy2(icon, app / "app.ico")
+    shutil.copy2(ROOT / "assets/brand/voxcpm-app-256.png", app / "app-icon.png")
     shutil.copytree(FRONTEND / "dist", app / "dist")
     backend = output / "app"
     backend.mkdir()

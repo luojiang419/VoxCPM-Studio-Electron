@@ -4,6 +4,7 @@ import ProductionStudio from "./ProductionStudio";
 import WorkspacePlayer from "./WorkspacePlayer";
 import SaveVoiceDialog from "./SaveVoiceDialog";
 import RuntimePreparation from "./RuntimePreparation";
+import brandIcon from "../app-icon.png";
 import type { GenerationConfig, StudioVoice } from "./production-types";
 
 type ThemeMode = "dark" | "light" | "system";
@@ -1007,12 +1008,13 @@ function App() {
           <button
             type="button"
             className={brandMarkClassName}
+            style={{ background: "transparent", boxShadow: "none" }}
             onClick={handleBrandMarkClick}
             disabled={busy && !bootstrap?.backendRunning}
             title={bootstrap?.backendRunning ? "本地服务运行中" : "点击启动本地服务"}
             aria-label={bootstrap?.backendRunning ? "本地服务运行中" : "点击启动本地服务"}
           >
-            V
+            <img src={brandIcon} alt="" style={{ width: 34, height: 34, objectFit: "contain" }} />
           </button>
           <div className="brand-copy">
             <strong>VoxCPM</strong>
