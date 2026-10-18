@@ -6,11 +6,13 @@ import SaveVoiceDialog from "./SaveVoiceDialog";
 import LipSyncStudio from "./LipSyncStudio";
 import RuntimePreparation from "./RuntimePreparation";
 import ComponentManager from "./ComponentManager";
+import MusicStudio from "./MusicStudio";
+import AssistantSettings from "./AssistantSettings";
 import brandIcon from "../app-icon.png";
 import type { GenerationConfig, StudioVoice } from "./production-types";
 
 type ThemeMode = "dark" | "light" | "system";
-type PageKey = "production" | "voices" | "history" | "workspace" | "lipsync" | "control" | "overview" | "batch" | "training" | "settings";
+type PageKey = "production" | "voices" | "history" | "workspace" | "lipsync" | "music" | "control" | "overview" | "batch" | "training" | "settings";
 
 type BootstrapState = {
   status: string;
@@ -161,6 +163,7 @@ const NAV_ITEMS: Array<{ key: PageKey; label: string }> = [
   { key: "workspace", label: "声音设计与克隆" },
   { key: "production", label: "配音工作台" },
   { key: "lipsync", label: "视频对口型" },
+  { key: "music", label: "音乐创作" },
   { key: "voices", label: "音色库" },
   { key: "history", label: "作品记录" },
   { key: "batch", label: "批量生成" },
@@ -1108,6 +1111,7 @@ function App() {
 
         <section className={`panel-shell ${page === "workspace" ? "voice-workspace-shell" : page === "batch" ? "batch-workspace-shell" : page === "overview" ? "overview-shell" : page === "lipsync" ? "lipsync-shell" : ""}`}>
           {page === "lipsync" && <LipSyncStudio backendBaseUrl={backendBaseUrl} latestAudio={workspaceOutputPath} />}
+          {page === "music" && <MusicStudio backendBaseUrl={backendBaseUrl} onSettings={() => setPage("settings")} />}
           {["production", "voices", "history"].includes(page) ? <ProductionStudio
             backendBaseUrl={backendBaseUrl}
             view={page === "voices" ? "voices" : page === "history" ? "history" : "editor"}
@@ -1628,6 +1632,7 @@ function App() {
 
           {page === "settings" ? (
             <div className="panel-grid settings-grid">
+              <AssistantSettings backendBaseUrl={backendBaseUrl} />
               <section className="panel-card">
                 <div className="panel-head">
                   <div>
@@ -1858,6 +1863,8 @@ function NavIcon(props: { page: PageKey | "update" }) {
   };
 
   switch (props.page) {
+    case "music":
+      return <svg viewBox="0 0 24 24" aria-hidden="true"><path {...common} d="M9 18V5l11-2v13M9 8l11-2"/><ellipse {...common} cx="6" cy="18" rx="3" ry="2.5"/><ellipse {...common} cx="17" cy="16" rx="3" ry="2.5"/></svg>;
     case "lipsync":
       return <svg viewBox="0 0 24 24" aria-hidden="true"><rect {...common} x="3" y="5" width="18" height="14" rx="3"/><path {...common} d="m10 9 5 3-5 3z"/></svg>;
     case "production":

@@ -670,6 +670,7 @@ async function startBackend() {
     PYTHONIOENCODING: "utf-8",
     VOXCPM_BACKEND_LOG: backendLogPath,
     VOXCPM_DATA_ROOT: dataRoot,
+    VOXCPM_PROJECT_ROOT: projectRoot,
     VOXCPM_PYTHON_EXE: pythonCommand,
     VOXCPM_MODEL_DIR: modelDir,
     HF_HOME: path.join(dataRoot, "cache", "hf-home"),

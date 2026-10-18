@@ -111,6 +111,19 @@ test('空间不足和并发进程在下载前拦截', async t => {
   const release = service.acquire();
   assert.throws(() => service.acquire(), /另一进程/); release();
 });
+test('视频补齐实际返回succeeded后立即复检，不无限轮询', async t => {
+  const { service } = await setup(t);
+  service.select({ selected: ['lipsync'] });
+  let checks = 0, polls = 0;
+  service.api = async (_url, route) => {
+    if (route === '/api/lipsync/status') return { ready: ++checks > 1, needsPreparation: checks === 1, hardware: { cuda: true, totalMB: 16384 } };
+    if (route === '/api/lipsync/prepare') return { taskId: 'prepared' };
+    if (route === '/api/tasks/prepared') { if (++polls > 1) throw new Error('不应重复轮询成功任务'); return { status: 'succeeded' }; }
+    return {};
+  };
+  const receipt = await service.prepare({ url: 'http://localhost', runtime: {} });
+  assert.equal(receipt.protocol, 2); assert.equal(polls, 1); assert.equal(checks, 2);
+});
 test('续装空间预检扣除已下载的运行包分卷', async t => {
   const { service, root } = await setup(t);
   t.mock.method(fsp, 'statfs', async () => ({ bavail: 1024 ** 3 + 15, bsize: 1 }));

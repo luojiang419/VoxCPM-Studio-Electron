@@ -63,7 +63,8 @@ def sources():
                 yield overlay if overlay and overlay.is_file() else file, "app/" + file.relative_to(PROJECT).as_posix()
     # 新增后端文件也必须进入发布包，不能依赖父目录已有副本。
     for file in sorted((ROOT / "backend/voxcpm").rglob("*")):
-        if file.is_file() and file.suffix in {".py", ".json"} and not (PROJECT / "src" / file.relative_to(ROOT / "backend")).exists():
+        skill_text = 'music_skills' in file.relative_to(ROOT / 'backend/voxcpm').parts and file.suffix in {'.md', '.txt', '.zip'}
+        if file.is_file() and (file.suffix in {".py", ".json"} or skill_text) and not (PROJECT / "src" / file.relative_to(ROOT / "backend")).exists():
             yield file, "app/src/" + file.relative_to(ROOT / "backend").as_posix()
     for name in ("download_bundle_model.py", "portable_self_check.py", "train_voxcpm_finetune.py", "test_voxcpm_ft_infer.py", "test_voxcpm_lora_infer.py"):
         yield PROJECT / "scripts" / name, "app/scripts/" + name

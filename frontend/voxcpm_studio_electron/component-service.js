@@ -148,7 +148,7 @@ class ComponentService {
               emit({ message: state.progressText || state.statusText || '正在准备视频组件', component: 'lipsync' });
               if (state.status === 'error' || state.status === 'failed') throw new Error(state.error || state.statusText);
               if (state.status === 'cancelled' || state.result?.cancelled) throw new Error('视频准备已暂停，下次可继续');
-              if (state.status === 'done' || state.status === 'completed') break;
+              if (state.status === 'succeeded' || state.status === 'done' || state.status === 'completed') break;
               await new Promise(resolve => setTimeout(resolve, 600));
             }
           } catch (error) {

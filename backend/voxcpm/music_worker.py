@@ -13,7 +13,7 @@ def probe(engine, model):
                       HF_ENDPOINT='https://hf-mirror.com', TOKENIZERS_PARALLELISM='false')
     sys.path.insert(0, str(engine / 'ComfyUI'))
     sys.path.insert(0, str(engine))
-    if model == 'heartmula':
+    if model in {'heartmula', 'yue2'}:
         sys.path.insert(0, str(engine / 'heartlib'))
         sys.path.insert(0, str(engine / 'heart-python'))
     import torch
@@ -41,13 +41,25 @@ def probe(engine, model):
 
 if __name__ == '__main__':
     parser = argparse.ArgumentParser(description=__doc__)
-    parser.add_argument('--probe', action='store_true', required=True)
+    mode = parser.add_mutually_exclusive_group(required=True)
+    mode.add_argument('--probe', action='store_true')
+    mode.add_argument('--generate', action='store_true')
     parser.add_argument('--engine', type=Path, required=True)
     parser.add_argument('--models', default='ace-xl-turbo')
     parser.add_argument('--single')
+    parser.add_argument('--models-root', type=Path)
+    parser.add_argument('--request', type=Path)
+    parser.add_argument('--output', type=Path)
     args = parser.parse_args()
     engine = args.engine.resolve()
-    if args.single:
+    if args.generate:
+        if not args.models_root or not args.request or not args.output:
+            parser.error('生成需要模型目录、请求文件和输出路径')
+        sys.path.insert(0, str(Path(__file__).resolve().parent))
+        from music_inference import generate
+        report = generate(engine, args.models_root.resolve(), json.loads(args.request.read_text(encoding='utf8')), args.output.resolve())
+        args.output.with_suffix('.report.json').write_text(json.dumps(report, ensure_ascii=False), encoding='utf8')
+    elif args.single:
         probe(engine, args.single)
     else:
         for model in args.models.split(','):

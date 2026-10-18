@@ -19,6 +19,9 @@ from pydantic import BaseModel, Field
 
 from .studio_workspace import WorkspaceStore
 from .studio_lipsync import LipSyncService
+from .studio_music import MusicService
+from .studio_assistant import AssistantError
+from .music_prompts import MusicBrief, compile_packet
 
 if TYPE_CHECKING:
     from .studio_app import VoxCPMStudio
@@ -102,6 +105,13 @@ class LipSyncRequest(BaseModel):
 
 class LipSyncPrepareRequest(BaseModel):
     model_version: Literal["auto", "1.5", "1.6"] = Field(default="auto", alias="modelVersion")
+
+
+class MusicGenerateRequest(BaseModel):
+    brief: MusicBrief
+    draft: dict[str, Any] | None = None
+    auto_optimize: bool = Field(default=True, alias='autoOptimize')
+    prompt_id: str = Field(default='', alias='promptId', max_length=32)
 
 
 class TrainingStartRequest(BaseModel):
@@ -201,7 +211,7 @@ class StudioTaskQueue:
             record = self._tasks.get(task_id)
             if record is None:
                 raise KeyError(task_id)
-            if record.kind not in {"generate-project", "generate-lipsync", "prepare-lipsync"}:
+            if record.kind not in {"generate-project", "generate-lipsync", "prepare-lipsync", "generate-music", "compose-music"}:
                 raise ValueError("当前任务不支持安全取消。")
             if record.status in {"queued", "running"}:
                 record.cancel_requested = True
@@ -220,7 +230,7 @@ class StudioTaskQueue:
             task_id, runner = self._queue.get()
             with self._lock:
                 record = self._tasks[task_id]
-                if record.cancel_requested and record.kind != "prepare-lipsync":
+                if record.cancel_requested and record.kind not in {"prepare-lipsync", "generate-music"}:
                     record.status = "cancelled"
                     record.status_text = "任务已取消。"
                     record.finished_at = _iso_now()
@@ -242,6 +252,7 @@ class StudioTaskQueue:
                     record.status = "failed"
                     record.status_text = "任务执行失败。"
                     record.error = str(exc)
+                    record.result = getattr(exc, 'partial_result', None)
                     record.finished_at = _iso_now()
 
 
@@ -257,19 +268,83 @@ def create_api_app(studio: Optional[Any] = None, model_dir: Optional[str] = None
     fallback_root = Path(studio_service.settings_payload()["output_dir"]).parent
     workspace = WorkspaceStore(Path(explicit_root or runtime_root or fallback_root) / "workspace", studio_service)
     lipsync = LipSyncService(Path(explicit_root or runtime_root or fallback_root), studio_service)
+    music = MusicService(Path(explicit_root or runtime_root or fallback_root), studio_service)
+    prompt_queue = StudioTaskQueue()
     app = FastAPI(title="VoxCPM Studio Local API", version="0.1.0")
     app.state.studio = studio_service
     app.state.task_queue = task_queue
     app.state.workspace = workspace
     app.state.lipsync = lipsync
+    app.state.music = music
+    app.state.prompt_queue = prompt_queue
 
     def workspace_call(operation: Callable, *args, **kwargs):
         try:
             return operation(*args, **kwargs)
         except KeyError as exc:
             raise HTTPException(status_code=404, detail=str(exc).strip("'")) from exc
-        except (ValueError, FileNotFoundError, TypeError) as exc:
+        except (ValueError, FileNotFoundError, TypeError, AssistantError) as exc:
             raise HTTPException(status_code=400, detail=str(exc)) from exc
+
+    @app.get('/api/assistant/settings')
+    def assistant_settings():
+        return workspace_call(music.assistants.public)
+
+    @app.put('/api/assistant/settings')
+    def save_assistant_settings(payload: dict):
+        return workspace_call(music.assistants.save, payload)
+
+    @app.post('/api/assistant/import')
+    def import_assistants(payload: dict):
+        return workspace_call(music.assistants.import_file, str(payload.get('path') or ''))
+
+    @app.post('/api/assistant/test')
+    def test_assistant(payload: dict):
+        return workspace_call(music.assistants.test, str(payload.get('providerId') or ''))
+
+    @app.get('/api/music/status')
+    def music_status():
+        return workspace_call(music.status)
+
+    @app.put('/api/music/settings')
+    def music_settings(payload: dict):
+        return workspace_call(music.configure, payload)
+
+    @app.get('/api/music/results')
+    def music_results():
+        return {'items': music.results()}
+
+    @app.post('/api/music/compose')
+    def compose_music(payload: MusicBrief):
+        return prompt_queue.submit('compose-music', 'AI音乐创作与提示词优化',
+            lambda task_id: music.compose(payload, lambda n, text: prompt_queue.progress(task_id, n, 100, text),
+                lambda: prompt_queue.cancelled(task_id)), contextual=True)
+
+    @app.get('/api/music/prompt-tasks/{task_id}')
+    def music_prompt_task(task_id: str):
+        return workspace_call(prompt_queue.get, task_id)
+
+    @app.post('/api/music/prompt-tasks/{task_id}/cancel')
+    def cancel_music_prompt_task(task_id: str):
+        return workspace_call(prompt_queue.cancel, task_id)
+
+    @app.post('/api/music/compile')
+    def compile_music(payload: MusicGenerateRequest):
+        return workspace_call(compile_packet, payload.brief, payload.draft or {'caption': payload.brief.caption, 'lyrics': payload.brief.lyrics})
+
+    @app.post('/api/music/generate')
+    def generate_music(payload: MusicGenerateRequest):
+        with lipsync.lock:
+            if lipsync.active or lipsync.preparing or studio_service.training_status_payload().get('running'):
+                raise HTTPException(status_code=409, detail='请先完成视频任务或停止训练，再生成音乐')
+            workspace_call(music.reserve, payload.brief.model_id)
+        try:
+            return task_queue.submit('generate-music', '音乐生成', lambda task_id: music.generate(payload,
+                lambda n, text: task_queue.progress(task_id, n, 100, text), lambda: task_queue.cancelled(task_id)), contextual=True)
+        except Exception:
+            with music.lock:
+                music.active = False
+            raise
 
     @app.get("/api/lipsync/status")
     def lipsync_status(modelVersion: Literal["auto", "1.5", "1.6"] = "auto"):
@@ -512,7 +587,7 @@ def create_api_app(studio: Optional[Any] = None, model_dir: Optional[str] = None
     @app.post("/api/training/start")
     def start_training(payload: TrainingStartRequest) -> dict[str, Any]:
         with lipsync.lock:
-            if lipsync.active or lipsync.preparing:
+            if lipsync.active or lipsync.preparing or music.active:
                 raise HTTPException(status_code=409, detail="视频正在使用显卡，请等待完成或取消视频任务后再训练。")
             return start_training_impl(payload)
 
