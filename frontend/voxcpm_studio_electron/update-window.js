@@ -2,6 +2,7 @@ const { app, BrowserWindow, dialog } = require("electron");
 const fs = require("fs");
 const path = require("path");
 const { spawn } = require("child_process");
+const { resolveManagedPython } = require("./runtime-service");
 
 app.whenReady().then(() => {
   const session = process.argv[process.argv.indexOf("--voxcpm-updater") + 1];
@@ -11,7 +12,7 @@ app.whenReady().then(() => {
   let finished = false;
   win.on("close", (event) => { if (!finished) event.preventDefault(); });
   const loaded = win.loadURL("data:text/html;charset=utf-8," + encodeURIComponent(`<!doctype html><html lang="zh-CN"><meta charset="utf-8"><style>body{background:#181817;color:#eee;font:16px 'Microsoft YaHei',sans-serif;margin:36px}h2{font-size:23px}progress{width:100%;height:18px;accent-color:#f6a66d}p{line-height:1.6;color:#aaa69d}</style><h2>正在更新 VoxCPM Studio</h2><p id="message">正在准备独立更新器…</p><progress id="progress" max="100" value="0"></progress><p>请保持此窗口打开，完成后软件会自动启动。</p></html>`));
-  const python = path.join(settings.root, "runtime", "python", "python.exe");
+  const python = resolveManagedPython(settings.root) || path.join(settings.root, "runtime", "python", "python.exe");
   const worker = spawn(python, ["-u", path.join(session, "updater.py"), session], {
     cwd: session, windowsHide: true, stdio: ["ignore", "pipe", "pipe"],
   });

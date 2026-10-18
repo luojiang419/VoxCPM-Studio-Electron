@@ -11,6 +11,8 @@ declare global {
       setAutoCheckUpdate: (enabled: boolean) => Promise<any>;
       getBootstrapState: () => Promise<any>;
       startBackend: () => Promise<any>;
+      getPreparationState: () => Promise<any>;
+      cancelPreparation: () => Promise<boolean>;
       stopBackend: () => Promise<any>;
       getResourceStats: () => Promise<any>;
       setThemeSource: (themeSource: string) => Promise<any>;

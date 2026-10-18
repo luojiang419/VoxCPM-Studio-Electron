@@ -48,7 +48,8 @@ def keys():
 
 
 def sources():
-    for name in ("main.js", "preload.js", "package.json", "update-service.js", "update-window.js", "update-config.json", "updater.py"):
+    for name in ("main.js", "preload.js", "package.json", "update-service.js", "update-window.js", "update-config.json", "updater.py",
+                 "runtime-service.js", "runtime-config.json", "runtime-requirements.txt"):
         yield FRONTEND / name, "resources/app/" + name
     for file in sorted((FRONTEND / "dist").rglob("*")):
         if file.is_file():

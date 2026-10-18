@@ -1,0 +1,231 @@
+{
+  "protocol": 1,
+  "python": {
+    "version": "3.12.10",
+    "name": "python-3.12.10-embed-amd64.zip",
+    "size": 11133606,
+    "sha256": "4acbed6dd1c744b0376e3b1cf57ce906f9dc9e95e68824584c8099a63025a3c3",
+    "urls": [
+      "https://mirrors.huaweicloud.com/python/3.12.10/python-3.12.10-embed-amd64.zip"
+    ]
+  },
+  "pip": {
+    "name": "pip-25.1.1-py3-none-any.whl",
+    "size": 1825227,
+    "sha256": "2913a38a2abf4ea6b64ab507bd9e967f3b53dc1ede74b01b0931e1ce548751af",
+    "urls": [
+      "https://mirrors.huaweicloud.com/repository/pypi/packages/29/a2/d40fb2460e883eca5199c62cfc2463fd261f760556ae6290f88488c362c0/pip-25.1.1-py3-none-any.whl"
+    ]
+  },
+  "profiles": {
+    "cu126": {
+      "torch": "2.6.0",
+      "wheels": [
+        {
+          "name": "torch-2.6.0+cu126-cp312-cp312-win_amd64.whl",
+          "size": 2496082434,
+          "sha256": "b10c39c83e5d1afd639b5c9f5683b351e97e41390a93f59c59187004a9949924",
+          "urls": [
+            "https://mirrors.nju.edu.cn/pytorch/whl/cu126/torch-2.6.0%2Bcu126-cp312-cp312-win_amd64.whl",
+            "https://mirrors.aliyun.com/pytorch-wheels/cu126/torch-2.6.0%2Bcu126-cp312-cp312-win_amd64.whl"
+          ]
+        },
+        {
+          "name": "torchaudio-2.6.0+cu126-cp312-cp312-win_amd64.whl",
+          "size": 4176541,
+          "sha256": "144b286d2f6195ba8d75ed1a568bddd718d032d54d1bf94940d47730c6321a0b",
+          "urls": [
+            "https://mirrors.nju.edu.cn/pytorch/whl/cu126/torchaudio-2.6.0%2Bcu126-cp312-cp312-win_amd64.whl",
+            "https://mirrors.aliyun.com/pytorch-wheels/cu126/torchaudio-2.6.0%2Bcu126-cp312-cp312-win_amd64.whl"
+          ]
+        }
+      ]
+    },
+    "cu128": {
+      "torch": "2.7.1",
+      "wheels": [
+        {
+          "name": "torch-2.7.1+cu128-cp312-cp312-win_amd64.whl",
+          "size": 3273024349,
+          "sha256": "2bb8c05d48ba815b316879a18195d53a6472a03e297d971e916753f8e1053d30",
+          "urls": [
+            "https://mirrors.nju.edu.cn/pytorch/whl/cu128/torch-2.7.1%2Bcu128-cp312-cp312-win_amd64.whl",
+            "https://mirrors.aliyun.com/pytorch-wheels/cu128/torch-2.7.1%2Bcu128-cp312-cp312-win_amd64.whl"
+          ]
+        },
+        {
+          "name": "torchaudio-2.7.1+cu128-cp312-cp312-win_amd64.whl",
+          "size": 4655660,
+          "sha256": "4586e3106701b06a4f9377f5c1da9e1d8555e16bd58fd7d810aa3f6cf50bd713",
+          "urls": [
+            "https://mirrors.nju.edu.cn/pytorch/whl/cu128/torchaudio-2.7.1%2Bcu128-cp312-cp312-win_amd64.whl",
+            "https://mirrors.aliyun.com/pytorch-wheels/cu128/torchaudio-2.7.1%2Bcu128-cp312-cp312-win_amd64.whl"
+          ]
+        }
+      ]
+    },
+    "cpu": {
+      "torch": "2.6.0",
+      "wheels": [
+        {
+          "name": "torch-2.6.0+cpu-cp312-cp312-win_amd64.whl",
+          "size": 206493444,
+          "sha256": "4027d982eb2781c93825ab9527f17fbbb12dbabf422298e4b954be60016f87d8",
+          "urls": [
+            "https://mirrors.nju.edu.cn/pytorch/whl/cpu/torch-2.6.0%2Bcpu-cp312-cp312-win_amd64.whl",
+            "https://mirrors.aliyun.com/pytorch-wheels/cpu/torch-2.6.0%2Bcpu-cp312-cp312-win_amd64.whl"
+          ]
+        },
+        {
+          "name": "torchaudio-2.6.0+cpu-cp312-cp312-win_amd64.whl",
+          "size": 2438883,
+          "sha256": "75266c25d394bb5d70f83a38b1b4d858c074a767c18f7ff87443bdf193c1b236",
+          "urls": [
+            "https://mirrors.nju.edu.cn/pytorch/whl/cpu/torchaudio-2.6.0%2Bcpu-cp312-cp312-win_amd64.whl",
+            "https://mirrors.aliyun.com/pytorch-wheels/cpu/torchaudio-2.6.0%2Bcpu-cp312-cp312-win_amd64.whl"
+          ]
+        }
+      ]
+    }
+  },
+  "models": [
+    {
+      "repo": "OpenBMB/VoxCPM2",
+      "folder": "openbmb__VoxCPM2",
+      "files": [
+        {
+          "name": "audiovae.pth",
+          "size": 376951122,
+          "sha256": "94b5d51e107e0507d4acc976cfdadb64edd6fd06d1f751dadbf2fd1594274bf1",
+          "urls": [
+            "https://modelscope.cn/api/v1/models/OpenBMB/VoxCPM2/repo?Revision=ea02bd9a3599f1900705b80c8db371a72065dba2&FilePath=audiovae.pth"
+          ]
+        },
+        {
+          "name": "config.json",
+          "size": 4336,
+          "sha256": "405f0dcd92f7feba6011ed4eac5c8d4f74cba9712f07fd5cfa3063bbdd95402c",
+          "urls": [
+            "https://modelscope.cn/api/v1/models/OpenBMB/VoxCPM2/repo?Revision=2e7c0dfff6646cef46c8bf106460a3dbce23a591&FilePath=config.json"
+          ]
+        },
+        {
+          "name": "model.safetensors",
+          "size": 4580080592,
+          "sha256": "f7f964cfa9da23653baec6e6f7750719977ad944ed9f95fe52fe3a620506891d",
+          "urls": [
+            "https://modelscope.cn/api/v1/models/OpenBMB/VoxCPM2/repo?Revision=d5f1818d22a8a84a71ad99eed983cb786f33985f&FilePath=model.safetensors"
+          ]
+        },
+        {
+          "name": "special_tokens_map.json",
+          "size": 1632,
+          "sha256": "068594063e37662c02b21acf42ebb334ef6a74fb810e68a2368f88f08351de76",
+          "urls": [
+            "https://modelscope.cn/api/v1/models/OpenBMB/VoxCPM2/repo?Revision=ea02bd9a3599f1900705b80c8db371a72065dba2&FilePath=special_tokens_map.json"
+          ]
+        },
+        {
+          "name": "tokenization_voxcpm2.py",
+          "size": 2895,
+          "sha256": "84489ea32b6ee0cae22ed5480cacb6df85c46624c3119be9a2021c3649a12729",
+          "urls": [
+            "https://modelscope.cn/api/v1/models/OpenBMB/VoxCPM2/repo?Revision=04123d1676da3fd7e1f2d4ed847408950c9cf26d&FilePath=tokenization_voxcpm2.py"
+          ]
+        },
+        {
+          "name": "tokenizer.json",
+          "size": 3676772,
+          "sha256": "f8984687e4a92a3503d521396d454b7d68e9fdaab2a0288eb3536c7c1aa4bc20",
+          "urls": [
+            "https://modelscope.cn/api/v1/models/OpenBMB/VoxCPM2/repo?Revision=ea02bd9a3599f1900705b80c8db371a72065dba2&FilePath=tokenizer.json"
+          ]
+        },
+        {
+          "name": "tokenizer_config.json",
+          "size": 5059,
+          "sha256": "e78a3ebb48a0b9437efd1823b6b726c823da89e49dd8bcc90c02419d9baa772b",
+          "urls": [
+            "https://modelscope.cn/api/v1/models/OpenBMB/VoxCPM2/repo?Revision=04123d1676da3fd7e1f2d4ed847408950c9cf26d&FilePath=tokenizer_config.json"
+          ]
+        }
+      ]
+    },
+    {
+      "repo": "iic/SenseVoiceSmall",
+      "folder": "iic__SenseVoiceSmall",
+      "files": [
+        {
+          "name": "am.mvn",
+          "size": 11203,
+          "sha256": "29b3c740a2c0cfc6b308126d31d7f265fa2be74f3bb095cd2f143ea970896ae5",
+          "urls": [
+            "https://modelscope.cn/api/v1/models/iic/SenseVoiceSmall/repo?Revision=70514a3da51f1160f51d18449dab6128bbd4928b&FilePath=am.mvn"
+          ]
+        },
+        {
+          "name": "chn_jpn_yue_eng_ko_spectok.bpe.model",
+          "size": 377341,
+          "sha256": "aa87f86064c3730d799ddf7af3c04659151102cba548bce325cf06ba4da4e6a8",
+          "urls": [
+            "https://modelscope.cn/api/v1/models/iic/SenseVoiceSmall/repo?Revision=70514a3da51f1160f51d18449dab6128bbd4928b&FilePath=chn_jpn_yue_eng_ko_spectok.bpe.model"
+          ]
+        },
+        {
+          "name": "config.yaml",
+          "size": 1855,
+          "sha256": "f71e239ba36705564b5bf2d2ffd07eece07b8e3f2bbf6d2c99d8df856339ac19",
+          "urls": [
+            "https://modelscope.cn/api/v1/models/iic/SenseVoiceSmall/repo?Revision=70514a3da51f1160f51d18449dab6128bbd4928b&FilePath=config.yaml"
+          ]
+        },
+        {
+          "name": "configuration.json",
+          "size": 396,
+          "sha256": "02810a7f8e9e8aee10370a265f7e799728ce25b4c00cdbf4602b303ee395a38e",
+          "urls": [
+            "https://modelscope.cn/api/v1/models/iic/SenseVoiceSmall/repo?Revision=70514a3da51f1160f51d18449dab6128bbd4928b&FilePath=configuration.json"
+          ]
+        },
+        {
+          "name": "model.pt",
+          "size": 936291369,
+          "sha256": "833ca2dcfdf8ec91bd4f31cfac36d6124e0c459074d5e909aec9cabe6204a3ea",
+          "urls": [
+            "https://modelscope.cn/api/v1/models/iic/SenseVoiceSmall/repo?Revision=70514a3da51f1160f51d18449dab6128bbd4928b&FilePath=model.pt"
+          ]
+        },
+        {
+          "name": "tokens.json",
+          "size": 352064,
+          "sha256": "a2594fc1474e78973149cba8cd1f603ebed8c39c7decb470631f66e70ce58e97",
+          "urls": [
+            "https://modelscope.cn/api/v1/models/iic/SenseVoiceSmall/repo?Revision=43d0ed61231c41f8393fa347b838a1f6e2d264f6&FilePath=tokens.json"
+          ]
+        }
+      ]
+    },
+    {
+      "repo": "iic/speech_zipenhancer_ans_multiloss_16k_base",
+      "folder": "iic__speech_zipenhancer_ans_multiloss_16k_base",
+      "files": [
+        {
+          "name": "configuration.json",
+          "size": 973,
+          "sha256": "877861f930f597b479887685556b33724a9c1c87e4a135207253f9bdc8e717a7",
+          "urls": [
+            "https://modelscope.cn/api/v1/models/iic/speech_zipenhancer_ans_multiloss_16k_base/repo?Revision=bed374bb53e4a5ffc62093676bab408a56b0db48&FilePath=configuration.json"
+          ]
+        },
+        {
+          "name": "pytorch_model.bin",
+          "size": 8424575,
+          "sha256": "b18896915e27a821585584221d0c0820f35e12145315ae3f1e73ccd5a68d195f",
+          "urls": [
+            "https://modelscope.cn/api/v1/models/iic/speech_zipenhancer_ans_multiloss_16k_base/repo?Revision=bed374bb53e4a5ffc62093676bab408a56b0db48&FilePath=pytorch_model.bin"
+          ]
+        }
+      ]
+    }
+  ]
+}

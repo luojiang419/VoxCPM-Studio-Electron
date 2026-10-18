@@ -9,6 +9,8 @@ contextBridge.exposeInMainWorld("voxcpmDesktop", {
   setAutoCheckUpdate: (enabled) => ipcRenderer.invoke("update:auto-check", enabled),
   getBootstrapState: () => ipcRenderer.invoke("runtime:get-bootstrap-state"),
   startBackend: () => ipcRenderer.invoke("runtime:start-backend"),
+  getPreparationState: () => ipcRenderer.invoke("runtime:preparation-state"),
+  cancelPreparation: () => ipcRenderer.invoke("runtime:cancel-preparation"),
   stopBackend: () => ipcRenderer.invoke("runtime:stop-backend"),
   getResourceStats: () => ipcRenderer.invoke("runtime:get-resource-stats"),
   setThemeSource: (themeSource) => ipcRenderer.invoke("runtime:set-theme-source", themeSource),

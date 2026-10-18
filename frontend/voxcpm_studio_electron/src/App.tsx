@@ -3,6 +3,7 @@ import UpdatePanel from "./UpdatePanel";
 import ProductionStudio from "./ProductionStudio";
 import WorkspacePlayer from "./WorkspacePlayer";
 import SaveVoiceDialog from "./SaveVoiceDialog";
+import RuntimePreparation from "./RuntimePreparation";
 import type { GenerationConfig, StudioVoice } from "./production-types";
 
 type ThemeMode = "dark" | "light" | "system";
@@ -528,6 +529,7 @@ function App() {
       setThemeMode((current) => current || state.themeSource || "dark");
     });
     const unsubscribe = window.voxcpmDesktop.onRuntimeEvent((payload) => {
+      if (payload.type === "runtime-preparation") return;
       if (payload.type === "update-state") {
         const update = payload.update;
         if (update.status === "available") setUpdateNotice(`有可用更新：VoxCPM Studio ${update.latestVersion}`);
@@ -998,6 +1000,7 @@ function App() {
 
   return (
     <div className={`app-shell studio-shell ${["production", "voices", "history"].includes(page) ? "studio-creative-page" : ""}`}>
+      <RuntimePreparation onRun={handleStartService} backendStatus={bootstrap?.status || ""} backendDetail={bootstrap?.detail || ""} />
       <aside className="sidebar">
         <div className="sidebar-top">
           <div className="studio-brand">
@@ -1073,7 +1076,7 @@ function App() {
                   </div>
                   <div className="control-action-row">
                     <button type="button" className="primary-button" onClick={handleStartService} disabled={busy || Boolean(bootstrap?.backendRunning)}>
-                      启动
+                      运行
                     </button>
                     <button type="button" className="ghost-button" onClick={handleStopService} disabled={busy || !bootstrap?.backendRunning}>
                       停止

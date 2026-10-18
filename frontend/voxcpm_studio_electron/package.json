@@ -6,6 +6,7 @@
   "private": true,
   "scripts": {
     "test:update": "node --test tests/update-service.test.cjs",
+    "test:runtime": "node --test tests/runtime-service.test.cjs",
     "typecheck": "tsc --noEmit",
     "build": "vite build",
     "start": "npm run build && electron .",
@@ -40,6 +41,9 @@
       "update-window.js",
       "update-config.json",
       "updater.py",
+      "runtime-service.js",
+      "runtime-config.json",
+      "runtime-requirements.txt",
       "package.json"
     ],
     "win": {

@@ -1,6 +1,7 @@
 from __future__ import annotations
 
 import json
+import locale
 import os
 import shutil
 import subprocess
@@ -13,6 +14,10 @@ from dataclasses import asdict, dataclass
 from datetime import datetime
 from pathlib import Path
 from typing import Any, Optional
+
+# kaldifst 使用 C 运行库打开 FST；只设置字符编码，使中文安装路径可用。
+if os.name == "nt":
+    locale.setlocale(locale.LC_CTYPE, ".UTF8")
 
 import gradio as gr
 import numpy as np
@@ -35,9 +40,10 @@ DEFAULT_ZIPENHANCER = "iic/speech_zipenhancer_ans_multiloss_16k_base"
 DEFAULT_PROXY_URL = "http://127.0.0.1:7890"
 HF_MIRROR_ENDPOINT = "https://hf-mirror.com"
 NO_LORA_LABEL = "不使用 LoRA"
-LOCAL_VOXCPM2_DIR = PROJECT_ROOT / "models" / "openbmb__VoxCPM2"
-LOCAL_ZIPENHANCER_DIR = PROJECT_ROOT / "models" / "iic__speech_zipenhancer_ans_multiloss_16k_base"
-LOCAL_ASR_DIR = PROJECT_ROOT / "models" / "iic__SenseVoiceSmall"
+MODELS_ROOT = Path(os.environ.get("VOXCPM_MODELS_ROOT") or PROJECT_ROOT / "models")
+LOCAL_VOXCPM2_DIR = MODELS_ROOT / "openbmb__VoxCPM2"
+LOCAL_ZIPENHANCER_DIR = MODELS_ROOT / "iic__speech_zipenhancer_ans_multiloss_16k_base"
+LOCAL_ASR_DIR = MODELS_ROOT / "iic__SenseVoiceSmall"
 MODELSCOPE_REPO_MAP = {
     "openbmb/VoxCPM2": "OpenBMB/VoxCPM2",
     "openbmb/VoxCPM1.5": "OpenBMB/VoxCPM1.5",

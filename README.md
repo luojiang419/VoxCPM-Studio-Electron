@@ -1,5 +1,7 @@
 # VoxCPM Studio Electron
 
+现已提供[轻量分发与自动补齐](./docs/轻量版与自动补齐.md)：仅分发 Electron 壳和源码，点击运行后自动从国内镜像与魔搭补齐 Python、依赖和模型，并为 RTX 50 系自动选择 CUDA 12.8。
+
 这是 `VoxCPM Studio` 的 Electron 原生桌面版源码仓库目录，包含：
 
 ![VoxCPM Studio 多角色配音工作台](./docs/screenshots/production-studio.png)

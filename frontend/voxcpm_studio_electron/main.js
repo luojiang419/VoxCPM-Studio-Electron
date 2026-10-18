@@ -3,6 +3,7 @@ if (process.argv.includes("--voxcpm-updater")) {
 } else {
 const { app, BrowserWindow, dialog, ipcMain, nativeTheme, shell } = require("electron");
 const { UpdateService, atomicJson } = require("./update-service");
+const { RuntimeService, resolveManagedPython } = require("./runtime-service");
 const fs = require("fs");
 const http = require("http");
 const net = require("net");
@@ -31,6 +32,7 @@ let lastBackendExitCode = null;
 let previousCpuSample = null;
 let currentThemeSource = "dark";
 let updateService = null;
+let runtimeService = null;
 let updateHealthWritten = false;
 let rendererReadyResolve;
 const rendererReady = new Promise((resolve) => { rendererReadyResolve = resolve; });
@@ -127,6 +129,8 @@ function resolvePythonCommand(appRoot, projectRoot) {
   if (override && override.trim()) {
     return override;
   }
+  const managed = resolveManagedPython(projectRoot);
+  if (managed) return managed;
 
   const candidates = process.platform === "win32"
     ? [
@@ -203,6 +207,7 @@ function listKnownDesktopApiProcesses(projectRoot, appRoot) {
     path.join(projectRoot, "runtime", "python", "python.exe"),
     path.join(appRoot, ".venv", "Scripts", "python.exe"),
     path.join(appRoot, "runtime", "python", "python.exe"),
+    ...["cpu", "cu126", "cu128"].map((profile) => path.join(projectRoot, "runtime", "managed", `py312-${profile}`, "python.exe")),
   ]
     .map(normalizeProcessValue)
     .filter(Boolean);
@@ -584,11 +589,24 @@ async function startBackend() {
   const projectRoot = resolveProjectRoot();
   const appRoot = resolveAppRoot();
   const dataRoot = resolveDataRoot();
-  const pythonCommand = resolvePythonCommand(appRoot, projectRoot);
+  let pythonCommand = resolvePythonCommand(appRoot, projectRoot);
   const backendLogPath = resolveBackendLogPath();
   const bundledModelDir = resolveBundledModelDir(projectRoot);
-  const modelDir = (process.env.VOXCPM_MODEL_DIR || bundledModelDir || "").trim();
+  let modelDir = (process.env.VOXCPM_MODEL_DIR || bundledModelDir || "").trim();
   const cleanedPids = cleanupStaleBackendProcesses(projectRoot, appRoot);
+  setBootstrapState({ status: "preparing", statusText: "正在补齐模型和依赖", detail: "正在检查运行环境，请稍候。" });
+  sendRuntimeEvent("boot", summarizeBootstrapState());
+  let runtime;
+  try {
+    runtime = await runtimeService.prepare({ existingPython: pythonCommand, existingModel: modelDir,
+      managed: fs.existsSync(path.join(projectRoot, "lightweight.json")) });
+    pythonCommand = runtime.python;
+    modelDir = runtime.modelDir || modelDir;
+  } catch (error) {
+    setBootstrapState({ status: "error", statusText: "运行环境准备未完成", detail: error.message });
+    sendRuntimeEvent("error", summarizeBootstrapState());
+    throw error;
+  }
   const port = await findFreePort();
   const serviceUrl = `http://127.0.0.1:${port}`;
   const healthUrl = `${serviceUrl}/api/health`;
@@ -623,7 +641,7 @@ async function startBackend() {
     : path.join(pythonDir, "..", "bin");
   const ffmpegRoot = path.join(projectRoot, "ffmpeg");
   const ffmpegBin = path.join(ffmpegRoot, "bin");
-  const currentPathValue = process.env.PATH || process.env.Path || "";
+  const currentPathValue = runtime.env.PATH || runtime.env.Path || "";
   const backendPathValue = [
     pythonDir,
     pythonScriptsDir,
@@ -635,6 +653,7 @@ async function startBackend() {
     .join(path.delimiter);
   const backendEnv = {
     ...process.env,
+    ...runtime.env,
     PATH: backendPathValue,
     Path: backendPathValue,
     PYTHONUTF8: "1",
@@ -742,6 +761,10 @@ async function startBackend() {
 
   try {
     return await backendStartPromise;
+  } catch (error) {
+    setBootstrapState({ status: "error", statusText: "本地服务尚未就绪", detail: String(error) });
+    sendRuntimeEvent("error", summarizeBootstrapState());
+    throw error;
   } finally {
     backendStartPromise = null;
   }
@@ -758,6 +781,10 @@ ipcMain.handle("update:check", () => updateService.check());
 ipcMain.handle("update:download", () => updateService.download());
 ipcMain.handle("update:auto-check", (_event, enabled) => updateService.setAutoCheck(enabled));
 ipcMain.handle("update:install", async () => {
+  if (!fs.existsSync(resolvePythonCommand(resolveAppRoot(), resolveProjectRoot()))) {
+    await dialog.showMessageBox(mainWindow, { type: "info", title: "请先准备运行环境", message: "请先点击运行，完成环境补齐后再安装更新。" });
+    return false;
+  }
   const answer = await dialog.showMessageBox(mainWindow, { type: "question", title: "重启并更新",
     message: "安装更新需要关闭软件。请确认生成与训练任务已结束。",
     detail: "安装完成后将自动重启，模型、配置与已有作品会保留。",
@@ -776,6 +803,8 @@ ipcMain.handle("runtime:set-theme-source", (_event, themeSource) => {
 });
 
 ipcMain.handle("runtime:start-backend", async () => startBackend());
+ipcMain.handle("runtime:preparation-state", () => runtimeService.state);
+ipcMain.handle("runtime:cancel-preparation", () => { runtimeService.cancel(); return true; });
 
 ipcMain.handle("runtime:stop-backend", async () => {
   killBackend("manual-stop");
@@ -837,11 +866,20 @@ app.whenReady().then(async () => {
   }
   updateService = new UpdateService({ root: resolveProjectRoot(), dataRoot: resolveDataRoot(), appDir: __dirname,
     currentVersion: app.getVersion(), onState: (state) => sendRuntimeEvent("update-state", { update: state }) });
+  runtimeService = new RuntimeService({ root: resolveProjectRoot(), appRoot: resolveAppRoot(), dataRoot: resolveDataRoot(), appDir: __dirname,
+    onState: (preparation) => sendRuntimeEvent("runtime-preparation", { preparation }) });
   nativeTheme.themeSource = currentThemeSource;
   setBootstrapState({});
   createWindow();
   if (updateService.getAutoCheck()) setTimeout(() => updateService.check(), 5000).unref();
   previousCpuSample = null;
+
+  // 轻量壳打开即用，首次下载由用户点击运行触发。
+  if (fs.existsSync(path.join(resolveProjectRoot(), "lightweight.json")) && !process.env.VOXCPM_UPDATE_HEALTH_FILE) {
+    setBootstrapState({ status: "stopped", statusText: "点击运行开始使用", detail: "首次运行将自动补齐模型和依赖，完成后自动启动。" });
+    sendRuntimeEvent("boot", summarizeBootstrapState());
+    return;
+  }
 
   try {
     await startBackend();
@@ -862,6 +900,7 @@ app.whenReady().then(async () => {
 });
 
 app.on("before-quit", () => {
+  runtimeService?.cancel();
   killBackend();
 });
 
