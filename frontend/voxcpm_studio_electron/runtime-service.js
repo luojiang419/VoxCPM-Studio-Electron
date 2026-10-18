@@ -198,7 +198,7 @@ class RuntimeService {
     for (const a of [this.config.python, this.config.pip, ...Object.values(this.config.profiles).flatMap((p) => p.wheels),
       ...(this.config.wheelhouse ? [this.config.wheelhouse.requirements, ...this.config.wheelhouse.files] : []),
       ...this.config.models.flatMap((m) => m.files)]) validateAsset(a);
-    this.state = { status: "idle", phase: "idle", message: "点击运行，自动检查并补齐模型和依赖。", log: "" };
+    this.state = { status: "idle", activity: "startup", phase: "idle", message: "音频系统待启动，启动后会检查已安装环境与模型。", log: "" };
     this.processRunner = runProcess;
   }
   emit(partial) {
@@ -209,10 +209,10 @@ class RuntimeService {
     this.emit({ log: (this.state.log + text).slice(-10000) });
     fs.appendFileSync(this.logPath, text, "utf8");
   }
-  cancel() { this.controller?.abort(new Error("已暂停补齐，下次运行可继续")); }
+  cancel() { this.controller?.abort(new Error("资源准备已暂停，下次启动可继续")); }
   check(partial) { this.emit({ status: this.state.status === "working" ? "working" : "checking", ...partial }); }
   assetProgress(value) {
-    if (value.downloading) this.emit({ status: "working", message: `正在补齐缺失或更新的组件：${value.name}`, ...value });
+    if (value.downloading) this.emit({ status: "working", activity: "prepare", message: `正在下载缺失资源：${value.name}`, ...value });
     else this.check(value);
   }
   startupSignature(selected, options) {
@@ -266,7 +266,7 @@ class RuntimeService {
       await this.startupProbe(ready.python, selected, ready.managed);
       this.controller.signal.throwIfAborted();
       this.log("已复用验证通过的本地环境，跳过完整依赖加载、pip 检查和模型哈希。\n");
-      this.emit({ status: "ready", phase: "ready", cached: true, message: "已复用就绪环境，正在启动本地服务", name: "", size: 0 });
+      this.emit({ status: "ready", phase: "environment-ready", cached: true, message: "已复用就绪环境，正在启动本地服务", name: "", size: 0 });
       return this.runtimeResult(ready.python, ready.modelDir, ready.managed);
     } catch (error) {
       this.controller.signal.throwIfAborted();
@@ -359,9 +359,9 @@ class RuntimeService {
     this.logPath = path.join(this.dataRoot, "cache", "runtime-bootstrap.log");
     this.readyPath = path.join(this.dataRoot, "cache", "runtime-ready.json");
     await fsp.mkdir(path.dirname(this.logPath), { recursive: true });
-    this.emit({ status: "checking", phase: "detect", cached: false, message: "正在检查本地运行环境", log: "", downloaded: 0, size: 0, name: "" });
+    this.emit({ status: "checking", activity: "startup", phase: "detect", cached: false, message: "正在识别音频设备与已安装环境", log: "", downloaded: 0, size: 0, name: "", modelName: "", modelState: "" });
     const selected = await this.detect();
-    this.emit({ ...selected, phase: "check", message: `已识别 ${selected.label}，正在检查运行环境` });
+    this.emit({ ...selected, phase: "check", message: `已识别 ${selected.label}，正在加载并检查音频组件` });
     this.env = { ...process.env, PYTHONUTF8: "1", PYTHONIOENCODING: "utf-8", PYTHONNOUSERSITE: "1", PIP_DISABLE_PIP_VERSION_CHECK: "1" };
     if (selected.gpu) this.env.CUDA_VISIBLE_DEVICES = selected.gpu.index;
     const existingDirectory = existingPython ? path.resolve(path.dirname(existingPython)) : "";
@@ -380,7 +380,7 @@ class RuntimeService {
       if (existingValid) {
         const modelDir = await this.prepareModels(existingModel);
         await this.rememberReady(startupSignature, selected, existingPython, modelDir, false);
-        this.emit({ status: "ready", phase: "ready", message: "已有运行环境检查通过，正在启动服务" });
+        this.emit({ status: "ready", phase: "environment-ready", message: "已有运行环境检查通过，正在启动服务" });
         return this.runtimeResult(existingPython, modelDir, false);
       }
     }
@@ -398,7 +398,7 @@ class RuntimeService {
       } catch (error) { this.controller.signal.throwIfAborted(); this.log(`Python 核心检查失败，开始恢复：${error.message}\n`); }
     }
     if (!pythonUsable) {
-      this.emit({ status: "working", phase: "python", message: "正在补齐独立 Python 运行环境" });
+      this.emit({ status: "working", activity: "prepare", phase: "python", message: "正在准备缺失的音频运行环境" });
       const archive = await get(this.config.python);
       const staging = directory + ".extracting";
       if (path.dirname(staging) !== path.join(this.root, "runtime", "managed")) throw new Error("运行环境解压路径无效");
@@ -437,7 +437,7 @@ try {
       valid = true;
     } catch (e) { this.controller.signal.throwIfAborted(); this.log(`环境复检失败，开始补齐：${e.message}\n`); }
     if (!valid) {
-      this.emit({ status: "working", phase: "dependencies", message: "正在补齐 Python 依赖与 CUDA 运行时，仅下载缺失或更新的组件", name: "", size: 0 });
+      this.emit({ status: "working", activity: "prepare", phase: "dependencies", message: "正在安装缺失的音频依赖与 CUDA 运行时", name: "", size: 0 });
       const pip = await get(this.config.pip);
       await this.run(python, ["-c", "import sys,runpy; sys.path.insert(0,sys.argv.pop(1)); runpy.run_module('pip',run_name='__main__')", pip,
         "install", "--no-deps", "--force-reinstall", pip]);
@@ -488,7 +488,7 @@ try {
     await this.run(python, ["-c", "import imageio_ffmpeg,shutil,sys; shutil.copy2(imageio_ffmpeg.get_ffmpeg_exe(),sys.argv[1])", path.join(ffmpegDir, "ffmpeg.exe")], { quiet: true, timeout: 15000 });
     await fsp.writeFile(marker, JSON.stringify({ signature, ...selected, checkedAt: new Date().toISOString() }));
     await this.rememberReady(startupSignature, selected, python, modelDir, true);
-    this.emit({ status: "ready", phase: "ready", message: "本地环境已就绪，正在启动服务", name: "", size: 0 });
+    this.emit({ status: "ready", phase: "environment-ready", message: "本地环境已就绪，正在启动服务", name: "", size: 0 });
     return this.runtimeResult(python, modelDir, true);
   }
   modelEnv() {
@@ -499,6 +499,8 @@ try {
     this.check({ phase: "models", message: "正在检查本地语音、识别和降噪模型", name: "", size: 0 });
     let modelDir = existingModel;
     for (const [i, model] of this.config.models.entries()) {
+      const label = ["VoxCPM 2", "SenseVoice 语音识别", "ZipEnhancer 音频降噪"][i] || model.folder;
+      this.check({ modelName: label, modelState: "checking", message: `${label} 模型文件检查中`, name: "", size: 0 });
       // 显式指定的其他版本模型由用户管理；默认 VoxCPM2 按清单检查所有必要文件。
       if (i === 0 && existingModel && fs.existsSync(path.join(existingModel, "config.json"))) {
         const config = JSON.parse(await fsp.readFile(path.join(existingModel, "config.json"), "utf8"));
@@ -507,6 +509,7 @@ try {
       const target = i === 0 && existingModel ? existingModel : safePath(this.root, `models/${model.folder}`);
       for (const asset of model.files) await downloadAsset(asset, target, {
         signal: this.controller.signal, progress: (value) => this.assetProgress(value) });
+      this.check({ modelName: label, modelState: "ready", message: `${label} 模型文件检查完成`, name: "", size: 0 });
       if (i === 0) modelDir = target;
     }
     return modelDir;

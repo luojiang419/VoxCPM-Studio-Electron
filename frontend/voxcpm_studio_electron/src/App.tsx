@@ -5,6 +5,7 @@ import WorkspacePlayer from "./WorkspacePlayer";
 import SaveVoiceDialog from "./SaveVoiceDialog";
 import LipSyncStudio from "./LipSyncStudio";
 import RuntimePreparation from "./RuntimePreparation";
+import UpdateNotification from "./UpdateNotification";
 import ComponentManager from "./ComponentManager";
 import MusicStudio from "./MusicStudio";
 import AssistantSettings from "./AssistantSettings";
@@ -1044,7 +1045,7 @@ function App() {
 
   if (bootstrap?.status !== "ready") return <main className="startup-gate">
     <div className="runtime-dialog-kicker">VOXCPM STUDIO</div>
-    <h1>准备好，再开始创作</h1>
+    <h1>{bootstrap?.status === "error" ? "音频系统启动未完成" : "音频系统启动中"}</h1>
     <p>{bootstrap?.statusText || "正在检查运行环境"}</p>
     <p className="runtime-intro">{bootstrap?.detail || "所选功能的依赖和模型全部就绪后，自动进入工作区。"}</p>
     <ComponentManager onRun={handleStartService} backendRunning={Boolean(bootstrap?.backendRunning)} />
@@ -1053,6 +1054,7 @@ function App() {
 
   return (
     <div className={`app-shell studio-shell ${["production", "voices", "history"].includes(page) ? "studio-creative-page" : ""}`}>
+      <UpdateNotification onOpen={() => { setPage("settings"); setUpdateFocusRequest(value => value + 1); }} />
       <RuntimePreparation onRun={handleStartService} backendStatus={bootstrap?.status || ""} backendDetail={bootstrap?.detail || ""} />
       <aside className="sidebar">
         <div className="sidebar-top">

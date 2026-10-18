@@ -37,6 +37,20 @@ test('同大小损坏文件也会重新下载，后续启动使用校验缓存',
   await service.ensureFile(asset('model.bin'), target, () => {}, runtimeService.controller.signal);
   assert.equal(downloads, 1);
 });
+
+test('真实下载保持准备状态，已安装组件自检仅标记启动', async t => {
+  const { service, root, runtimeService, states } = await setup(t);
+  const transfers = [];
+  await service.ensureFile(asset('model.bin'), path.join(root, 'model.bin'), value => transfers.push(value), runtimeService.controller.signal);
+  const begin = transfers.findIndex(value => value.downloading);
+  assert.ok(begin >= 0);
+  assert.ok(transfers.slice(begin).every(value => value.activity === 'prepare'));
+  service.select({ selected: [], removed: ['ace-xl-turbo'] });
+  service.api = async () => ({ hardware: { cuda: true, totalMB: 16384 } });
+  await service.prepare({ url: '', runtime: {} });
+  assert.ok(states.length > 0 && states.every(value => value.activity === 'startup'));
+  assert.ok(states.every(value => value.status !== 'working'));
+});
 test('复用模型先校验，移除托管链接不删除原 ComfyUI 模型', async t => {
   const { service, root, runtimeService, catalog } = await setup(t);
   const source = path.join(root, 'external-comfy'); fs.mkdirSync(source);

@@ -2,9 +2,10 @@ import { useEffect, useRef, useState } from "react";
 import "./runtime-preparation.css";
 import ComponentManager from "./ComponentManager";
 
-type State = { status: string; phase: string; message: string; profile?: string; label?: string;
-  name?: string; downloaded?: number; size?: number; verifying?: boolean; reused?: boolean; log?: string };
-const stages = [["detect", "设备"], ["python", "环境"], ["dependencies", "依赖"], ["models", "语音模型"], ["components", "所选功能"], ["ready", "进入工作区"]];
+type State = { status: string; phase: string; message: string; activity?: "startup" | "prepare"; profile?: string; label?: string;
+  name?: string; downloaded?: number; size?: number; verifying?: boolean; reused?: boolean; log?: string; modelName?: string; modelState?: string };
+const stages = ["设备检查", "音频环境", "模型检查", "音频服务", "功能自检", "启动完成"];
+const phases: Record<string, number> = { detect: 0, check: 1, python: 1, dependencies: 1, verify: 1, models: 2, "environment-ready": 2, service: 3, components: 4, ready: 5 };
 const mb = (n: number) => `${(n / 1024 / 1024).toFixed(1)} MB`;
 
 export default function RuntimePreparation({ onRun, backendStatus, backendDetail }: { onRun: () => void; backendStatus: string; backendDetail: string }) {
@@ -14,42 +15,50 @@ export default function RuntimePreparation({ onRun, backendStatus, backendDetail
   const dialog = useRef<HTMLDialogElement>(null);
   const returnFocus = useRef<HTMLElement | null>(null);
   useEffect(() => {
+    let active = true, received = false;
     const receive = (value: State) => { setState(value); if (["working", "error", "cancelled"].includes(value.status)) setOpen(true); };
-    window.voxcpmDesktop.getPreparationState().then(receive).catch(() => {});
-    return window.voxcpmDesktop.onRuntimeEvent((event) => { if (event.type === "runtime-preparation") receive(event.preparation); });
+    const unsubscribe = window.voxcpmDesktop.onRuntimeEvent(event => { if (event.type === "runtime-preparation") { received = true; receive(event.preparation); } });
+    window.voxcpmDesktop.getPreparationState().then(value => { if (active && !received) receive(value); }).catch(() => {});
+    return () => { active = false; unsubscribe(); };
   }, []);
   useEffect(() => {
     if (backendStatus === "ready") setOpen(false);
-    else if (backendStatus === "error" && state?.status === "ready") setOpen(true);
-  }, [backendStatus, state?.status]);
+    else if (["preparing", "booting", "error"].includes(backendStatus)) setOpen(true);
+  }, [backendStatus]);
   useEffect(() => {
-    if (open) { returnFocus.current = document.activeElement as HTMLElement; dialog.current?.showModal(); }
+    if (open) { returnFocus.current = document.activeElement as HTMLElement; if (!dialog.current?.open) dialog.current?.showModal(); }
     else { dialog.current?.close(); returnFocus.current?.focus(); }
   }, [open]);
-  const working = state?.status === "working" || (state?.status === "ready" && !["error", "stopped"].includes(backendStatus));
   const backendFailed = state?.status === "ready" && backendStatus === "error";
-  const phase = state?.phase === "check" ? "detect" : state?.phase === "verify" ? "dependencies" : state?.phase;
-  const index = stages.findIndex(([key]) => key === phase);
+  const failed = backendFailed || state?.status === "error" || backendStatus === "error";
+  const paused = state?.status === "cancelled";
+  const working = !failed && !paused && (["preparing", "booting"].includes(backendStatus) || ["checking", "working"].includes(state?.status || ""));
+  const preparing = state?.activity === "prepare" || (!state?.activity && state?.status === "working" && ["python", "dependencies"].includes(state.phase));
+  const index = phases[state?.phase || "detect"] ?? 0;
   const percent = state?.size ? Math.min(100, Math.round((state.downloaded || 0) / state.size * 100)) : undefined;
+  const title = failed ? "音频系统启动未完成" : paused ? "资源准备已暂停" : preparing ? "正在准备缺失的音频资源" : "音频系统启动中";
   return <>
-    {!open && ["preparing", "booting"].includes(backendStatus) && <div className="runtime-startup-status" role="status"><span />{state?.status === "ready" ? "正在启动本地引擎…" : "正在检查本地环境…"}</div>}
     {!open && ["stopped", "error"].includes(backendStatus) && <button type="button" className="runtime-run-button primary-button" onClick={onRun}>运行</button>}
-    <dialog ref={dialog} className="runtime-dialog" aria-labelledby="runtime-title" onCancel={(event) => { if (working) event.preventDefault(); else setOpen(false); }}>
-      <div className="runtime-dialog-kicker">VOXCPM STUDIO · 运行环境</div>
-      <h2 id="runtime-title">{backendFailed ? "本地服务启动未完成" : state?.status === "error" ? "运行环境准备未完成" : state?.status === "cancelled" ? "已暂停补齐" : state?.status === "ready" ? "正在启动本地服务" : "正在补齐缺失组件"}</h2>
-      <p className="runtime-intro">{backendFailed ? "运行环境已就绪，请查看本地服务启动日志以定位问题。" : "正在准备缺失或更新的组件，已就绪的运行环境和模型会保留并复用。需要下载时请保持网络连接。"}</p>
-      <ol className="runtime-stages">{stages.map(([key, label], i) => <li key={key} className={i === index ? "current" : i < index ? "done" : ""}><span>{i < index ? "✓" : i + 1}</span>{label}</li>)}</ol>
+    <dialog ref={dialog} className="runtime-dialog runtime-startup-dialog" aria-labelledby="runtime-title" onCancel={event => { if (working) event.preventDefault(); else setOpen(false); }}>
+      <div className="runtime-dialog-kicker">VOXCPM STUDIO · {preparing ? "资源准备" : "音频启动"}</div>
+      <h2 id="runtime-title">{title}</h2>
+      <p className="runtime-intro">{failed ? "启动未完成，请查看下方说明。已安装的文件会保留，可重试启动。" : preparing ? "检测到缺失或需要更新的资源，正在下载或安装；已完成的文件会直接复用。" : "正在检查已安装模型并加载音频组件，完成后自动进入工作区。模型权重会在生成时按需加载。"}</p>
+      <ol className="runtime-stages">{stages.map((label, i) => <li key={label} className={i === index ? "current" : i < index ? "done" : ""}><span>{i < index ? "✓" : i + 1}</span>{label}</li>)}</ol>
       {state?.label && <div className="runtime-device">{state.label}{state.profile === "cpu" && " · 速度取决于 CPU 性能"}</div>}
-      <p className="runtime-message" role="status" aria-live="polite">{backendFailed ? backendDetail : state?.message}</p>
-      {working && <progress aria-label="当前文件补齐进度" max={100} value={state?.verifying ? undefined : percent} />}
-      {state?.name && <div className="runtime-file"><span>{state.verifying ? "正在校验 " : state.reused ? "已复用 " : ""}{state.name}</span><span>{state.size ? `${mb(state.downloaded || 0)} / ${mb(state.size)}` : ""}</span></div>}
+      <p className="runtime-message" role="status" aria-live="polite">{failed ? backendDetail || state?.message : state?.message || "音频组件加载中，请稍候…"}</p>
+      {state?.modelName && <div className="runtime-model-state"><span>{state.modelName}</span><strong>{state.modelState === "ready" ? "检查完成" : state.modelState === "loading" ? "加载中" : "检查中"}</strong></div>}
+      {working && <>
+        <progress aria-label={preparing ? "资源准备进度" : "音频系统启动进度"} aria-valuetext={`阶段 ${index + 1} / ${stages.length}：${stages[index]}`} max={100} value={preparing ? state?.verifying ? undefined : percent : state?.phase === "service" ? undefined : index * 20} />
+        <p className="runtime-stage-caption">{preparing ? "资源准备" : "启动阶段"} {index + 1} / {stages.length} · {stages[index]}{!preparing && "，请稍候"}</p>
+      </>}
+      {state?.name && <div className="runtime-file"><span>{state.verifying ? "正在校验 " : state.reused ? "校验完成 " : ""}{state.name}</span><span>{preparing && state.size ? `${mb(state.downloaded || 0)} / ${mb(state.size)}` : ""}</span></div>}
       <button type="button" className="runtime-log-toggle" onClick={() => setShowLog(!showLog)}>{showLog ? "收起详细日志" : "查看详细日志"}</button>
-      {showLog && <pre className="runtime-log">{state?.log || "等待输出；下载阶段可查看上方文件进度。"}</pre>}
+      {showLog && <pre className="runtime-log">{state?.log || (preparing ? "下载和安装详情将在此显示。" : "音频组件正在加载，请稍候。")}</pre>}
       <div className="runtime-dialog-actions">{working
-        ? <button type="button" className="ghost-button" disabled={state?.status === "ready"} onClick={() => window.voxcpmDesktop.cancelPreparation()}>暂停补齐</button>
-        : <><button type="button" className="ghost-button" onClick={() => setOpen(false)}>稍后再试</button><button type="button" className="primary-button" onClick={onRun}>{backendFailed ? "重新启动服务" : "继续准备并运行"}</button></>}
+        ? preparing ? <button type="button" className="ghost-button" onClick={() => window.voxcpmDesktop.cancelPreparation()}>暂停准备</button> : <span className="runtime-intro">加载完成后会自动进入，无需操作</span>
+        : <><button type="button" className="ghost-button" onClick={() => setOpen(false)}>稍后再试</button><button type="button" className="primary-button" onClick={onRun}>{failed ? "重新启动" : "继续准备并运行"}</button></>}
       </div>
-      <ComponentManager onRun={onRun} backendRunning={false} />
+      {!working && <ComponentManager onRun={onRun} backendRunning={false} />}
     </dialog>
   </>;
 }

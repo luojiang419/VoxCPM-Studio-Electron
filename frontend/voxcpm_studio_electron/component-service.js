@@ -120,7 +120,7 @@ class ComponentService {
     if (this.working) return this.working;
     const perform = async () => {
       const service = this.runtimeService, signal = service.controller.signal;
-      const emit = partial => service.emit({ status: 'working', phase: 'components', name: '', size: 0, ...partial });
+      const emit = partial => service.emit({ status: 'checking', activity: 'startup', phase: 'components', name: '', size: 0, modelName: '', modelState: '', ...partial });
       const release = this.acquire();
       try {
         await fsp.rm(this.receipt, { force: true });
@@ -139,13 +139,13 @@ class ComponentService {
         const models = this.catalog.models.filter(model => profile.selected.includes(model.id));
         await this.checkSpace(models);
         if (profile.selected.includes('lipsync') && (video.needsPreparation || !video.ready)) {
-          emit({ message: `正在补齐 LatentSync ${video.preferredVersion} 所需全部资源` });
+          emit({ status: 'working', activity: 'prepare', message: `正在准备 LatentSync ${video.preferredVersion} 缺失的资源` });
           const task = await this.api(url, '/api/lipsync/prepare', { model_version: 'auto' }, signal);
           try {
             while (true) {
               signal.throwIfAborted();
               const state = await this.api(url, `/api/tasks/${task.taskId}`, undefined, signal);
-              emit({ message: state.progressText || state.statusText || '正在准备视频组件', component: 'lipsync' });
+              emit({ status: 'working', activity: 'prepare', message: state.progressText || state.statusText || '正在准备视频组件', component: 'lipsync' });
               if (state.status === 'error' || state.status === 'failed') throw new Error(state.error || state.statusText);
               if (state.status === 'cancelled' || state.result?.cancelled) throw new Error('视频准备已暂停，下次可继续');
               if (state.status === 'succeeded' || state.status === 'done' || state.status === 'completed') break;
@@ -160,12 +160,15 @@ class ComponentService {
         }
         if (models.length) {
           await this.prepareRuntime(runtime, emit, signal);
-          for (const model of models) for (const asset of model.files) {
-            const target = safePath(this.root, asset.name);
-            emit({ message: `正在准备 ${model.label}`, component: model.id });
-            await this.ensureFile(asset, target, emit, signal, true);
+          for (const model of models) {
+            emit({ message: `${model.label} 模型文件检查中`, modelName: model.label, modelState: 'checking', component: model.id });
+            for (const asset of model.files) {
+              const target = safePath(this.root, asset.name);
+              await this.ensureFile(asset, target, emit, signal, true);
+            }
+            emit({ message: `${model.label} 模型文件检查完成`, modelName: model.label, modelState: 'ready', component: model.id });
           }
-          emit({ message: '正在验证音乐运行环境与模型文件' });
+          emit({ message: '音乐音频组件加载与自检中，模型权重将在生成时加载' });
           const directory = safePath(this.root, `runtime/music/${this.catalog.runtime.version}`);
           const args = [path.join(this.appRoot, 'src/voxcpm/music_worker.py'), '--probe', '--engine', directory, '--models', models.map(m => m.id).join(',')];
           try { await service.run(path.join(directory, 'python/python.exe'), args, { timeout: 180000 }); }
@@ -179,7 +182,7 @@ class ComponentService {
         const signature = crypto.createHash('sha256').update(JSON.stringify({ profile, catalog: this.catalog })).digest('hex');
         const receipt = { protocol: 2, selected: profile.selected, signature, checkedAt: new Date().toISOString() };
         atomicJson(this.receipt, receipt);
-        service.emit({ status: 'ready', phase: 'ready', message: '所选组件已全部就绪，正在进入工作区', name: '', size: 0 });
+        service.emit({ status: 'ready', activity: 'startup', phase: 'ready', message: '音频系统启动完成，正在进入工作区', modelName: '', modelState: '', name: '', size: 0 });
         return receipt;
       } catch (error) {
         service.emit({ status: signal.aborted ? 'cancelled' : 'error', phase: 'components', message: error.message }); throw error;
@@ -216,8 +219,12 @@ class ComponentService {
         const space = await fsp.statfs(path.parse(target).root);
         const partial = await fsp.stat(target + '.part').catch(() => null);
         if (Number(space.bavail) * Number(space.bsize) < Math.max(0, asset.size - (partial?.size || 0)) + 512 * 1024 ** 2) throw new Error('下载空间不足，请释放空间后继续');
+        let downloading = false;
         await downloadAsset({ ...asset, name: path.basename(target) }, path.dirname(target), { signal,
-          fetchImpl: this.fetchImpl, progress: p => emit({ ...p, message: `正在补齐 ${path.basename(target)}` }) });
+          fetchImpl: this.fetchImpl, progress: p => {
+            downloading ||= !!p.downloading;
+            emit({ ...p, activity: downloading ? 'prepare' : 'startup', status: downloading ? 'working' : 'checking', message: `${downloading ? '正在下载缺失资源' : '正在校验已安装文件'}：${path.basename(target)}` });
+          } });
       }
     }
     signal.throwIfAborted();
@@ -239,7 +246,7 @@ class ComponentService {
     const cache = safePath(this.dataRoot, `cache/music-runtime/${spec.version}`);
     await fsp.mkdir(cache, { recursive: true });
     for (const part of spec.parts) await this.ensureFile(part, path.join(cache, part.name), emit, signal);
-    emit({ message: '正在安装已校验的独立音乐环境' });
+    emit({ status: 'working', activity: 'prepare', message: '正在安装已校验的独立音乐环境' });
     await this.runtimeService.run(runtime.python, [path.join(this.appRoot, 'src/voxcpm/music_install.py'), '--cache', cache, '--target', directory,
       '--spec', path.join(this.appDir, 'music-config.json')], { timeout: 30 * 60 * 1000 });
     signal.throwIfAborted();

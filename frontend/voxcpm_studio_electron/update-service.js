@@ -109,17 +109,17 @@ class UpdateService {
     return this.setState({ autoCheck: Boolean(enabled) });
   }
   setState(patch) { Object.assign(this.state, patch); this.onState({ ...this.state }); return { ...this.state }; }
-  async check() {
+  async check({ source = "manual" } = {}) {
     if (this.running) return this.state;
     this.running = true;
-    this.setState({ status: "checking", message: "正在检查新版本…", progress: 0 });
+    this.setState({ status: "checking", checkSource: source, message: "正在检查新版本…", progress: 0 });
     try {
       const envelope = await readJson(this.config.manifestUrl);
       const manifest = verifyEnvelope(envelope, this.config.publicKey, this.currentVersion);
       this.envelope = envelope; this.manifest = manifest;
       const available = isNewer(manifest, this.currentVersion, this.state.currentReleaseId);
       this.session = null;
-      return this.setState({ status: available ? "available" : "current", latestVersion: manifest.version,
+      return this.setState({ status: available ? "available" : "current", latestVersion: manifest.version, latestReleaseId: manifest.releaseId,
         canDownload: available,
         notes: manifest.notes, publishedAt: manifest.publishedAt, size: manifest.package.size,
         message: available ? `发现新版本 ${manifest.version}` : "当前已是最新版本" });

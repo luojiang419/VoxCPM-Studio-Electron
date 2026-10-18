@@ -58,7 +58,10 @@ test("真实 HTTP 检查、断点续传、哈希失败与并发保护", async (t
   fs.writeFileSync(path.join(temp, "updater.py"), "# test helper");
   const service = new UpdateService({ root: temp, dataRoot: temp, appDir: temp, currentVersion: "2.0.1",
     config: { manifestUrl: base + "/latest", publicKey, autoCheck: true } });
-  assert.equal((await service.check()).status, "available");
+  const automatic = await service.check({ source: "startup" });
+  assert.equal(automatic.status, "available");
+  assert.equal(automatic.checkSource, "startup");
+  assert.equal((await service.check()).checkSource, "manual");
   fs.mkdirSync(service.cache, { recursive: true });
   const part = path.join(service.cache, hash + ".part");
   fs.writeFileSync(part, bytes.subarray(0, 100));

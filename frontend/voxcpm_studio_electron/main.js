@@ -59,6 +59,17 @@ let bootstrapState = {
   themeSource: "dark",
   systemPrefersDark: true,
 };
+let startupUpdateScheduled = false;
+
+function scheduleStartupUpdate() {
+  if (startupUpdateScheduled || !updateService.getAutoCheck()) return;
+  startupUpdateScheduled = true;
+  void rendererReady.then(() => {
+    setTimeout(() => {
+      if (bootstrapState.status === "ready" && updateService.getAutoCheck()) void updateService.check({ source: "startup" });
+    }, 1000).unref();
+  });
+}
 
 function findUp(startDir, matcher) {
   let current = path.resolve(startDir);
@@ -604,7 +615,7 @@ async function startBackend() {
   const bundledModelDir = resolveBundledModelDir(projectRoot);
   let modelDir = (process.env.VOXCPM_MODEL_DIR || bundledModelDir || "").trim();
   const cleanedPids = cleanupStaleBackendProcesses(projectRoot, appRoot);
-  setBootstrapState({ status: "preparing", statusText: "正在检查本地运行环境", detail: "正在复用已就绪的环境，缺失组件会自动修复。" });
+  setBootstrapState({ status: "preparing", statusText: "音频系统启动中", detail: "正在检查已安装模型并加载音频组件，完成后自动进入工作区。" });
   sendRuntimeEvent("boot", summarizeBootstrapState());
   let runtime;
   try {
@@ -618,6 +629,7 @@ async function startBackend() {
     throw error;
   }
   const port = await findFreePort();
+  runtimeService.emit({ status: "checking", activity: "startup", phase: "service", message: "音频服务加载中，已安装模型将在生成时按需加载", modelName: "音频服务", modelState: "loading", name: "", size: 0 });
   const serviceUrl = `http://127.0.0.1:${port}`;
   const healthUrl = `${serviceUrl}/api/health`;
 
@@ -752,7 +764,7 @@ async function startBackend() {
     );
   }
 
-  setBootstrapState({ status: "preparing", statusText: "正在准备所选功能", detail: "全部组件自检通过后进入工作区。" });
+  setBootstrapState({ status: "preparing", statusText: "音频系统启动中", detail: "音频服务加载完成，正在检查所选功能。" });
   componentReceipt = await componentService.prepare({ url: serviceUrl, runtime });
   setBootstrapState({
     status: "ready",
@@ -769,6 +781,7 @@ async function startBackend() {
     dataRoot,
   });
   sendRuntimeEvent("ready", summarizeBootstrapState());
+  scheduleStartupUpdate();
   return summarizeBootstrapState();
   })();
 
@@ -921,7 +934,6 @@ app.whenReady().then(async () => {
   nativeTheme.themeSource = currentThemeSource;
   setBootstrapState({});
   createWindow();
-  if (!preparingInstallation && updateService.getAutoCheck()) setTimeout(() => updateService.check(), 5000).unref();
   previousCpuSample = null;
 
   try {
