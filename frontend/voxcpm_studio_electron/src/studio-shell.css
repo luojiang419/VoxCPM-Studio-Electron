@@ -34,7 +34,7 @@ html, body, #root { height: 100%; overflow: hidden; background: var(--bg); font-
 .studio-shell .nav-text { font-size: 12px; font-weight: 500; color: var(--muted); }
 .studio-shell .nav-icon { width: 17px; height: 17px; color: var(--muted); }
 .studio-shell .nav-icon svg { width: 17px; height: 17px; }
-.studio-shell .nav-item:nth-child(6) { margin-top: 24px; }
+.studio-shell .nav-item:nth-child(7) { margin-top: 24px; }
 .studio-sidebar-foot { border-top: 1px solid var(--line); padding: 19px 10px 0; font-size: 10px; color: var(--muted); }
 .studio-sidebar-foot > div { display: flex; gap: 7px; align-items: center; }
 .studio-sidebar-foot strong { color: var(--text); font-weight: 500; }

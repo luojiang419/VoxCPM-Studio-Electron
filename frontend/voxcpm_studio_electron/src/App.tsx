@@ -3,12 +3,13 @@ import UpdatePanel from "./UpdatePanel";
 import ProductionStudio from "./ProductionStudio";
 import WorkspacePlayer from "./WorkspacePlayer";
 import SaveVoiceDialog from "./SaveVoiceDialog";
+import LipSyncStudio from "./LipSyncStudio";
 import RuntimePreparation from "./RuntimePreparation";
 import brandIcon from "../app-icon.png";
 import type { GenerationConfig, StudioVoice } from "./production-types";
 
 type ThemeMode = "dark" | "light" | "system";
-type PageKey = "production" | "voices" | "history" | "workspace" | "control" | "overview" | "batch" | "training" | "settings";
+type PageKey = "production" | "voices" | "history" | "workspace" | "lipsync" | "control" | "overview" | "batch" | "training" | "settings";
 
 type BootstrapState = {
   status: string;
@@ -158,6 +159,7 @@ type TrainingForm = {
 const NAV_ITEMS: Array<{ key: PageKey; label: string }> = [
   { key: "workspace", label: "声音设计与克隆" },
   { key: "production", label: "配音工作台" },
+  { key: "lipsync", label: "视频对口型" },
   { key: "voices", label: "音色库" },
   { key: "history", label: "作品记录" },
   { key: "batch", label: "批量生成" },
@@ -1065,7 +1067,8 @@ function App() {
         {globalMessage ? <div className="notice-banner">{globalMessage}</div> : null}
         {updateNotice && page !== "settings" ? <div className="notice-banner">{updateNotice} <button type="button" className="ghost-button" onClick={() => setPage("settings")}>查看更新</button></div> : null}
 
-        <section className={`panel-shell ${page === "workspace" ? "voice-workspace-shell" : page === "batch" ? "batch-workspace-shell" : page === "overview" ? "overview-shell" : ""}`}>
+        <section className={`panel-shell ${page === "workspace" ? "voice-workspace-shell" : page === "batch" ? "batch-workspace-shell" : page === "overview" ? "overview-shell" : page === "lipsync" ? "lipsync-shell" : ""}`}>
+          {page === "lipsync" && <LipSyncStudio backendBaseUrl={backendBaseUrl} latestAudio={workspaceOutputPath} />}
           {["production", "voices", "history"].includes(page) ? <ProductionStudio
             backendBaseUrl={backendBaseUrl}
             view={page === "voices" ? "voices" : page === "history" ? "history" : "editor"}
@@ -1816,6 +1819,8 @@ function NavIcon(props: { page: PageKey }) {
   };
 
   switch (props.page) {
+    case "lipsync":
+      return <svg viewBox="0 0 24 24" aria-hidden="true"><rect {...common} x="3" y="5" width="18" height="14" rx="3"/><path {...common} d="m10 9 5 3-5 3z"/></svg>;
     case "production":
       return <svg viewBox="0 0 24 24" aria-hidden="true"><rect {...common} x="4" y="3" width="16" height="18" rx="3"/><path {...common} d="M8 7h8M8 11h5M8 15h4"/><path {...common} d="m15 14 4 3-4 3z"/></svg>;
     case "voices":

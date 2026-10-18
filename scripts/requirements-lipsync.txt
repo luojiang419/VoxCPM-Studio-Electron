@@ -1,0 +1,24 @@
+# 独立视频环境；torch / torchvision 由安装入口选择 CUDA 12.6 版本。
+diffusers==0.32.2
+transformers==4.48.0
+huggingface-hub==0.36.2
+accelerate==1.6.0
+numpy==1.26.4
+opencv-python==4.11.0.86
+decord==0.6.0
+omegaconf==2.3.0
+kornia==0.8.0
+einops==0.8.1
+librosa==0.10.2.post1
+imageio==2.37.0
+imageio-ffmpeg==0.6.0
+ffmpeg-python==0.2.0
+insightface==0.7.3
+onnxruntime==1.21.0
+onnx==1.17.0
+albumentations==1.4.24
+matplotlib==3.10.1
+scikit-image==0.25.2
+soundfile==0.13.1
+scipy==1.15.2
+tqdm==4.67.1

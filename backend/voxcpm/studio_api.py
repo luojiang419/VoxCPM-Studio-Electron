@@ -9,7 +9,7 @@ import uuid
 from dataclasses import dataclass, field
 from datetime import datetime
 from pathlib import Path
-from typing import TYPE_CHECKING, Any, Callable, Optional
+from typing import TYPE_CHECKING, Any, Callable, Optional, Literal
 from urllib.parse import quote
 
 from fastapi import FastAPI, HTTPException, Query
@@ -18,6 +18,7 @@ from fastapi.responses import FileResponse
 from pydantic import BaseModel, Field
 
 from .studio_workspace import WorkspaceStore
+from .studio_lipsync import LipSyncService
 
 if TYPE_CHECKING:
     from .studio_app import VoxCPMStudio
@@ -86,6 +87,16 @@ class BatchGenerateRequest(BaseModel):
 class SaveAsRequest(BaseModel):
     source_path: str = Field(alias="sourcePath")
     target_path: str = Field(alias="targetPath")
+
+
+class LipSyncRequest(BaseModel):
+    mode: Literal["video", "photo"] = "video"
+    source_path: str = Field(alias="sourcePath", min_length=1)
+    audio_path: str = Field(alias="audioPath", min_length=1)
+    steps: int = Field(default=20, ge=20, le=50)
+    guidance: float = Field(default=1.5, ge=1.0, le=3.0)
+    seed: int = Field(default=1247, ge=0, le=2147483647)
+    short_video: Literal["loop", "hold"] = Field(default="loop", alias="shortVideo")
 
 
 class TrainingStartRequest(BaseModel):
@@ -185,11 +196,11 @@ class StudioTaskQueue:
             record = self._tasks.get(task_id)
             if record is None:
                 raise KeyError(task_id)
-            if record.kind != "generate-project":
+            if record.kind not in {"generate-project", "generate-lipsync"}:
                 raise ValueError("当前任务不支持安全取消。")
             if record.status in {"queued", "running"}:
                 record.cancel_requested = True
-                record.status_text = "已请求取消，当前片段结束后停止。"
+                record.status_text = "正在停止视频推理进程。" if record.kind == "generate-lipsync" else "已请求取消，当前片段结束后停止。"
             return record.to_payload()
 
     def get(self, task_id: str) -> dict[str, Any]:
@@ -240,10 +251,12 @@ def create_api_app(studio: Optional[Any] = None, model_dir: Optional[str] = None
     runtime_root = studio_service.runtime_summary_payload().get("data_root", "")
     fallback_root = Path(studio_service.settings_payload()["output_dir"]).parent
     workspace = WorkspaceStore(Path(explicit_root or runtime_root or fallback_root) / "workspace", studio_service)
+    lipsync = LipSyncService(Path(explicit_root or runtime_root or fallback_root), studio_service)
     app = FastAPI(title="VoxCPM Studio Local API", version="0.1.0")
     app.state.studio = studio_service
     app.state.task_queue = task_queue
     app.state.workspace = workspace
+    app.state.lipsync = lipsync
 
     def workspace_call(operation: Callable, *args, **kwargs):
         try:
@@ -252,6 +265,30 @@ def create_api_app(studio: Optional[Any] = None, model_dir: Optional[str] = None
             raise HTTPException(status_code=404, detail=str(exc).strip("'")) from exc
         except (ValueError, FileNotFoundError, TypeError) as exc:
             raise HTTPException(status_code=400, detail=str(exc)) from exc
+
+    @app.get("/api/lipsync/status")
+    def lipsync_status():
+        return lipsync.status()
+
+    @app.put("/api/lipsync/settings")
+    def lipsync_settings(payload: dict):
+        return workspace_call(lipsync.configure, str(payload.get("root", "")))
+
+    @app.get("/api/lipsync/results")
+    def lipsync_results():
+        return {"items": lipsync.results()}
+
+    @app.post("/api/lipsync/generate")
+    def generate_lipsync(payload: LipSyncRequest):
+        if not lipsync.status()["ready"]:
+            raise HTTPException(status_code=400, detail="视频模型尚未就绪，请先选择已安装的 LatentSync 目录。")
+        if getattr(studio_service, "_training_is_running", lambda: False)():
+            raise HTTPException(status_code=409, detail="请先停止 LoRA 训练，再生成视频。")
+        workspace_call(lipsync.validate, payload)
+        return task_queue.submit("generate-lipsync", "视频对口型" if payload.mode == "video" else "照片说话",
+            lambda task_id: lipsync.generate(payload,
+                lambda percent, text: task_queue.progress(task_id, percent, 100, text),
+                lambda: task_queue.cancelled(task_id)), contextual=True)
 
     @app.get("/api/workspace/projects")
     def list_projects():
@@ -363,8 +400,11 @@ def create_api_app(studio: Optional[Any] = None, model_dir: Optional[str] = None
 
     @app.post("/api/asr/recognize")
     def recognize_audio(payload: AudioRecognizeRequest) -> dict[str, Any]:
-        text = studio_service.recognize_audio(payload.audio_path)
-        return {"text": text}
+        with lipsync.lock:
+            if lipsync.active:
+                raise HTTPException(status_code=409, detail="视频正在使用显卡，请等待完成后再识别参考音频。")
+            text = studio_service.recognize_audio(payload.audio_path)
+            return {"text": text}
 
     @app.post("/api/tasks/warmup")
     def warmup_task() -> dict[str, Any]:
@@ -447,6 +487,12 @@ def create_api_app(studio: Optional[Any] = None, model_dir: Optional[str] = None
 
     @app.post("/api/training/start")
     def start_training(payload: TrainingStartRequest) -> dict[str, Any]:
+        with lipsync.lock:
+            if lipsync.active:
+                raise HTTPException(status_code=409, detail="视频正在使用显卡，请等待完成或取消视频任务后再训练。")
+            return start_training_impl(payload)
+
+    def start_training_impl(payload: TrainingStartRequest) -> dict[str, Any]:
         message, log_text = studio_service.start_training(
             pretrained_path=payload.pretrained_path,
             train_manifest=payload.train_manifest,
