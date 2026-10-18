@@ -123,7 +123,8 @@ async function cdp(port) {
   // 使用同一更新会话启动独立更新器；绕开交互确认仅用于自动化冒烟测试。
   const cache = path.join(testRoot, "data/cache/updates");
   const session = fs.readdirSync(cache).filter((name) => name.startsWith("session-")).sort().at(-1);
-  const service = new UpdateService({ root: testRoot, dataRoot: path.join(testRoot, "data"), appDir, currentVersion: fromVersion });
+  const Launcher = process.argv.includes("--legacy-client") ? require(path.join(appDir, "update-service.js")).UpdateService : UpdateService;
+  const service = new Launcher({ root: testRoot, dataRoot: path.join(testRoot, "data"), appDir, currentVersion: fromVersion });
   service.session = path.join(cache, session); service.state.status = "downloaded";
   await service.launch();
   // 主进程在生产中调用 app.quit；测试通过 taskkill 关闭本次测试进程树。
@@ -143,7 +144,7 @@ async function cdp(port) {
   const recheck = new UpdateService({ root: testRoot, dataRoot: path.join(testRoot, "data"), appDir, currentVersion: "2.0.2",
     config: { ...installedConfig, ...(manifestArgument >= 0 ? { manifestUrl: process.argv[manifestArgument + 1] } : {}) } });
   assert.equal((await recheck.check()).status, "current", "重启后不能重复提示同一发布更新");
-  assert.equal(recheck.getState().lastResult?.status, "complete");
+  if (!process.argv.includes("--legacy-client")) assert.equal(recheck.getState().lastResult?.status, "complete");
   assert.equal(await digest(sentinel), dataHash);
   assert.equal(await digest(modelConfig), modelHash);
   if (lightweight) assert.ok(fs.readFileSync(path.join(testRoot, "data/cache/runtime-bootstrap.log"), "utf8").includes("已复用验证通过的本地环境"), "更新重启未复用已验证运行时");
@@ -158,6 +159,7 @@ async function cdp(port) {
   }
   const report = { result: "passed", fromVersion, toVersion: "2.0.2", testRoot, session: service.session,
     installedReleaseId: installedConfig.releaseId, recheckStatus: recheck.state.status, signedUpdaterBootstrap: process.argv.includes("--fixed-client"),
+    legacyClient: process.argv.includes("--legacy-client"),
     userDataPreserved: true, modelPreserved: true, restartedBackend: backendState.serviceUrl, health,
     ...(componentProfile ? { componentSelectionPreserved: true, musicModels: music.models.length, officialRules: music.rules.models.length } : {}) };
   fs.writeFileSync(path.join(testRoot, "smoke-result.json"), JSON.stringify(report, null, 2));
