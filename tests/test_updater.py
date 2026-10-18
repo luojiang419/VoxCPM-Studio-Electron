@@ -239,3 +239,39 @@ def test_installed_file_corruption_rolls_back(tmp_path, monkeypatch):
     with pytest.raises(OSError, match="安装后文件校验失败"):
         u.install(root, session, manifest)
     assert old.read_bytes() == b"original"
+
+
+@pytest.mark.parametrize("case", ["interrupted", "running", "foreign"])
+def test_offline_repair_recovers_only_owned_stopped_transactions(tmp_path, monkeypatch, case):
+    repair_spec = importlib.util.spec_from_file_location("repair_update", MODULE.parents[2] / "scripts/repair_update.py")
+    repair = importlib.util.module_from_spec(repair_spec)
+    repair_spec.loader.exec_module(repair)
+    root, external, settings = prepare(tmp_path)
+    session = root / "data/cache/updates/session-old"
+    session.parent.mkdir(parents=True)
+    import shutil
+    shutil.move(str(external), str(session))
+    settings["session"] = str(session)
+    u.write_json(session / "session.json", settings)
+    old = root / "resources/app/main.js"
+    old.parent.mkdir(parents=True); old.write_bytes(b"original")
+    u.install(root, session, u.validate(session, settings))
+    pending = session.parent / "pending.json"
+    u.write_json(pending, {"session": str(session), "pid": 12345})
+    monkeypatch.setattr(u, "alive", lambda pid: case == "running")
+    if case == "foreign":
+        settings["root"] = str(tmp_path)
+        u.write_json(session / "session.json", settings)
+        with pytest.raises(ValueError, match="不一致"):
+            repair.recover_pending(root, u)
+    elif case == "running":
+        with pytest.raises(RuntimeError, match="仍在运行"):
+            repair.recover_pending(root, u)
+    else:
+        assert repair.recover_pending(root, u) is True
+        assert old.read_bytes() == b"original"
+        assert not pending.exists()
+        assert u.read_json(session / "journal.json")["status"] == "rolled-back"
+        return
+    assert old.read_bytes() == b"new desktop"
+    assert pending.exists()

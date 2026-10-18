@@ -1,5 +1,7 @@
 # VoxCPM Studio Electron
 
+2026-10-18 已发布更新修复 `2.0.2 / 20261018135226`，旧用户在软件内「检查更新」即可升级。若反复更新失败，可[下载一次性修复包](https://modelscope.cn/api/v1/models/jiangjiang419/voxcpm-studio-updates/repo?Revision=master&FilePath=repairs%2F2.0.2%2F20261018135226%2FVoxCPM-Studio-2.0.2-Update-Repair-20261018135226.zip)，完整解压并关闭原软件后运行「修复更新.cmd」，在原安装目录保留模型、配置和作品完成修复。详见[自动更新与故障恢复](./docs/自动更新说明.md)。
+
 现已提供[轻量分发与自动补齐](./docs/轻量版与自动补齐.md)：可仅分发约 36 KB 的 Windows 原生启动器，点击运行后从魔搭补齐 Electron 桌面、Python、固定依赖和模型，为 RTX 50 系自动选择 CUDA 12.8。也保留完整 Electron 壳的轻量 ZIP。
 
 本机开发版现已支持[视频对口型与照片说话](./docs/本机视频对口型与照片说话.md)：首次进入页面按显卡自动补齐对应模型和独立视频依赖，16GB及以上默认LatentSync 1.6，8～不足16GB默认1.5；支持断点续传、暂停、重试和就绪缓存。复用已生成配音，支持进度、取消、作品恢复及MP4导出；1.6显存不足停止并保留版本。

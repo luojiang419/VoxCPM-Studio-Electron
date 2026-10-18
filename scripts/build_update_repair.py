@@ -7,7 +7,7 @@ import zipfile
 ROOT = Path(__file__).resolve().parents[1]
 
 
-def build(snapshot: Path):
+def build(snapshot: Path, output_dir: Path | None = None):
     import sys
     sys.path.insert(0, str(ROOT / "frontend/voxcpm_studio_electron"))
     from updater import read_json, sha256
@@ -20,7 +20,7 @@ def build(snapshot: Path):
     package = snapshot / manifest["package"]["name"]
     if sha256(package) != manifest["package"]["sha256"]:
         raise ValueError("快照包哈希错误")
-    output = ROOT / "builds/正式分发" / ("VoxCPM-更新修复-" + manifest["releaseId"])
+    output = output_dir or ROOT / "builds/正式分发" / ("VoxCPM-更新修复-" + manifest["releaseId"])
     output.mkdir(parents=True, exist_ok=False)
     for name in ("repair_update.py", "repair_update.ps1"):
         shutil.copy2(ROOT / "scripts" / name, output / name)
@@ -38,8 +38,10 @@ def build(snapshot: Path):
         "无需重新下载模型，无需额外安装 Python。软件原有运行环境必须已准备完毕。\n"
         "签名验证后替换应用文件，自动重启；启动失败回滚，并显示具体原因和日志路径。\n"
         "不会删除模型、配置、音色与作品。请保持修复窗口打开至显示成功。\n"
+        "遇到上次更新中断时，会在确认更新进程已退出后从事务备份恢复，再安装修复。不要手动删除pending.json或backup。\n"
+        "若修复仍失败，不要卸载或删除原目录；保留窗口中显示的updater.log和会话目录，联系维护者定位。\n"
         f"目标版本：{manifest['version']}；发布序号：{manifest['releaseId']}。\n"
-        "此包为本地修复交付，未激活公网更新；远端较旧时再次检查会显示已是最新版本。\n", encoding="utf-8-sig")
+        "修复成功后，请在设置中确认发布序号并再次检查更新。相同或更旧的修复包会拒绝重复安装。\n", encoding="utf-8-sig")
     archive = output.with_suffix(".zip")
     with zipfile.ZipFile(archive, "x", zipfile.ZIP_DEFLATED) as z:
         for file in output.iterdir():
@@ -52,4 +54,6 @@ def build(snapshot: Path):
 if __name__ == "__main__":
     parser = argparse.ArgumentParser(description=__doc__)
     parser.add_argument("snapshot", type=Path)
-    build(parser.parse_args().snapshot.resolve(strict=True))
+    parser.add_argument("--output", type=Path, help="使用独立目录保存公开分发包，不覆盖已验证旧产物")
+    args = parser.parse_args()
+    build(args.snapshot.resolve(strict=True), args.output)

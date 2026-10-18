@@ -158,6 +158,24 @@ def publish(output):
         "此仓库仅存放 VoxCPM Studio 桌面更新，不包含模型权重或用户数据。\n\n"
         "客户端通过 public/latest.json 验证 Ed25519 签名，下载后校验 SHA-256。\n"
         "已有旧版首次接入请参阅源码仓库 docs/自动更新说明.md。\n", "utf-8")
+    repair_report = output / "repair-publication.json"
+    if repair_report.exists():
+        repair = read_json(repair_report)
+        if repair.get("releaseId") != manifest.get("releaseId") or not repair.get("anonymousVerification"):
+            raise ValueError("修复包发布记录与本次更新不一致")
+        with (activation / "README.md").open("a", encoding="utf-8") as stream:
+            stream.write(
+                f"\n## 当前正式更新\n\n版本：{manifest['version']}，发布序号：{manifest['releaseId']}。\n\n"
+                "已安装用户在软件内点击“检查更新”，下载后重启安装，无需重新安装模型。\n\n"
+                f"## 更新失败的补救\n\n[下载一次性更新修复包]({repair['repairUrl']})（约 {repair['size'] / 1024 ** 2:.1f} MB）。\n\n"
+                "1. 完整解压修复包，关闭原软件和独立更新窗口。\n"
+                "2. 双击“修复更新.cmd”；默认目录自动识别，找不到时选择包含 VoxCPM Studio.exe 的原安装目录。\n"
+                "3. 等待修复成功与自动重启，在设置里核对当前发布序号，再检查更新。\n\n"
+                "修复在原目录进行，保留模型、配置、音色和作品；上次更新中断时先使用事务备份恢复。"
+                "请不要卸载、删除原目录或手动清理 pending.json / backup。\n\n"
+                "若修复仍失败，保留窗口所列的 updater.log 与会话目录，并提供错误内容给维护者定位；"
+                "运行环境缺失、权限限制或安全软件拦截需要按日志处理，不通过修改版本标记掩盖失败。\n\n"
+                f"修复包 SHA256：`{repair['sha256']}`。\n")
     api.upload_folder(repo_id=repo, folder_path=str(activation), commit_message=f"activate: VoxCPM Studio {manifest['version']}")
     if json.loads(read_remote(latest_url)) != envelope:
         raise ValueError("魔搭最新入口匿名回读不一致")

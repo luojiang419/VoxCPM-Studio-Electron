@@ -36,6 +36,7 @@ try {
     $prepared = & $python (Join-Path $PSScriptRoot 'repair_update.py') $InstallRoot
     if ($LASTEXITCODE -ne 0) { throw '修复准备失败，请查看上方具体原因。原应用文件尚未替换。' }
     $session = $prepared | ConvertFrom-Json
+    if ($session.recoveredInterruptedUpdate) { Write-Host '已使用原事务备份恢复上次中断的更新，继续安装修复。' }
     Write-Host "目标发布序号：$($session.releaseId)"
     $lastMessage = ''
     while ($true) {

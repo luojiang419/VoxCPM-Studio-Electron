@@ -12,6 +12,24 @@ import sys
 import uuid
 
 
+def recover_pending(root: Path, updater):
+    pending = root / "data/cache/updates/pending.json"
+    if not pending.exists():
+        return False
+    state = updater.read_json(pending)
+    session = Path(state["session"]).resolve(strict=True)
+    if not session.is_relative_to(pending.parent.resolve()):
+        raise ValueError("未完成事务的会话目录不属于当前软件，请保留日志后联系维护者")
+    settings = updater.read_json(session / "session.json")
+    if Path(settings["root"]).resolve() != root or Path(settings["session"]).resolve() != session:
+        raise ValueError("未完成事务与当前软件目录不一致，已停止恢复")
+    if state.get("pid") and updater.alive(state["pid"]):
+        raise RuntimeError("独立更新进程仍在运行，请等待完成或正常关闭更新器后重试")
+    # 使用已有事务备份恢复，不删除用户数据、不丢弃回滚记录。
+    updater.run(session, recover=True)
+    return True
+
+
 def prepare(root: Path, snapshot: Path, helper: Path):
     root = root.resolve(strict=True)
     app = root / "resources/app"
@@ -32,8 +50,7 @@ def prepare(root: Path, snapshot: Path, helper: Path):
     updater = importlib.util.module_from_spec(spec)
     spec.loader.exec_module(updater)
     cache = root / "data/cache/updates"
-    if (cache / "pending.json").exists():
-        raise RuntimeError("存在未完成的更新事务。请先启动软件完成自动恢复，再关闭软件并重试；请勿删除更新记录。")
+    recovered = recover_pending(root, updater)
     config = updater.read_json(app / "update-config.json")
     package = updater.read_json(app / "package.json")
     envelope = updater.read_json(snapshot / "envelope.json")
@@ -58,7 +75,7 @@ def prepare(root: Path, snapshot: Path, helper: Path):
         child = subprocess.Popen([sys.executable, "-u", str(session / "updater.py"), str(session)],
             cwd=session, stdin=subprocess.DEVNULL, stdout=log, stderr=log,
             creationflags=subprocess.CREATE_NO_WINDOW)
-    print(json.dumps({"session": str(session), "pid": child.pid, "releaseId": verified["releaseId"]}, ensure_ascii=True))
+    print(json.dumps({"session": str(session), "pid": child.pid, "releaseId": verified["releaseId"], "recoveredInterruptedUpdate": recovered}, ensure_ascii=True))
 
 
 if __name__ == "__main__":

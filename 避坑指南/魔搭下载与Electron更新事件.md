@@ -33,3 +33,5 @@
 验证：28 项 Python 事务测试、5 项 Node 更新测试与准备心跳测试通过。scripts/smoke_update_reliability.cjs 故意破坏旧更新脚本，实际下载签名包、握手安装、重启后再次检查为 current；旧版离线修复、运行中拒绝、相同版本拒绝、用户数据保留与真实设置面板检查通过。记录 builds/update-reliability-validation/1792331704504/report.json。
 
 另用 scripts/smoke_update_legacy.cjs 验证 `20261017132910`、`20261018131046` 两份完整未修补旧客户端直接升级：会话脚本与原旧脚本逐字节相同，升级重启后均为current。报告 builds/legacy-update-validation/1792332759826/report.json、1792332666281/report.json。旧脚本会妨碍某些修复首次生效，但不等于所有旧客户端都会升级失败；不能在没有故障日志时把它当成唯一根因。
+
+2026-10-18已发布魔搭并验证r8未修补客户端的真实公网升级：builds/update-smoke-1792333642094/smoke-result.json。独立修复还需要处理pending事务，否则主程序损坏时会出现“先启动软件恢复”却无法启动的循环；现在确认事务属于当前目录且原进程已退出后直接用原备份恢复。31项Python回归及损坏main.js的实际恢复升级通过，报告builds/repair-recovery-validation/1792333510461/report.json。不要直接删除pending/backup或伪造新版本标记。
