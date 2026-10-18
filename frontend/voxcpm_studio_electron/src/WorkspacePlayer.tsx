@@ -1,6 +1,7 @@
 import { useEffect, useRef, useState, type ReactNode } from "react";
 
 type Props = {
+  variant?: "voice" | "music";
   src: string;
   fileName: string;
   canGenerate: boolean;
@@ -33,7 +34,9 @@ function PlayerIcon({ name }: { name: "play" | "pause" | "folder" | "download" |
   return <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.65" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true">{paths[name]}</svg>;
 }
 
-export default function WorkspacePlayer({ src, fileName, canGenerate, hasOutput, generating, status, onGenerate, onSave, onOpenDirectory, canSaveVoice, saveVoiceHint, onSaveVoice }: Props) {
+export default function WorkspacePlayer({ variant = "voice", src, fileName, canGenerate, hasOutput, generating, status, onGenerate, onSave, onOpenDirectory, canSaveVoice, saveVoiceHint, onSaveVoice }: Props) {
+  const audioLabel = variant === "music" ? "音乐" : "合成音频";
+  const emptyTitle = variant === "music" ? "准备好，听听你的音乐" : "准备好，听听你的声音";
   const audioRef = useRef<HTMLAudioElement>(null);
   const playRequest = useRef(0);
   const [playing, setPlaying] = useState(false);
@@ -72,7 +75,7 @@ export default function WorkspacePlayer({ src, fileName, canGenerate, hasOutput,
     }
   }
 
-  return <footer className="workspace-generation-footer" aria-label="合成音频播放器">
+  return <footer className="workspace-generation-footer" aria-label={`${audioLabel}播放器`}>
     <audio ref={audioRef} src={src || undefined} preload="metadata" muted={muted}
       onLoadedMetadata={event => setDuration(Number.isFinite(event.currentTarget.duration) ? event.currentTarget.duration : 0)}
       onDurationChange={event => setDuration(Number.isFinite(event.currentTarget.duration) ? event.currentTarget.duration : 0)}
@@ -83,21 +86,21 @@ export default function WorkspacePlayer({ src, fileName, canGenerate, hasOutput,
     {audioError && <p className="workspace-playback-error" role="alert">{audioError}</p>}
     <div className="workspace-transport">
       <div className="workspace-player">
-        <button type="button" className={`workspace-play-button ${playing ? "is-playing" : ""}`} aria-label={playing ? "暂停合成音频" : "播放合成音频"} title={playing ? "暂停" : "播放"} disabled={!src} onClick={() => void togglePlayback()}>
+        <button type="button" className={`workspace-play-button ${playing ? "is-playing" : ""}`} aria-label={`${playing ? "暂停" : "播放"}${audioLabel}`} title={playing ? "暂停" : "播放"} disabled={!src} onClick={() => void togglePlayback()}>
           <PlayerIcon name={playing ? "pause" : "play"} />
         </button>
-        <div className="workspace-now-playing"><strong title={fileName || "准备好，听听你的声音"}>{fileName || "准备好，听听你的声音"}</strong><span>{src ? `${timeLabel(currentTime)} / ${timeLabel(duration)}` : "生成后在这里试听"}</span></div>
+        <div className="workspace-now-playing"><strong title={fileName || emptyTitle}>{fileName || emptyTitle}</strong><span>{src ? `${timeLabel(currentTime)} / ${timeLabel(duration)}` : "生成后在这里试听"}</span></div>
       </div>
       <div className="workspace-seek-controls">
-        <input type="range" className="workspace-audio-seek" aria-label="合成音频播放进度" aria-valuetext={`${timeLabel(currentTime)} / ${timeLabel(duration)}`} min={0} max={duration || 1} step={0.01} value={Math.min(currentTime, duration || 0)} disabled={!src || !duration}
+        <input type="range" className="workspace-audio-seek" aria-label={`${audioLabel}播放进度`} aria-valuetext={`${timeLabel(currentTime)} / ${timeLabel(duration)}`} min={0} max={duration || 1} step={0.01} value={Math.min(currentTime, duration || 0)} disabled={!src || !duration}
           onChange={event => { const time = Number(event.target.value); if (audioRef.current) { audioRef.current.currentTime = time; setCurrentTime(time); } }} />
         <button type="button" className="workspace-mute-button" aria-label={muted ? "取消静音" : "静音"} aria-pressed={muted} disabled={!src} onClick={() => setMuted(value => !value)}><PlayerIcon name={muted ? "muted" : "volume"} /></button>
       </div>
       <div className="workspace-action-bar">
         <button type="button" className="ghost-button" onClick={onOpenDirectory} disabled={!hasOutput}><PlayerIcon name="folder" /><span>输出目录</span></button>
         <button type="button" className="ghost-button" onClick={onSave} disabled={!hasOutput}><PlayerIcon name="download" /><span>另存音频</span></button>
-        <button type="button" className="ghost-button workspace-save-voice" onClick={onSaveVoice} disabled={!canSaveVoice} title={saveVoiceHint}><span>保存音色</span></button>
-        <button type="button" className="primary-button" onClick={onGenerate} disabled={!canGenerate}><PlayerIcon name="spark" /><span>{generating ? "正在生成…" : "开始生成"}</span></button>
+        {variant === "voice" && <button type="button" className="ghost-button workspace-save-voice" onClick={onSaveVoice} disabled={!canSaveVoice} title={saveVoiceHint}><span>保存音色</span></button>}
+        <button type="button" className="primary-button" onClick={onGenerate} disabled={!canGenerate}><PlayerIcon name="spark" /><span>{generating ? "正在生成…" : variant === "music" ? "生成音乐" : "开始生成"}</span></button>
       </div>
     </div>
   </footer>;

@@ -1,3 +1,8 @@
+.studio-shell .panel-shell.music-workspace-shell { display: flex; flex-direction: column; padding: 0; overflow: hidden; }
+.music-workspace-shell > .music-layout { flex: 1; min-height: 0; overflow: auto; overscroll-behavior: contain; align-content: start; padding: 18px 24px 30px; }
+.studio-shell .music-workspace-shell > .workspace-generation-footer { margin-top: 0; }
+.music-workspace-shell .workspace-generation-footer .music-task-card { margin: 0; padding: 10px 24px 0; border: 0; border-radius: 0; background: transparent; }
+.music-workspace-shell .workspace-generation-footer .music-task-card strong { display: block; max-height: 40px; overflow: auto; overflow-wrap: anywhere; font-size: 11px; }
 .music-layout { display: grid; grid-template-columns: minmax(0, 1fr) 310px; align-items: start; gap: 22px; padding: 4px 0 30px; }
 .music-main, .music-options { display: grid; min-width: 0; gap: 18px; }
 .music-card { min-width: 0; border: 1px solid var(--line); border-radius: 18px; background: var(--panel); padding: 24px; }
@@ -47,9 +52,7 @@
 .music-full-button { width: 100%; margin-top: 16px; }
 .music-options .music-switch-label { font-size: 11px; }
 .music-parameter-grid { display: grid; grid-template-columns: minmax(0, 1fr) minmax(0, 1fr); gap: 0 14px; }
-.music-generate-button { width: 100%; margin-top: 20px; min-height: 45px; }
 .music-backend > .field { margin-top: 16px; }
-.music-result audio { width: 100%; height: 42px; margin-bottom: 14px; }
 .music-history > button { display: flex; width: 100%; align-items: center; gap: 14px; padding: 13px 10px; border: 0; border-top: 1px solid var(--line); background: transparent; color: var(--muted); text-align: left; cursor: pointer; font-size: 11px; }
 .music-history > button strong { flex: 1; color: var(--text); font-size: 12px; font-weight: 500; }
 .music-history > button.is-current { background: var(--panel-soft); border-radius: 8px; }

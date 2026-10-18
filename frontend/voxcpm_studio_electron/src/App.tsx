@@ -1109,7 +1109,7 @@ function App() {
         {globalMessage ? <div className="notice-banner">{globalMessage}</div> : null}
         {updateNotice && page !== "settings" ? <div className="notice-banner">{updateNotice} <button type="button" className="ghost-button" onClick={() => setPage("settings")}>查看更新</button></div> : null}
 
-        <section className={`panel-shell ${page === "workspace" ? "voice-workspace-shell" : page === "batch" ? "batch-workspace-shell" : page === "overview" ? "overview-shell" : page === "lipsync" ? "lipsync-shell" : ""}`}>
+        <section className={`panel-shell ${page === "workspace" ? "voice-workspace-shell" : page === "music" ? "music-workspace-shell" : page === "batch" ? "batch-workspace-shell" : page === "overview" ? "overview-shell" : page === "lipsync" ? "lipsync-shell" : ""}`}>
           {page === "lipsync" && <LipSyncStudio backendBaseUrl={backendBaseUrl} latestAudio={workspaceOutputPath} />}
           {page === "music" && <MusicStudio backendBaseUrl={backendBaseUrl} onSettings={() => setPage("settings")} />}
           {["production", "voices", "history"].includes(page) ? <ProductionStudio

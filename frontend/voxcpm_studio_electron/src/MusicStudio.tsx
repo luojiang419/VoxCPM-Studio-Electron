@@ -1,5 +1,6 @@
 import { useEffect, useRef, useState } from "react";
 import { musicRequest, type AssistantConfig, type MusicBrief, type MusicDraft, type MusicResult, type PromptPacket } from "./music-api";
+import WorkspacePlayer from "./WorkspacePlayer";
 import "./music-studio.css";
 
 type Model = { id: string; name: string; ready: boolean; installed: boolean; selected: boolean; size: number };
@@ -122,9 +123,24 @@ export default function MusicStudio({ backendBaseUrl, onSettings }: { backendBas
       await window.voxcpmDesktop.startBackend();
     });
   }
-  const generateButton = <button className="primary-button music-generate-button" disabled={locked || !selected?.ready || !(brief.idea.trim() || brief.lyrics.trim() || draft.caption.trim() || draft.lyrics.trim()) || (brief.modelId === "yue2" && brief.instrumental) || (current && compiled?.canGenerate === false)} onClick={() => void generate()}>{running?.kind === "audio" ? "正在生成音乐…" : "生成音乐  →"}</button>;
+  async function saveAudio() {
+    const output = result;
+    if (!output) return;
+    await perform(async () => {
+      const target = await window.voxcpmDesktop.saveDialog({
+        defaultPath: (output.title || "音乐").replace(/[<>:"/\\|?*]/g, "_") + ".wav",
+        filters: [{ name: "WAV音频", extensions: ["wav"] }],
+      });
+      if (!target.canceled && target.filePath) {
+        await musicRequest(backendBaseUrl, "/api/files/save-as", { method: "POST", body: JSON.stringify({ sourcePath: output.outputPath, targetPath: target.filePath }) });
+        setMessage("音乐已另存为。");
+      }
+    });
+  }
+  const canGenerate = !locked && !!backendBaseUrl && !!selected?.ready && !!(brief.idea.trim() || brief.lyrics.trim() || draft.caption.trim() || draft.lyrics.trim()) && !(brief.modelId === "yue2" && brief.instrumental) && !(current && compiled?.canGenerate === false);
   const taskPanel = (running || message) && <section className="music-task-card" role="status" aria-live="polite"><div><strong>{running ? task?.progressText || task?.statusText || "任务已加入队列" : message}</strong>{running && <progress max={100} value={running.kind === "prompt" ? task?.completed || undefined : undefined} />}</div>{running && <button className="ghost-button" disabled={!!task?.cancelRequested} onClick={() => void perform(async () => { const route = running.kind === "prompt" ? "/api/music/prompt-tasks/" : "/api/tasks/"; setTask(await musicRequest(backendBaseUrl, route + running.id + "/cancel", { method: "POST", body: "{}" })); })}>{task?.cancelRequested ? "正在取消…" : "取消任务"}</button>}</section>;
-  return <div className="music-layout">
+  return <>
+  <div className="music-layout">
     <div className="music-main">
       <section className="music-card music-brief-card">
         <div className="music-card-heading"><div><span className="music-kicker">从灵感开始</span><h2>今天，想听到怎样的音乐？</h2></div><span className="music-ai-pill">{assistant?.providers.some(p => p.enabled) ? "AI 助手已就绪" : "待配置 AI 助手"}</span></div>
@@ -132,7 +148,6 @@ export default function MusicStudio({ backendBaseUrl, onSettings }: { backendBas
         <details className="music-details"><summary>更多要求与已有歌词 <span>可选</span></summary><label className="field"><span>创作要求</span><textarea value={brief.requirements} disabled={locked} onChange={e => setBrief({ ...brief, requirements: e.target.value })} rows={3} placeholder="如：男中音、不要说唱、铜管和弦乐逐步进入、结尾完整收束。" /></label><label className="field"><span>已有歌词</span><textarea value={brief.lyrics} disabled={locked} onChange={e => setBrief({ ...brief, lyrics: e.target.value })} rows={6} placeholder="有歌词可以直接粘贴；没有时，AI会根据需求创作。" /></label><label className="music-switch-label"><input className="music-switch" type="checkbox" role="switch" checked={brief.preserveLyrics} disabled={locked} onChange={e => setBrief({ ...brief, preserveLyrics: e.target.checked })} />保留已有歌词原文</label></details>
         <div className="music-brief-actions"><label className="music-switch-label"><input className="music-switch" type="checkbox" role="switch" checked={brief.instrumental} disabled={locked} onChange={e => setBrief({ ...brief, instrumental: e.target.checked })} />纯音乐</label><button className="primary-button" disabled={locked || !backendBaseUrl || !(brief.idea.trim() || brief.lyrics.trim() || draft.caption.trim() || draft.lyrics.trim())} onClick={() => void compose()}>{current ? "再次优化 / 创作" : packet ? "AI 适配所选模型" : "AI 创作 / 优化"}</button></div>
       </section>
-      {taskPanel}
       <section className="music-card music-prompt-card">
         <div className="music-card-heading"><div><span className="music-kicker">生成前，可自由修改</span><h3>最终音乐提示词</h3></div><span className={`music-ready-label ${current ? "is-ready" : ""}`}>{current ? "已适配当前模型" : packet ? "需求或模型已改变，等待适配" : "等待创作或手动填写"}</span></div>
         <label className="music-title-input"><span>作品名称</span><input value={draft.title} disabled={locked} placeholder="未命名音乐" onChange={e => editDraft({ title: e.target.value })} /></label>
@@ -142,11 +157,11 @@ export default function MusicStudio({ backendBaseUrl, onSettings }: { backendBas
         {(current ? compiled?.warnings || packet?.warnings || [] : []).map(warning => <p className="music-help" key={warning}>{warning}</p>)}
         <details className="music-details"><summary>查看最终模型输入与规则来源</summary><p className="music-help">{official?.kind === "official-skill" ? `官方技能：${official.skill}` : "依据HeartMuLa官方文档与推理协议整理"} <button className="music-text-button" onClick={() => official && window.voxcpmDesktop.openExternal(official.url)}>查看官方来源 ↗</button></p><pre className="music-input-preview">{current && compiled ? JSON.stringify(compiled.inputs, null, 2) : "完成当前模型的适配后，可在此查看实际提交字段。"}</pre><button className="ghost-button" disabled={!current || !compiled} onClick={() => void perform(async () => { await navigator.clipboard.writeText(JSON.stringify(compiled!.inputs, null, 2)); setMessage("最终模型输入已复制。"); })}>复制模型输入</button></details>
       </section>
-      {result && <section className="music-card music-result"><div className="music-card-heading"><div><span className="music-kicker">试听作品</span><h3>{result.title}</h3></div><button className="ghost-button" onClick={() => void perform(async () => { const target = await window.voxcpmDesktop.saveDialog({ defaultPath: (result.title || "音乐").replace(/[<>:"/\\|?*]/g, "_") + ".wav", filters: [{ name: "WAV音频", extensions: ["wav"] }] }); if (!target.canceled && target.filePath) { await musicRequest(backendBaseUrl, "/api/files/save-as", { method: "POST", body: JSON.stringify({ sourcePath: result.outputPath, targetPath: target.filePath }) }); setMessage("音乐已另存为。"); } })}>另存为</button></div><audio controls preload="metadata" src={backendBaseUrl + result.previewUrl} /><div className="music-result-meta"><span>{status?.models.find(m => m.id === result.modelId)?.name || result.modelId}</span><span>音频 {seconds(result.duration)}</span><span>生成 {seconds(result.report.elapsedSeconds)}</span>{result.report.assistantSeconds > 0 && <span>AI创作 {seconds(result.report.assistantSeconds)}</span>}</div></section>}
-      {results.length > 0 && <section className="music-card music-history"><div className="music-card-heading"><h3>最近作品</h3><span className="music-help">已保留实际提示词与歌词</span></div>{results.slice(0, 8).map(item => <button className={item.outputPath === result?.outputPath ? "is-current" : ""} key={item.outputPath} onClick={() => setResult(item)}><span className="music-history-icon">♪</span><strong>{item.title}</strong><span>{status?.models.find(m => m.id === item.modelId)?.name || item.modelId}</span><small>{seconds(item.duration)}</small></button>)}</section>}
+      {result && <section className="music-card music-result"><div className="music-card-heading"><div><span className="music-kicker">当前试听作品</span><h3>{result.title}</h3></div><span className="music-help">底部播放与保存</span></div><div className="music-result-meta"><span>{status?.models.find(m => m.id === result.modelId)?.name || result.modelId}</span><span>音频 {seconds(result.duration)}</span><span>生成 {seconds(result.report.elapsedSeconds)}</span>{result.report.assistantSeconds > 0 && <span>AI创作 {seconds(result.report.assistantSeconds)}</span>}</div></section>}
+      {results.length > 0 && <section className="music-card music-history"><div className="music-card-heading"><h3>最近作品</h3><span className="music-help">点击载入底部播放器</span></div>{results.slice(0, 8).map(item => <button className={item.outputPath === result?.outputPath ? "is-current" : ""} key={item.outputPath} aria-pressed={item.outputPath === result?.outputPath} onClick={() => setResult(item)}><span className="music-history-icon">♪</span><strong>{item.title}</strong><span>{status?.models.find(m => m.id === item.modelId)?.name || item.modelId}</span><small>{seconds(item.duration)}</small></button>)}</section>}
     </div>
     <aside className="music-options">
-      <section className="music-card"><div className="music-card-heading"><h3>音乐模型</h3><span className="music-kicker">自由选择</span></div><label className="field"><span>当前模型</span><select value={brief.modelId} disabled={locked} onChange={e => setBrief({ ...brief, modelId: e.target.value })}>{(status?.models || [{ id: "ace-xl-turbo", name: "ACE-Step 1.5 XL Turbo" }]).map(model => <option value={model.id} key={model.id}>{model.name}</option>)}</select></label>{selected && <div className="music-model-facts"><span>{(selected.size / 1024 ** 3).toFixed(2)} GiB</span><span>{selected.ready ? "已就绪" : selected.installed ? "文件已安装" : "待补齐"}</span></div>}{selected && !selected.ready && <button className="ghost-button music-full-button" disabled={locked} onClick={() => void enableModel()}>启用并补齐此模型</button>}<p className="music-help">更换模型后，AI会重新适配提示词；相同需求下保留已写好的歌词。</p>{generateButton}</section>
+      <section className="music-card"><div className="music-card-heading"><h3>音乐模型</h3><span className="music-kicker">自由选择</span></div><label className="field"><span>当前模型</span><select value={brief.modelId} disabled={locked} onChange={e => setBrief({ ...brief, modelId: e.target.value })}>{(status?.models || [{ id: "ace-xl-turbo", name: "ACE-Step 1.5 XL Turbo" }]).map(model => <option value={model.id} key={model.id}>{model.name}</option>)}</select></label>{selected && <div className="music-model-facts"><span>{(selected.size / 1024 ** 3).toFixed(2)} GiB</span><span>{selected.ready ? "已就绪" : selected.installed ? "文件已安装" : "待补齐"}</span></div>}{selected && !selected.ready && <button className="ghost-button music-full-button" disabled={locked} onClick={() => void enableModel()}>启用并补齐此模型</button>}<p className="music-help">更换模型后，AI会重新适配提示词；相同需求下保留已写好的歌词。</p></section>
       <section className="music-card"><div className="music-card-heading"><h3>AI 助手</h3><button className="music-text-button" onClick={onSettings}>配置 ↗</button></div><label className="field"><span>用于创作与优化</span><select value={brief.providerId} disabled={locked} onChange={e => setBrief({ ...brief, providerId: e.target.value })}><option value="">使用默认助手</option>{assistant?.providers.filter(p => p.enabled).map(p => <option key={p.id} value={p.id}>{p.name} · {p.model}</option>)}</select></label><label className="music-switch-label"><input type="checkbox" role="switch" className="music-switch" checked={autoOptimize} disabled={locked} onChange={e => setAutoOptimize(e.target.checked)} />生成前自动创作与适配</label><p className="music-help">已适配或手动编辑的当前草稿会直接使用。助手不可用时会提示，不会悄悄改用原始需求生成。</p></section>
       <section className="music-card"><div className="music-card-heading"><h3>歌曲参数</h3></div><div className="music-parameter-grid">
         <label className="field"><span>期望时长 / 秒</span><input type="number" min={10} max={300} value={brief.duration} disabled={locked} onChange={e => setBrief({ ...brief, duration: Number(e.target.value) })} /></label>
@@ -158,5 +173,14 @@ export default function MusicStudio({ backendBaseUrl, onSettings }: { backendBas
       </div><p className="music-help">模型可能提前结束歌曲。节奏、音色和结构是生成方向，可通过试听继续调整。</p>{brief.modelId === "yue2" && brief.instrumental && <p className="music-help">当前YuE2运行接口尚未接入官方纯音乐转谱。可先创作提示词，或使用ACE/MiniMax生成纯音乐。</p>}</section>
       <details className="music-card music-backend"><summary>音乐后端设置</summary><p className="music-help">留空时优先复用本机兼容的ComfyUI，否则启动独立音乐后端。也可指定已部署的ComfyUI地址。</p><label className="field"><span>ComfyUI 地址</span><input value={comfyUrl} disabled={locked} placeholder="自动，或 http://127.0.0.1:8188" onChange={e => setComfyUrl(e.target.value)} /></label><button className="ghost-button" disabled={locked} onClick={() => void perform(async () => { await musicRequest(backendBaseUrl, "/api/music/settings", { method: "PUT", body: JSON.stringify({ comfyUrl }) }); setMessage("音乐后端设置已保存。"); })}>保存后端设置</button></details>
     </aside>
-  </div>;
+  </div>
+  <WorkspacePlayer variant="music"
+    src={result ? backendBaseUrl + result.previewUrl : ""}
+    fileName={result?.title || ""} hasOutput={!!result}
+    canGenerate={canGenerate} generating={running?.kind === "audio"}
+    onGenerate={() => void generate()} onSave={() => void saveAudio()}
+    onOpenDirectory={() => { const output = result; if (output) void window.voxcpmDesktop.showItemInFolder(output.outputPath).catch(error => setMessage((error as Error).message)); }}
+    status={taskPanel}
+  />
+  </>;
 }
