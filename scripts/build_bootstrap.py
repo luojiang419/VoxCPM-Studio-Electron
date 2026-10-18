@@ -17,7 +17,7 @@ from modelscope_runtime import DEFAULT_REPO, file_url, publish_file, sha256
 ROOT = Path(__file__).resolve().parents[1]
 
 
-def build(payload: Path, output: Path, release_id: str, payload_url: str | None = None):
+def build(payload: Path, output: Path, release_id: str, payload_url: str | None = None, demo: bool = False):
     if output.exists():
         raise ValueError(f"启动器输出目录已存在：{output}")
     output.mkdir(parents=True)
@@ -40,13 +40,13 @@ def build(payload: Path, output: Path, release_id: str, payload_url: str | None 
         manifest["appReleaseId"] = json.loads(archive.read(root + "/resources/app/update-config.json"))["releaseId"]
     source_manifest = output.parent / (output.name + "-manifest.json")
     source_manifest.write_text(json.dumps(manifest, ensure_ascii=False, separators=(",", ":")), encoding="utf-8")
-    executable = output / "VoxCPM启动器.exe"
+    executable = output / ("VoxCPM启动器-界面演示.exe" if demo else "VoxCPM启动器.exe")
     compiler = Path("C:/Windows/Microsoft.NET/Framework64/v4.0.30319/csc.exe")
-    subprocess.run([str(compiler), "/nologo", "/target:winexe", "/platform:anycpu", "/optimize+", "/out:" + str(executable),
+    subprocess.run([str(compiler), "/nologo", "/target:winexe", "/platform:anycpu", "/optimize+", *(["/define:DEMO"] if demo else []), "/out:" + str(executable),
                     "/resource:" + str(source_manifest) + ",bootstrap-manifest.json", "/reference:System.Windows.Forms.dll",
                     "/reference:System.Drawing.dll", "/reference:System.Web.Extensions.dll", "/reference:System.IO.Compression.dll",
                     "/reference:System.IO.Compression.FileSystem.dll", str(ROOT / "bootstrap/Program.cs")], check=True)
-    (output / "使用说明.txt").write_text(
+    (output / "使用说明.txt").write_text("界面演示：点击运行可观看准备进度，并可暂停、继续和重新演示。\n此版本不会下载、安装或打开工作台。\n" if demo else
         "双击 VoxCPM启动器.exe，点击运行。\n"
         "启动器会从魔搭补齐桌面环境，然后自动打开工作台并补齐依赖和模型。\n"
         "不需要预先安装 Python；Windows 10/11 自带的 .NET Framework 可运行启动器。\n"
@@ -58,7 +58,7 @@ def build(payload: Path, output: Path, release_id: str, payload_url: str | None 
         for file in output.iterdir():
             zip_output.write(file, file.name)
     plan = {"repository": DEFAULT_REPO, "prefix": prefix, "payload": str(payload), "launcher": str(executable),
-            "manifest": str(source_manifest), "package": str(archive)}
+            "manifest": str(source_manifest), "package": str(archive), "demo": demo}
     if payload_url:
         from urllib.parse import parse_qs, urlparse
         parsed = urlparse(payload_url)
@@ -71,6 +71,8 @@ def build(payload: Path, output: Path, release_id: str, payload_url: str | None 
 
 
 def publish(plan):
+    if plan.get("demo"):
+        raise ValueError("演示版本不作为正式启动器发布")
     from modelscope.hub.api import HubApi
 
     api = HubApi()
@@ -96,6 +98,7 @@ if __name__ == "__main__":
     parser.add_argument("--output", type=Path)
     parser.add_argument("--release-id", default=datetime.now(timezone(timedelta(hours=8))).strftime("%Y%m%d%H%M%S"))
     parser.add_argument("--payload-url", help="复用已发布的不可变魔搭桌面包")
+    parser.add_argument("--demo", action="store_true", help="构建不执行下载的界面演示版")
     parser.add_argument("--publish", action="store_true")
     parser.add_argument("--plan", type=Path, help="发布已构建的启动器，避免重复构建")
     args = parser.parse_args()
@@ -104,6 +107,6 @@ if __name__ == "__main__":
     else:
         if args.payload is None or args.output is None:
             parser.error("构建时需指定 --payload 和 --output")
-        plan = build(args.payload.resolve(strict=True), args.output.resolve(), args.release_id, args.payload_url)
+        plan = build(args.payload.resolve(strict=True), args.output.resolve(), args.release_id, args.payload_url, args.demo)
     if args.publish:
         publish(plan)

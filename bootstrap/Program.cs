@@ -2,6 +2,7 @@ using System;
 using System.Collections.Generic;
 using System.Diagnostics;
 using System.Drawing;
+using System.Drawing.Drawing2D;
 using System.IO;
 using System.IO.Compression;
 using System.Linq;
@@ -187,55 +188,177 @@ namespace VoxBootstrap {
         }
     }
 
-    public sealed class Launcher : Form {
-        readonly Label message = new Label(), detail = new Label();
-        readonly ProgressBar progress = new ProgressBar();
-        readonly Button run = new Button(), pause = new Button();
-        CancellationTokenSource cancellation;
-        readonly Manifest manifest;
-        public Launcher(Manifest value) {
-            manifest = value; Text = "VoxCPM Studio 启动器"; ClientSize = new Size(580, 320);
-            Font = new Font("Microsoft YaHei UI", 9); BackColor = Color.White; StartPosition = FormStartPosition.CenterScreen;
-            FormBorderStyle = FormBorderStyle.FixedSingle; MaximizeBox = false;
-            var title = new Label { Text = "VoxCPM Studio", Font = new Font(Font.FontFamily, 22, FontStyle.Bold), Left = 30, Top = 27, Width = 520, Height = 44 };
-            var subtitle = new Label { Text = "点击运行，自动从魔搭补齐桌面、依赖和模型。", Left = 32, Top = 86, Width = 515, Height = 26, ForeColor = Color.DimGray };
-            message.SetBounds(32, 130, 515, 54); message.Text = "首次需要联网。已有资源会校验复用，下载中断后可以继续。";
-            progress.SetBounds(32, 190, 515, 8); detail.SetBounds(32, 210, 515, 26); detail.ForeColor = Color.DimGray;
-            run.Text = "运行"; run.SetBounds(440, 260, 106, 34); run.FlatStyle = FlatStyle.Flat; run.BackColor = Color.FromArgb(44, 44, 44); run.ForeColor = Color.White;
-            pause.Text = "暂停"; pause.SetBounds(322, 260, 106, 34); pause.Visible = false;
-            Controls.AddRange(new Control[] { title, subtitle, message, progress, detail, run, pause });
-            run.Click += async (sender, args) => await Start();
-            pause.Click += (sender, args) => { if (cancellation != null) cancellation.Cancel(); };
-            FormClosing += (sender, args) => { if (cancellation != null) cancellation.Cancel(); };
+    public sealed class SoftButton : Button {
+        public bool Primary, Dark;
+        bool hovering;
+        public SoftButton() {
+            SetStyle(ControlStyles.UserPaint | ControlStyles.AllPaintingInWmPaint | ControlStyles.OptimizedDoubleBuffer, true);
+            FlatStyle = FlatStyle.Flat; FlatAppearance.BorderSize = 0; Cursor = Cursors.Hand;
+            Font = new Font("Microsoft YaHei UI", 10); UseVisualStyleBackColor = false;
         }
+        protected override void OnMouseEnter(EventArgs e) { hovering = true; Invalidate(); base.OnMouseEnter(e); }
+        protected override void OnMouseLeave(EventArgs e) { hovering = false; Invalidate(); base.OnMouseLeave(e); }
+        protected override void OnPaint(PaintEventArgs e) {
+            e.Graphics.SmoothingMode = SmoothingMode.AntiAlias;
+            Color surface = Primary ? (Dark ? Color.FromArgb(236, 232, 224) : Color.FromArgb(40, 42, 39)) : (Dark ? Color.FromArgb(43, 44, 41) : Color.FromArgb(242, 241, 236));
+            if (hovering && Enabled) surface = Primary ? (Dark ? Color.White : Color.FromArgb(66, 67, 61)) : (Dark ? Color.FromArgb(55, 56, 51) : Color.FromArgb(233, 231, 224));
+            using (var shape = Launcher.Round(new RectangleF(0, 0, Width - 1, Height - 1), 12)) using (var fill = new SolidBrush(surface)) e.Graphics.FillPath(fill, shape);
+            Color ink = Primary ? (Dark ? Color.FromArgb(35, 36, 33) : Color.White) : (Dark ? Color.FromArgb(217, 216, 207) : Color.FromArgb(83, 85, 78));
+            if (!Enabled) ink = Color.FromArgb(146, 146, 136);
+            TextRenderer.DrawText(e.Graphics, Text, Font, ClientRectangle, ink, TextFormatFlags.HorizontalCenter | TextFormatFlags.VerticalCenter);
+            if (Focused && ShowFocusCues) ControlPaint.DrawFocusRectangle(e.Graphics, Rectangle.Inflate(ClientRectangle, -5, -5), ink, surface);
+        }
+    }
+
+    public sealed class Launcher : Form {
+        readonly SoftButton run = new SoftButton { Primary = true }, pause = new SoftButton(), close = new SoftButton(), minimize = new SoftButton();
+        readonly Manifest manifest;
+        readonly bool preview, dark;
+        readonly System.Windows.Forms.Timer animation = new System.Windows.Forms.Timer { Interval = 70 };
+        CancellationTokenSource cancellation;
+        string view = "idle", statusTitle = "一切准备，交给我们。", statusDetail = "点击运行，自动从魔搭准备桌面环境。";
+        double fraction, pulse;
+        long downloaded, total;
+        public static GraphicsPath Round(RectangleF r, float radius) {
+            var p = new GraphicsPath(); float d = Math.Min(radius * 2, Math.Min(r.Width, r.Height));
+            p.AddArc(r.X, r.Y, d, d, 180, 90); p.AddArc(r.Right - d, r.Y, d, d, 270, 90);
+            p.AddArc(r.Right - d, r.Bottom - d, d, d, 0, 90); p.AddArc(r.X, r.Bottom - d, d, d, 90, 90); p.CloseFigure(); return p;
+        }
+        static bool SystemDark() {
+            try { using (var key = Microsoft.Win32.Registry.CurrentUser.OpenSubKey(@"Software\Microsoft\Windows\CurrentVersion\Themes\Personalize")) return key != null && Convert.ToInt32(key.GetValue("AppsUseLightTheme", 1)) == 0; }
+            catch { return false; }
+        }
+        Color Paper { get { return dark ? Color.FromArgb(29, 31, 29) : Color.FromArgb(251, 250, 247); } }
+        Color Ink { get { return dark ? Color.FromArgb(235, 233, 225) : Color.FromArgb(40, 43, 39); } }
+        Color Muted { get { return dark ? Color.FromArgb(158, 161, 150) : Color.FromArgb(124, 128, 116); } }
+        Color Accent { get { return dark ? Color.FromArgb(218, 166, 121) : Color.FromArgb(181, 123, 83); } }
+        public Launcher(Manifest value, bool demonstration = false, bool? darkMode = null) {
+            manifest = value; preview = demonstration; dark = darkMode ?? SystemDark();
+            Text = "VoxCPM Studio" + (preview ? " · 界面演示" : " 启动器"); ClientSize = new Size(720, 540);
+            AutoScaleMode = AutoScaleMode.None; Font = new Font("Microsoft YaHei UI", 10); BackColor = Paper;
+            StartPosition = FormStartPosition.CenterScreen; FormBorderStyle = FormBorderStyle.None; DoubleBuffered = true;
+            AccessibleName = "VoxCPM Studio 启动器"; MaximizeBox = false;
+            run.Text = "运行  →"; run.AccessibleName = "运行并准备工作台"; run.TabIndex = 0;
+            pause.Text = "暂停"; pause.AccessibleName = "暂停准备"; pause.Visible = false; pause.TabIndex = 1;
+            close.Text = "×"; close.AccessibleName = "关闭启动器"; close.TabIndex = 3;
+            minimize.Text = "−"; minimize.AccessibleName = "最小化"; minimize.TabIndex = 2;
+            foreach (var button in new[] { run, pause, close, minimize }) { button.Dark = dark; button.BackColor = Paper; Controls.Add(button); }
+            run.Click += async (sender, args) => { if (preview) StartDemo(); else await Start(); };
+            pause.Click += (sender, args) => { if (preview) SetPreview("paused", fraction); else if (cancellation != null) cancellation.Cancel(); };
+            close.Click += (sender, args) => Close(); minimize.Click += (sender, args) => WindowState = FormWindowState.Minimized;
+            AcceptButton = run; CancelButton = pause;
+            animation.Tick += (sender, args) => {
+                pulse += .075;
+                if (preview && view == "downloading") {
+                    fraction = Math.Min(1, fraction + .009); downloaded = (long)(fraction * 111063687); total = 111063687;
+                    if (fraction >= 1) SetPreview("ready", 1);
+                }
+                Invalidate();
+            };
+            FormClosing += (sender, args) => { animation.Stop(); if (cancellation != null) cancellation.Cancel(); };
+            Resize += (sender, args) => LayoutButtons(); LayoutButtons();
+        }
+        protected override CreateParams CreateParams { get { var p = base.CreateParams; p.ClassStyle |= 0x20000; return p; } }
+        [System.Runtime.InteropServices.DllImport("user32.dll")] static extern bool ReleaseCapture();
+        [System.Runtime.InteropServices.DllImport("user32.dll")] static extern IntPtr SendMessage(IntPtr h, int m, IntPtr w, IntPtr l);
+        protected override void OnMouseDown(MouseEventArgs e) {
+            base.OnMouseDown(e);
+            if (e.Button == MouseButtons.Left && e.Y < Height * .16 && e.X < Width * .82) { ReleaseCapture(); SendMessage(Handle, 0xA1, new IntPtr(2), IntPtr.Zero); }
+        }
+        void LayoutButtons() {
+            float sx = ClientSize.Width / 720f, sy = ClientSize.Height / 540f;
+            run.SetBounds((int)(510 * sx), (int)(472 * sy), (int)(168 * sx), (int)(46 * sy));
+            pause.SetBounds((int)(404 * sx), (int)(472 * sy), (int)(92 * sx), (int)(46 * sy));
+            close.SetBounds((int)(666 * sx), (int)(27 * sy), (int)(28 * sx), (int)(28 * sy));
+            minimize.SetBounds((int)(630 * sx), (int)(27 * sy), (int)(28 * sx), (int)(28 * sy));
+            using (var shape = Round(new RectangleF(0, 0, ClientSize.Width, ClientSize.Height), 22)) { var old = Region; Region = new Region(shape); if (old != null) old.Dispose(); }
+            Invalidate();
+        }
+        void TextAt(Graphics g, string text, float size, Color color, float x, float y, float width, bool bold = false) {
+            using (var font = new Font("Microsoft YaHei UI", size, bold ? FontStyle.Bold : FontStyle.Regular, GraphicsUnit.Pixel))
+            using (var brush = new SolidBrush(color)) g.DrawString(text, font, brush, new RectangleF(x, y, width, size * 2.7f));
+        }
+        protected override void OnPaint(PaintEventArgs e) {
+            base.OnPaint(e); var g = e.Graphics; g.SmoothingMode = SmoothingMode.AntiAlias;
+            g.TextRenderingHint = System.Drawing.Text.TextRenderingHint.AntiAliasGridFit;
+            g.ScaleTransform(ClientSize.Width / 720f, ClientSize.Height / 540f);
+            using (var shape = Round(new RectangleF(0.5f, .5f, 719, 539), 22)) using (var border = new Pen(dark ? Color.FromArgb(58, 61, 55) : Color.FromArgb(224, 225, 216))) g.DrawPath(border, shape);
+            using (var shape = Round(new RectangleF(42, 34, 38, 38), 12)) using (var brush = new SolidBrush(Ink)) g.FillPath(brush, shape);
+            TextAt(g, "V", 26, Paper, 49, 36, 30, true);
+            using (var brush = new SolidBrush(Accent)) g.FillEllipse(brush, 69, 41, 5, 5);
+            TextAt(g, "VOXCPM", 14, Ink, 92, 35, 160, true); TextAt(g, "STUDIO", 10, Muted, 93, 57, 140);
+            TextAt(g, "本地 AI 配音工作台", 11, Muted, 475, 43, 150);
+            TextAt(g, "好声音，从这里开始。", 31, Ink, 40, 133, 420);
+            TextAt(g, "让灵感发声，让准备更简单。", 14, Muted, 43, 183, 400);
+            // 波形用向量绘制，不携带图片或网页运行时。
+            using (var pen = new Pen(dark ? Color.FromArgb(48, 52, 46) : Color.FromArgb(234, 232, 221), 1)) { g.DrawEllipse(pen, 470, 109, 150, 150); g.DrawEllipse(pen, 493, 132, 104, 104); }
+            for (int i = 0; i < 37; i++) {
+                double envelope = Math.Pow(Math.Sin((i + 1) * Math.PI / 38), 1.8);
+                float h = (float)(8 + envelope * (20 + 42 * Math.Abs(Math.Sin(i * .69 + ((view == "working" || view == "downloading") ? pulse : 0)))));
+                float x = 444 + i * 5.7f;
+                using (var pen = new Pen(i > 14 && i < 24 ? Accent : (dark ? Color.FromArgb(115, 120, 108) : Color.FromArgb(181, 186, 171)), 2.8f)) { pen.StartCap = LineCap.Round; pen.EndCap = LineCap.Round; g.DrawLine(pen, x, 184 - h / 2, x, 184 + h / 2); }
+            }
+            using (var shape = Round(new RectangleF(42, 268, 636, 128), 18)) using (var brush = new SolidBrush(dark ? Color.FromArgb(38, 41, 36) : Color.FromArgb(242, 242, 235))) g.FillPath(brush, shape);
+            TextAt(g, statusTitle, 16, Ink, 62, 289, 455, true);
+            string amount = total > 0 ? Math.Round(fraction * 100) + "%" : (view == "idle" ? "等待开始" : view == "ready" ? "已就绪" : view == "paused" ? "已暂停" : "准备中");
+            TextAt(g, amount, 12, Muted, 596, 292, 70);
+            TextAt(g, statusDetail, 12, Muted, 63, 321, 590);
+            using (var shape = Round(new RectangleF(63, 361, 594, 5), 2.5f)) using (var brush = new SolidBrush(dark ? Color.FromArgb(61, 66, 55) : Color.FromArgb(223, 226, 213))) g.FillPath(brush, shape);
+            float filled = (float)(594 * fraction);
+            if (filled > 2) using (var shape = Round(new RectangleF(63, 361, filled, 5), 2.5f)) using (var brush = new SolidBrush(Accent)) g.FillPath(brush, shape);
+            if (total == 0 && view == "working") using (var brush = new SolidBrush(Accent)) g.FillRectangle(brush, 63 + (float)((Math.Sin(pulse) + 1) * 232), 361, 130, 5);
+            TextAt(g, total > 0 ? String.Format("{0:F1} MB / {1:F1} MB", downloaded / 1048576.0, total / 1048576.0) : "首次联网准备 · 已有资源自动复用", 10, Muted, 63, 376, 570);
+            string[] steps = { "桌面环境", "进入工作台", "准备模型" };
+            for (int i = 0; i < 3; i++) {
+                int x = 44 + i * 211; bool active = view == "ready" ? i == 1 : i == 0;
+                using (var brush = new SolidBrush(active ? Accent : (dark ? Color.FromArgb(58, 62, 53) : Color.FromArgb(232, 234, 225)))) g.FillEllipse(brush, x, 422, 20, 20);
+                TextAt(g, i == 0 && view == "ready" ? "✓" : (i + 1).ToString(), 10, active ? Paper : Muted, x + 5, 425, 20);
+                TextAt(g, steps[i], 11, active ? Ink : Muted, x + 29, 424, 125);
+                if (i < 2) using (var pen = new Pen(dark ? Color.FromArgb(55, 60, 49) : Color.FromArgb(226, 229, 217))) g.DrawLine(pen, x + 126, 432, x + 190, 432);
+            }
+            using (var brush = new SolidBrush(Accent)) g.FillEllipse(brush, 44, 486, 5, 5);
+            TextAt(g, preview ? "界面演示 · 不会下载或安装文件" : "魔搭直连 · 下载可暂停，文件会保留", 11, Muted, 56, 480, 345);
+        }
+        public void SetPreview(string state, double value) {
+            view = state; fraction = Math.Max(0, Math.Min(1, value)); downloaded = (long)(fraction * 111063687); total = state == "idle" ? 0 : 111063687;
+            if (state == "idle") { statusTitle = "一切准备，交给我们。"; statusDetail = "点击运行，自动从魔搭准备桌面环境。"; run.Text = "运行  →"; }
+            else if (state == "paused") { statusTitle = "稍作停留，进度还在。"; statusDetail = "已保留下载内容，随时可以继续。"; run.Text = "继续准备  →"; }
+            else if (state == "ready") { statusTitle = "桌面已准备好。"; statusDetail = "接下来进入工作台，继续准备模型与依赖。"; run.Text = preview ? "重新演示  ↻" : "即将打开  →"; }
+            else { statusTitle = "正在准备你的创作空间。"; statusDetail = "从魔搭补齐桌面环境，完成后自动打开工作台。"; run.Text = "正在准备…"; }
+            run.Enabled = state != "downloading" && state != "working"; pause.Visible = state == "downloading" || state == "working";
+            if (state == "downloading" || state == "working") animation.Start(); else animation.Stop();
+            AccessibleDescription = statusTitle + statusDetail; Invalidate();
+        }
+        void StartDemo() { if (view == "ready") fraction = 0; SetPreview("downloading", fraction); }
         async Task Start() {
-            run.Enabled = false; pause.Visible = true; cancellation = new CancellationTokenSource();
+            SetPreview("working", fraction); total = 0; cancellation = new CancellationTokenSource();
             string root = Path.Combine(AppDomain.CurrentDomain.BaseDirectory, "VoxCPMStudio");
             var reporter = new Progress<Status>(status => {
                 if (IsDisposed) return;
-                message.Text = status.text;
-                progress.Style = status.total > 0 ? ProgressBarStyle.Continuous : ProgressBarStyle.Marquee;
-                if (status.total > 0) { progress.Value = Math.Min(100, (int)(status.done * 100 / status.total)); detail.Text = String.Format("{0:F1} MB / {1:F1} MB", status.done / 1048576.0, status.total / 1048576.0); }
-                else detail.Text = "模型和依赖会在工作台中继续补齐。";
+                statusTitle = status.text; statusDetail = "完成后自动打开工作台，继续准备模型与依赖。";
+                downloaded = status.done; total = status.total;
+                if (total > 0) fraction = Math.Max(0, Math.Min(1, (double)downloaded / total));
+                AccessibleDescription = statusTitle; Invalidate();
             });
             try {
                 string executable = await Task.Run(() => Core.Prepare(root, manifest, cancellation.Token, reporter));
+                SetPreview("ready", 1); run.Enabled = false; await Task.Delay(350, cancellation.Token);
                 cancellation.Token.ThrowIfCancellationRequested();
                 var start = new ProcessStartInfo(executable, "--voxcpm-run") { WorkingDirectory = root, UseShellExecute = false };
-                start.EnvironmentVariables.Remove("ELECTRON_RUN_AS_NODE");
-                Process.Start(start); cancellation.Dispose(); cancellation = null; Close();
-            } catch (OperationCanceledException) { message.Text = "已暂停。点击继续运行，可复用已完成的下载。"; }
+                start.EnvironmentVariables.Remove("ELECTRON_RUN_AS_NODE"); Process.Start(start); Close();
+            } catch (OperationCanceledException) { if (!IsDisposed) SetPreview("paused", fraction); }
             catch (Exception error) {
-                message.Text = "暂未完成：" + error.Message;
+                if (!IsDisposed) { view = "error"; statusTitle = "暂时未能完成准备。"; statusDetail = error.Message; animation.Stop(); run.Text = "重试  →"; Invalidate(); }
                 try { Directory.CreateDirectory(root); File.AppendAllText(Path.Combine(root, "bootstrap.log"), DateTimeOffset.Now + " " + error + Environment.NewLine); } catch { }
             } finally {
-                if (cancellation != null) { cancellation.Dispose(); cancellation = null; }
-                if (!IsDisposed) { run.Enabled = true; run.Text = "继续运行"; pause.Visible = false; progress.Style = ProgressBarStyle.Continuous; }
+                cancellation.Dispose(); cancellation = null;
+                if (!IsDisposed) { run.Enabled = true; pause.Visible = false; }
             }
         }
+        protected override void Dispose(bool disposing) { if (disposing) animation.Dispose(); base.Dispose(disposing); }
     }
     public static class Program {
-        [STAThread] public static void Main() {
+        [STAThread] public static void Main(string[] args) {
             ServicePointManager.SecurityProtocol = SecurityProtocolType.Tls12;
             Application.EnableVisualStyles(); Application.SetCompatibleTextRenderingDefault(false);
             try {
@@ -247,7 +370,11 @@ namespace VoxBootstrap {
                 using (var hash = SHA256.Create()) identity = BitConverter.ToString(hash.ComputeHash(System.Text.Encoding.UTF8.GetBytes(AppDomain.CurrentDomain.BaseDirectory.ToUpperInvariant()))).Replace("-", "");
                 using (var mutex = new Mutex(false, "Local\\VoxCPM-Bootstrap-" + identity)) {
                     if (!mutex.WaitOne(0)) { MessageBox.Show("启动器已在运行，请查看已有窗口。", "VoxCPM Studio"); return; }
-                    try { Application.Run(new Launcher(manifest)); } finally { mutex.ReleaseMutex(); }
+                    bool demo = args.Contains("--demo");
+#if DEMO
+                    demo = true;
+#endif
+                    try { Application.Run(new Launcher(manifest, demo)); } finally { mutex.ReleaseMutex(); }
                 }
             } catch (Exception error) { MessageBox.Show(error.Message, "VoxCPM Studio 启动未完成", MessageBoxButtons.OK, MessageBoxIcon.Error); Environment.ExitCode = 1; }
         }
