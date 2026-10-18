@@ -110,9 +110,10 @@ async function prepareUpdater(session, manifest, python) {
 }
 
 class UpdateService {
-  constructor({ root, dataRoot, appDir, currentVersion, pythonExecutable, onState = () => {}, config }) {
+  constructor({ root, dataRoot, appDir, currentVersion, pythonExecutable, getTheme = () => "light", onState = () => {}, config }) {
     this.root = root; this.dataRoot = dataRoot; this.appDir = appDir;
     this.currentVersion = currentVersion; this.onState = onState;
+    this.getTheme = getTheme;
     this.python = pythonExecutable || resolveManagedPython(root) || path.join(root, "runtime", "python", "python.exe");
     this.config = config || JSON.parse(fs.readFileSync(path.join(appDir, "update-config.json"), "utf8"));
     this.cache = path.join(dataRoot, "cache", "updates");
@@ -192,7 +193,7 @@ class UpdateService {
       await prepareUpdater(session, this.manifest, this.python);
       atomicJson(path.join(session, "session.json"), { root: this.root, publicKey: this.config.publicKey,
         currentVersion: this.currentVersion, currentReleaseId: this.state.currentReleaseId,
-        parentPid: process.pid, session, pythonExecutable: this.python, resultPath: path.join(this.cache, "last-result.json"),
+        parentPid: process.pid, session, pythonExecutable: this.python, theme: this.getTheme(), resultPath: path.join(this.cache, "last-result.json"),
         executable: path.join(this.root, "VoxCPM Studio.exe") });
       this.session = session;
       return this.setState({ status: "downloaded", progress: 100, message: "更新包已校验，准备重启安装" });

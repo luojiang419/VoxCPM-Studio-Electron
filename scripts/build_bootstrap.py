@@ -57,7 +57,7 @@ def build(payload: Path, output: Path, release_id: str, payload_url: str | None 
                     "/resource:" + str(ROOT / "assets/brand/voxcpm-app-256.png") + ",app-mark.png",
                     "/resource:" + str(source_manifest) + ",bootstrap-manifest.json", "/resource:" + str(ROOT / "assets/brand/disk-local-256.png") + ",disk-local.png", "/reference:System.Windows.Forms.dll",
                     "/reference:System.Drawing.dll", "/reference:Accessibility.dll", "/reference:System.Web.Extensions.dll", "/reference:System.IO.Compression.dll",
-                    "/reference:System.IO.Compression.FileSystem.dll", str(ROOT / "bootstrap/Program.cs"), str(ROOT / "bootstrap/Installation.cs"), str(ROOT / "bootstrap/Components.cs"), str(ROOT / "bootstrap/DiskCard.cs")], check=True)
+                    "/reference:System.IO.Compression.FileSystem.dll", str(ROOT / "bootstrap/Program.cs"), str(ROOT / "bootstrap/SharedTheme.cs"), str(ROOT / "bootstrap/Installation.cs"), str(ROOT / "bootstrap/Components.cs"), str(ROOT / "bootstrap/DiskCard.cs")], check=True)
     (output / "使用说明.txt").write_text("界面演示：点击运行可观看准备进度，并可暂停、继续和重新演示。\n此版本不会下载、安装或打开工作台。\n" if demo else
         "双击 VoxCPM安装器.exe，选择独立安装目录并点击安装并运行。\n"
         "安装器会从魔搭补齐应用、依赖和模型，服务就绪后创建快捷方式并登记 Windows 卸载入口。\n"

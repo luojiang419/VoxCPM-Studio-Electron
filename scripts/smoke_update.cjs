@@ -50,8 +50,10 @@ async function cdp(port) {
 (async () => {
   fs.mkdirSync(testRoot, { recursive: true });
   for (const entry of fs.readdirSync(original, { withFileTypes: true })) {
+    if (["allow-main-exit.json", "smoke-result.json", "settings-before-update.png", "standalone-updater.png"].includes(entry.name)) continue;
     if (entry.isFile() || ["locales", "resources", "app"].includes(entry.name)) {
-      fs.cpSync(path.join(original, entry.name), path.join(testRoot, entry.name), { recursive: true });
+      fs.cpSync(path.join(original, entry.name), path.join(testRoot, entry.name), { recursive: true,
+        filter: source => !path.basename(source).startsWith("app-held-for-independence-test") });
     }
   }
   // 大型固定资源共享只读目录；更新器白名单禁止写入这些目录。
@@ -73,6 +75,7 @@ async function cdp(port) {
     fs.writeFileSync(path.join(appDir, "updater.py"), "raise RuntimeError('旧更新器不应执行')\n");
   }
   const allowExitFile = path.join(testRoot, "allow-main-exit.json");
+  fs.rmSync(allowExitFile, { force: true });
   if (process.argv.includes("--main-install")) {
     const mainPath = path.join(appDir, "main.js");
     // 仅在隔离夹具里确认弹窗并延迟退出，留出验证独立进程与移开旧文件的时间。
@@ -182,7 +185,7 @@ __updateTestDialog.showMessageBox=(...args)=>['启动独立更新器','重启并
       "-UpdaterProcessId", String(standalone.hostPid), "-OutputPath", path.join(testRoot, "standalone-updater.png")], { encoding: "utf8", windowsHide: true });
     assert.equal(capture.status, 0, capture.stderr);
     // 更新器就绪后，整个旧前端目录变为不可用，验证安装不再加载其中的JS或页面。
-    fs.renameSync(appDir, appDir + "-held-for-independence-test");
+    fs.renameSync(appDir, appDir + "-held-for-independence-test-" + Date.now());
     console.log("原生独立窗口已显示，旧resources/app目录已移开，继续关闭主程序并安装");
   }
   // 主进程在生产中调用 app.quit；测试通过 taskkill 关闭本次测试进程树。
@@ -194,7 +197,7 @@ __updateTestDialog.showMessageBox=(...args)=>['启动独立更新器','重启并
   const result = await until(() => {
     if (!fs.existsSync(statusPath)) return false;
     const status = JSON.parse(fs.readFileSync(statusPath));
-    if (status.status === "error") throw new Error(status.message);
+    if (["error", "rolled-back"].includes(status.status)) throw new Error(status.message);
     return status.status === "complete" && status;
   }, 240000);
   assert.equal(result.version, "2.0.2");

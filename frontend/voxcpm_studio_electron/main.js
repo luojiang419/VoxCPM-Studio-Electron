@@ -916,6 +916,7 @@ app.whenReady().then(async () => {
     }
   }
   updateService = new UpdateService({ root: resolveProjectRoot(), dataRoot: resolveDataRoot(), appDir: __dirname,
+    getTheme: () => currentThemeSource === "system" ? (nativeTheme.shouldUseDarkColors ? "dark" : "light") : currentThemeSource,
     pythonExecutable: resolvePythonCommand(resolveAppRoot(), resolveProjectRoot()),
     currentVersion: app.getVersion(), onState: (state) => sendRuntimeEvent("update-state", { update: state }) });
   runtimeService = new RuntimeService({ root: resolveProjectRoot(), appRoot: resolveAppRoot(), dataRoot: resolveDataRoot(), appDir: __dirname,

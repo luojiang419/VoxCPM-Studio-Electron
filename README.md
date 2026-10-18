@@ -1,6 +1,6 @@
 # VoxCPM Studio Electron
 
-2026-10-18 已发布原生独立更新器 `2.0.2 / 20261018144842`：点击「启动独立更新器」后，由会话目录内的 `VoxCPM Updater.exe` 接管，工作台退出后独立窗口继续安装并自动打开新版。旧用户在软件内「检查更新」即可获取新版；若反复失败，可[下载独立修复包](https://modelscope.cn/api/v1/models/jiangjiang419/voxcpm-studio-updates/repo?Revision=master&FilePath=repairs%2F2.0.2%2F20261018144842%2FVoxCPM-Studio-2.0.2-Update-Repair-20261018144842.zip)，完整解压并关闭原软件后运行「修复更新.cmd」，在原安装目录保留模型、配置和作品完成修复。详见[自动更新与故障恢复](./docs/自动更新说明.md)。
+2026-10-18 已发布安装器同款主题的原生独立更新器 `2.0.2 / 20261018151919`：共用品牌视觉、圆角卡片与按钮，提供浅深主题和四阶段进度。点击「启动独立更新器」后，由会话目录内的 `VoxCPM Updater.exe` 接管，工作台退出后独立窗口继续安装并自动打开新版。旧用户在软件内「检查更新」即可获取新版；若反复失败，可[下载独立修复包](https://modelscope.cn/api/v1/models/jiangjiang419/voxcpm-studio-updates/repo?Revision=master&FilePath=repairs%2F2.0.2%2F20261018151919%2FVoxCPM-Studio-2.0.2-Update-Repair-20261018151919.zip)，完整解压并关闭原软件后运行「修复更新.cmd」，在原安装目录保留模型、配置和作品完成修复。详见[自动更新与故障恢复](./docs/自动更新说明.md)。
 
 现已提供[轻量分发与自动补齐](./docs/轻量版与自动补齐.md)：可仅分发约 36 KB 的 Windows 原生启动器，点击运行后从魔搭补齐 Electron 桌面、Python、固定依赖和模型，为 RTX 50 系自动选择 CUDA 12.8。也保留完整 Electron 壳的轻量 ZIP。
 

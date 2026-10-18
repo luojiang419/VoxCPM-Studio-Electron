@@ -10,8 +10,10 @@ OUTPUT = ROOT / "frontend/voxcpm_studio_electron/standalone-updater.exe"
 
 def build():
     source = ROOT / "updater/Program.cs"
+    shared = ROOT / "bootstrap/SharedTheme.cs"
     icon = ROOT / "assets/brand/voxcpm-app.ico"
-    fingerprint = hashlib.sha256(source.read_bytes() + icon.read_bytes()).hexdigest()
+    mark = ROOT / "assets/brand/voxcpm-app-256.png"
+    fingerprint = hashlib.sha256(source.read_bytes() + shared.read_bytes() + icon.read_bytes() + mark.read_bytes()).hexdigest()
     metadata = OUTPUT.with_suffix(".build.json")
     if OUTPUT.exists() and metadata.exists():
         cached = json.loads(metadata.read_text("utf-8"))
@@ -20,7 +22,8 @@ def build():
     compiler = Path("C:/Windows/Microsoft.NET/Framework64/v4.0.30319/csc.exe")
     subprocess.run([str(compiler), "/nologo", "/target:winexe", "/platform:anycpu", "/optimize+",
                     "/out:" + str(OUTPUT), "/win32icon:" + str(icon), "/reference:System.Windows.Forms.dll",
-                    "/reference:System.Drawing.dll", "/reference:System.Web.Extensions.dll", str(source)], check=True)
+                    "/resource:" + str(mark) + ",app-mark.png", "/reference:Accessibility.dll",
+                    "/reference:System.Drawing.dll", "/reference:System.Web.Extensions.dll", str(shared), str(source)], check=True)
     metadata.write_text(json.dumps({"source": fingerprint, "sha256": hashlib.sha256(OUTPUT.read_bytes()).hexdigest()}, indent=2), encoding="utf-8")
     return OUTPUT
 

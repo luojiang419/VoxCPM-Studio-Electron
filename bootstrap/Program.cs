@@ -189,105 +189,6 @@ namespace VoxBootstrap {
         }
     }
 
-    public enum ButtonGlyph { None, Close, Minimize, Sun, Moon }
-    public sealed class SoftButton : Control, IButtonControl {
-        public bool Primary, Dark;
-        public ButtonGlyph Glyph;
-        bool hovering, pressed;
-        Bitmap background;
-        Color cachedSurface, cachedPaper, cachedInk;
-        ButtonGlyph cachedGlyph;
-        public DialogResult DialogResult { get; set; }
-        public SoftButton() {
-            SetStyle(ControlStyles.UserPaint | ControlStyles.AllPaintingInWmPaint | ControlStyles.OptimizedDoubleBuffer | ControlStyles.Selectable | ControlStyles.StandardClick, true);
-            Cursor = Cursors.Hand; TabStop = true; AccessibleRole = AccessibleRole.PushButton;
-            Font = new Font("Microsoft YaHei UI", 10);
-        }
-        public void NotifyDefault(bool value) { Invalidate(); }
-        public void PerformClick() { if (CanSelect) OnClick(EventArgs.Empty); }
-        protected override AccessibleObject CreateAccessibilityInstance() { return new ButtonAccessibility(this); }
-        sealed class ButtonAccessibility : ControlAccessibleObject {
-            readonly SoftButton button;
-            public ButtonAccessibility(SoftButton value) : base(value) { button=value; }
-            public override string DefaultAction { get { return "点击"; } }
-            public override void DoDefaultAction() { button.PerformClick(); }
-        }
-        protected override void OnClick(EventArgs e) {
-            if (!Enabled) return;
-            if (DialogResult != DialogResult.None && FindForm() != null) FindForm().DialogResult = DialogResult;
-            base.OnClick(e);
-        }
-        protected override void OnMouseEnter(EventArgs e) { hovering = true; Invalidate(); base.OnMouseEnter(e); }
-        protected override void OnMouseLeave(EventArgs e) { hovering = false; pressed = false; Invalidate(); base.OnMouseLeave(e); }
-        protected override void OnMouseDown(MouseEventArgs e) { if (Enabled && e.Button == MouseButtons.Left) { pressed = true; Focus(); Invalidate(); } base.OnMouseDown(e); }
-        protected override void OnMouseUp(MouseEventArgs e) { pressed = false; Invalidate(); base.OnMouseUp(e); }
-        protected override void OnMouseCaptureChanged(EventArgs e) { pressed = false; Invalidate(); base.OnMouseCaptureChanged(e); }
-        protected override void OnEnabledChanged(EventArgs e) { pressed = false; Invalidate(); base.OnEnabledChanged(e); }
-        protected override void OnGotFocus(EventArgs e) { Invalidate(); base.OnGotFocus(e); }
-        protected override void OnLostFocus(EventArgs e) { pressed = false; Invalidate(); base.OnLostFocus(e); }
-        protected override bool IsInputKey(Keys keyData) { return (keyData & Keys.KeyCode) == Keys.Space || (keyData & Keys.KeyCode) == Keys.Enter || base.IsInputKey(keyData); }
-        protected override void OnKeyDown(KeyEventArgs e) {
-            if (e.KeyCode == Keys.Space && Enabled) { pressed = true; Invalidate(); e.Handled = true; }
-            if (e.KeyCode == Keys.Enter && Enabled) { PerformClick(); e.Handled = true; e.SuppressKeyPress = true; }
-            base.OnKeyDown(e);
-        }
-        protected override void OnKeyUp(KeyEventArgs e) { if (e.KeyCode == Keys.Space && pressed) { pressed = false; PerformClick(); Invalidate(); e.Handled = true; } base.OnKeyUp(e); }
-        protected override void OnPaintBackground(PaintEventArgs e) { e.Graphics.Clear(Parent == null ? BackColor : Parent.BackColor); }
-        void CacheBackground(Color paper, Color surface, Color ink) {
-            if (background != null && background.Size == ClientSize && cachedPaper == paper && cachedSurface == surface && cachedInk == ink && cachedGlyph == Glyph) return;
-            if (background != null) background.Dispose();
-            background = new Bitmap(Width, Height, System.Drawing.Imaging.PixelFormat.Format32bppPArgb);
-            // 圆角先以 4 倍尺寸绘制再缩小，并用父背景预合成，避免原生主题白底和透明边缘白色杂边。
-            using (var large = new Bitmap(Width * 4, Height * 4, System.Drawing.Imaging.PixelFormat.Format32bppPArgb)) {
-                using (var g = Graphics.FromImage(large)) {
-                    g.Clear(paper); g.ScaleTransform(4,4); g.SmoothingMode = SmoothingMode.AntiAlias;
-                    float radius=Glyph==ButtonGlyph.None?Math.Min(12,Height*.27f):Math.Min(Width,Height)/2f-.5f;
-                    using (var shape = Launcher.Round(new RectangleF(.5f,.5f,Width-1,Height-1),radius))
-                    using (var fill = new SolidBrush(surface)) g.FillPath(fill,shape);
-                    if(Glyph!=ButtonGlyph.None) {
-                        float scale=Math.Min(Width,Height)/28f, cx=Width/2f, cy=Height/2f, r=3.5f*scale;
-                        using(var pen=new Pen(ink,1.35f*scale) { StartCap=LineCap.Round,EndCap=LineCap.Round }) {
-                            if(Glyph==ButtonGlyph.Close) { g.DrawLine(pen,cx-r,cy-r,cx+r,cy+r); g.DrawLine(pen,cx+r,cy-r,cx-r,cy+r); }
-                            else if(Glyph==ButtonGlyph.Minimize) g.DrawLine(pen,cx-r,cy,cx+r,cy);
-                            else if(Glyph==ButtonGlyph.Sun) {
-                                g.DrawEllipse(pen,cx-2.5f*scale,cy-2.5f*scale,5*scale,5*scale);
-                                for(int i=0;i<8;i++) { double angle=i*Math.PI/4; g.DrawLine(pen,cx+(float)Math.Cos(angle)*4.5f*scale,cy+(float)Math.Sin(angle)*4.5f*scale,cx+(float)Math.Cos(angle)*6.2f*scale,cy+(float)Math.Sin(angle)*6.2f*scale); }
-                            } else {
-                                using(var fill=new SolidBrush(ink)) g.FillEllipse(fill,cx-4.7f*scale,cy-4.7f*scale,9.4f*scale,9.4f*scale);
-                                using(var cutout=new SolidBrush(surface)) g.FillEllipse(cutout,cx-1.9f*scale,cy-6.2f*scale,8.8f*scale,8.8f*scale);
-                            }
-                        }
-                    }
-                }
-                using (var g = Graphics.FromImage(background)) {
-                    g.CompositingMode = System.Drawing.Drawing2D.CompositingMode.SourceCopy;
-                    g.InterpolationMode = InterpolationMode.HighQualityBicubic; g.PixelOffsetMode = PixelOffsetMode.HighQuality;
-                    // 镜像边界避免双三次采样读到图片外的透明黑，造成浅色背景亮边。
-                    using(var attributes=new System.Drawing.Imaging.ImageAttributes()) {
-                        attributes.SetWrapMode(WrapMode.TileFlipXY);
-                        g.DrawImage(large,new Rectangle(0,0,Width,Height),0,0,large.Width,large.Height,GraphicsUnit.Pixel,attributes);
-                    }
-                }
-            }
-            cachedPaper=paper; cachedSurface=surface; cachedInk=ink; cachedGlyph=Glyph;
-        }
-        protected override void OnPaint(PaintEventArgs e) {
-            if (Width < 2 || Height < 2) return;
-            e.Graphics.SmoothingMode = SmoothingMode.AntiAlias;
-            Color surface = Primary ? (Dark ? Color.FromArgb(236, 232, 224) : Color.FromArgb(40, 42, 39)) : (Dark ? Color.FromArgb(43, 44, 41) : Color.FromArgb(242, 241, 236));
-            if (hovering && Enabled) surface = Primary ? (Dark ? Color.White : Color.FromArgb(66, 67, 61)) : (Dark ? Color.FromArgb(55, 56, 51) : Color.FromArgb(233, 231, 224));
-            if (pressed && Enabled) surface = Primary ? (Dark ? Color.FromArgb(218,214,205) : Color.FromArgb(27,30,26)) : (Dark ? Color.FromArgb(65,69,59) : Color.FromArgb(221,225,211));
-            Color ink = Primary ? (Dark ? Color.FromArgb(35, 36, 33) : Color.White) : (Dark ? Color.FromArgb(217, 216, 207) : Color.FromArgb(83, 85, 78));
-            if (!Enabled) ink = Color.FromArgb(146, 146, 136);
-            CacheBackground(Parent == null ? BackColor : Parent.BackColor,surface,ink);
-            e.Graphics.DrawImageUnscaled(background,0,0);
-            if(Glyph==ButtonGlyph.None) TextRenderer.DrawText(e.Graphics, Text, Font, ClientRectangle, ink, TextFormatFlags.HorizontalCenter | TextFormatFlags.VerticalCenter);
-            if (Focused && ShowFocusCues) using(var pen=new Pen(Dark?Color.FromArgb(190,157,114):Color.FromArgb(147,120,82)) { DashStyle=DashStyle.Dot })
-                using(var path=Launcher.Round(new RectangleF(4,4,Width-9,Height-9),8)) e.Graphics.DrawPath(pen,path);
-        }
-        protected override void Dispose(bool disposing) { if(disposing && background!=null) background.Dispose(); base.Dispose(disposing); }
-    }
-
     public sealed class Launcher : Form {
         readonly SoftButton run = new SoftButton { Primary = true }, pause = new SoftButton(), close = new SoftButton(), minimize = new SoftButton();
         readonly SoftButton browse = new SoftButton(), detect = new SoftButton(), theme = new SoftButton();
@@ -314,15 +215,11 @@ namespace VoxBootstrap {
         int installPhase;
         string completedRoot;
         bool destinationBlocked;
-        public static GraphicsPath Round(RectangleF r, float radius) {
-            var p = new GraphicsPath(); float d = Math.Min(radius * 2, Math.Min(r.Width, r.Height));
-            p.AddArc(r.X, r.Y, d, d, 180, 90); p.AddArc(r.Right - d, r.Y, d, d, 270, 90);
-            p.AddArc(r.Right - d, r.Bottom - d, d, d, 0, 90); p.AddArc(r.X, r.Bottom - d, d, d, 90, 90); p.CloseFigure(); return p;
-        }
-        Color Paper { get { return dark ? Color.FromArgb(29, 31, 29) : Color.FromArgb(251, 250, 247); } }
-        Color Ink { get { return dark ? Color.FromArgb(235, 233, 225) : Color.FromArgb(40, 43, 39); } }
-        Color Muted { get { return dark ? Color.FromArgb(158, 161, 150) : Color.FromArgb(124, 128, 116); } }
-        Color Accent { get { return dark ? Color.FromArgb(218, 166, 121) : Color.FromArgb(181, 123, 83); } }
+        public static GraphicsPath Round(RectangleF r, float radius) { return StudioTheme.Round(r, radius); }
+        Color Paper { get { return StudioTheme.Paper(dark); } }
+        Color Ink { get { return StudioTheme.Ink(dark); } }
+        Color Muted { get { return StudioTheme.Muted(dark); } }
+        Color Accent { get { return StudioTheme.Accent(dark); } }
         public Launcher(Manifest value, bool demonstration = false, bool? darkMode = null, Func<string> detectRoot = null, Func<InstallDrive[]> survey = null) {
             manifest = value; preview = demonstration; dark = darkMode ?? false;
             diskPanel=new DiskStrip(dark) { Name="local-disks", TabIndex=0 };
@@ -477,7 +374,7 @@ namespace VoxBootstrap {
             base.OnPaint(e); var g = e.Graphics; g.SmoothingMode = SmoothingMode.AntiAlias;
             g.TextRenderingHint = System.Drawing.Text.TextRenderingHint.AntiAliasGridFit;
             g.ScaleTransform(ClientSize.Width / 720f, ClientSize.Height / 830f);
-            using (var shape = Round(new RectangleF(0.5f, .5f, 719, 829), 22)) using (var border = new Pen(dark ? Color.FromArgb(58, 61, 55) : Color.FromArgb(224, 225, 216))) g.DrawPath(border, shape);
+            using (var shape = Round(new RectangleF(0.5f, .5f, 719, 829), 22)) using (var border = new Pen(StudioTheme.Border(dark))) g.DrawPath(border, shape);
             if (brandMark != null) g.DrawImage(brandMark, new Rectangle(36, 28, 50, 50));
             else TextAt(g, "V", 28, Accent, 48, 36, 32, true);
             TextAt(g, "VOXCPM", 14, Ink, 92, 35, 160, true); TextAt(g, "STUDIO", 10, Muted, 93, 57, 140);
@@ -497,7 +394,7 @@ namespace VoxBootstrap {
             TextAt(g, "安装到专用应用文件夹", 11, Muted, 44, 411, 400);
             using (var shape = Round(new RectangleF(42, 430, 636, 48), 12)) using (var pen = new Pen(dark ? Color.FromArgb(65, 70, 60) : Color.FromArgb(218, 222, 209))) g.DrawPath(pen, shape);
             g.TranslateTransform(0, 280);
-            using (var shape = Round(new RectangleF(42, 268, 636, 144), 18)) using (var brush = new SolidBrush(dark ? Color.FromArgb(38, 41, 36) : Color.FromArgb(242, 242, 235))) g.FillPath(brush, shape);
+            using (var shape = Round(new RectangleF(42, 268, 636, 144), 18)) using (var brush = new SolidBrush(StudioTheme.Card(dark))) g.FillPath(brush, shape);
             var textLayout=PreparationTextLayout.Measure(g,statusTitle,destinationBlocked || view=="error");
             DrawStatusText(g,statusTitle,textLayout.TitleSize,Ink,textLayout.Title,true);
             string amount = destinationBlocked ? "需处理" : total > 0 ? Math.Round(fraction * 100) + "%" : (view == "idle" ? "等待开始" : view == "ready" ? "已就绪" : view == "paused" ? "已暂停" : "准备中");
@@ -506,7 +403,7 @@ namespace VoxBootstrap {
                 DrawStatusText(g,statusDetail,12,Muted,textLayout.Detail,false);
             } else {
             DrawStatusText(g,statusDetail,12,Muted,textLayout.Detail,false);
-            using (var shape = Round(textLayout.Bar, 2.5f)) using (var brush = new SolidBrush(dark ? Color.FromArgb(61, 66, 55) : Color.FromArgb(223, 226, 213))) g.FillPath(brush, shape);
+            using (var shape = Round(textLayout.Bar, 2.5f)) using (var brush = new SolidBrush(StudioTheme.Track(dark))) g.FillPath(brush, shape);
             float filled = (float)(594 * fraction);
             if (filled > 2) using (var shape = Round(new RectangleF(textLayout.Bar.X,textLayout.Bar.Y,filled,5), 2.5f)) using (var brush = new SolidBrush(Accent)) g.FillPath(brush, shape);
             if (total == 0 && view == "working") using (var brush = new SolidBrush(Accent)) g.FillRectangle(brush,textLayout.Bar.X+(float)(pulse*464),textLayout.Bar.Y,130,5);

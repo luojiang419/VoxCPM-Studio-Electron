@@ -18,7 +18,7 @@ executable = output / "InstallationSmoke.exe"
 subprocess.run(["C:/Windows/Microsoft.NET/Framework64/v4.0.30319/csc.exe", "/nologo", "/target:exe", "/main:InstallationSmoke", "/out:" + str(executable),
                 "/reference:System.Windows.Forms.dll", "/reference:System.Drawing.dll", "/reference:Accessibility.dll", "/reference:System.Web.Extensions.dll",
                 "/reference:System.IO.Compression.dll", "/reference:System.IO.Compression.FileSystem.dll",
-                *[str(ROOT / "bootstrap" / name) for name in ("Program.cs", "Installation.cs", "DiskCard.cs", "InstallationSmoke.cs")]], check=True)
+                *[str(ROOT / "bootstrap" / name) for name in ("Program.cs", "SharedTheme.cs", "Installation.cs", "Components.cs", "DiskCard.cs", "InstallationSmoke.cs")]], check=True)
 command = [str(executable), str(args.manifest.resolve()), str(args.payload.resolve()), str(args.installer.resolve()),
            str(ROOT / "builds/bootstrap-validation/runtime"), str(ROOT.parent / "models"), str(output), str(ROOT / "assets/brand/voxcpm-app.ico")]
 if args.standard_user:
