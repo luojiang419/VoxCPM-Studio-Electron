@@ -29,6 +29,7 @@ export default function UpdateNotification({ onOpen }: { onOpen: () => void }) {
     <div className="runtime-dialog-kicker">VOXCPM STUDIO · 软件更新</div>
     <h2 id="update-available-title">发现新版本</h2>
     <p className="runtime-intro">VoxCPM Studio {update?.latestVersion}{update?.size ? ` · ${(update.size / 1024 ** 2).toFixed(1)} MB` : ""}</p>
+    {update?.latestReleaseId && <p className="runtime-intro">发布序号 {update.latestReleaseId}</p>}
     {update?.notes && <div className="update-notification-notes">{update.notes}</div>}
     <p className="runtime-intro">可在准备好后下载并安装，个人设置与作品会保留。</p>
     <div className="runtime-dialog-actions">

@@ -3,7 +3,9 @@ const path = require("path");
 const crypto = require("crypto");
 const http = require("http");
 const https = require("https");
-const { spawn } = require("child_process");
+const { spawn, execFile } = require("child_process");
+const { promisify } = require("util");
+const { resolveManagedPython } = require("./runtime-service");
 const { pipeline } = require("stream/promises");
 
 function versionParts(value) {
@@ -90,14 +92,32 @@ function atomicJson(file, value) {
   fs.renameSync(file + ".tmp", file);
 }
 
+async function prepareUpdater(session, manifest, python) {
+  const record = manifest.files?.find((file) => file.path === "resources/app/updater.py");
+  if (!record || !Number.isSafeInteger(record.size) || record.size <= 0 || record.size > 2 * 1024 * 1024 ||
+      !/^[0-9a-f]{64}$/.test(record.sha256)) throw new Error("签名清单缺少有效更新器，请联系发布者");
+  // 仅用本机 Python 标准库读取 ZIP 字节；通过签名清单哈希后才允许执行新版脚本。
+  const { stdout } = await promisify(execFile)(python, ["-c",
+    "import sys,zipfile; z=zipfile.ZipFile(sys.argv[1]); e=z.getinfo('resources/app/updater.py'); assert e.file_size==int(sys.argv[2]); sys.stdout.buffer.write(z.read(e))",
+    path.join(session, "package.zip"), String(record.size)],
+    { encoding: "buffer", maxBuffer: 2 * 1024 * 1024, timeout: 30000, windowsHide: true });
+  if (stdout.length !== record.size || crypto.createHash("sha256").update(stdout).digest("hex") !== record.sha256) {
+    throw new Error("新版更新器哈希校验失败");
+  }
+  fs.writeFileSync(path.join(session, "updater.py"), stdout);
+}
+
 class UpdateService {
-  constructor({ root, dataRoot, appDir, currentVersion, onState = () => {}, config }) {
+  constructor({ root, dataRoot, appDir, currentVersion, pythonExecutable, onState = () => {}, config }) {
     this.root = root; this.dataRoot = dataRoot; this.appDir = appDir;
     this.currentVersion = currentVersion; this.onState = onState;
+    this.python = pythonExecutable || resolveManagedPython(root) || path.join(root, "runtime", "python", "python.exe");
     this.config = config || JSON.parse(fs.readFileSync(path.join(appDir, "update-config.json"), "utf8"));
     this.cache = path.join(dataRoot, "cache", "updates");
     this.settingsPath = path.join(dataRoot, "config", "update-settings.json");
-    this.state = { status: "idle", currentVersion, currentReleaseId: this.config.releaseId || "00000000000000", progress: 0, message: "尚未检查更新", autoCheck: this.getAutoCheck() };
+    let lastResult;
+    try { lastResult = JSON.parse(fs.readFileSync(path.join(this.cache, "last-result.json"), "utf8")); } catch { /* 首次使用没有记录。 */ }
+    this.state = { status: "idle", currentVersion, currentReleaseId: this.config.releaseId || "00000000000000", progress: 0, message: "尚未检查更新", autoCheck: this.getAutoCheck(), lastResult };
     this.running = false;
   }
   getAutoCheck() {
@@ -109,8 +129,12 @@ class UpdateService {
     return this.setState({ autoCheck: Boolean(enabled) });
   }
   setState(patch) { Object.assign(this.state, patch); this.onState({ ...this.state }); return { ...this.state }; }
+  getState() {
+    try { this.state.lastResult = JSON.parse(fs.readFileSync(path.join(this.cache, "last-result.json"), "utf8")); } catch { /* 无更新记录。 */ }
+    return { ...this.state };
+  }
   async check({ source = "manual" } = {}) {
-    if (this.running) return this.state;
+    if (this.running || ["downloaded", "installing"].includes(this.state.status)) return this.state;
     this.running = true;
     this.setState({ status: "checking", checkSource: source, message: "正在检查新版本…", progress: 0 });
     try {
@@ -163,10 +187,11 @@ class UpdateService {
       fs.mkdirSync(session);
       fs.copyFileSync(part, path.join(session, "package.zip"));
       atomicJson(path.join(session, "envelope.json"), this.envelope);
-      fs.copyFileSync(path.join(this.appDir, "updater.py"), path.join(session, "updater.py"));
+      await prepareUpdater(session, this.manifest, this.python);
       atomicJson(path.join(session, "session.json"), { root: this.root, publicKey: this.config.publicKey,
         currentVersion: this.currentVersion, currentReleaseId: this.state.currentReleaseId,
-        parentPid: process.pid, session, executable: path.join(this.root, "VoxCPM Studio.exe") });
+        parentPid: process.pid, session, pythonExecutable: this.python, resultPath: path.join(this.cache, "last-result.json"),
+        executable: path.join(this.root, "VoxCPM Studio.exe") });
       this.session = session;
       return this.setState({ status: "downloaded", progress: 100, message: "更新包已校验，准备重启安装" });
     } catch (error) {
@@ -176,13 +201,44 @@ class UpdateService {
   async launch() {
     if (this.state.status !== "downloaded" || !this.session) throw new Error("尚无已校验的更新包");
     if (!fs.existsSync(path.join(this.root, "runtime_manifest.json"))) throw new Error("开发环境不支持安装，请使用便携版测试更新");
+    this.setState({ status: "installing", message: "正在校验更新器，完成后自动重启…" });
+    const session = this.session;
+    const settings = JSON.parse(fs.readFileSync(path.join(session, "session.json"), "utf8"));
+    const target = JSON.parse(JSON.parse(fs.readFileSync(path.join(session, "envelope.json"), "utf8")).payload);
+    for (const name of ["ready.json", "cancel.json", "status.json"]) fs.rmSync(path.join(session, name), { force: true });
+    try {
     const child = spawn(path.join(this.root, "VoxCPM Studio.exe"), ["--voxcpm-updater", this.session], {
       detached: true, stdio: "ignore", windowsHide: true,
       env: Object.fromEntries(Object.entries(process.env).filter(([key]) => key !== "ELECTRON_RUN_AS_NODE")),
     });
     await new Promise((resolve, reject) => { child.once("spawn", resolve); child.once("error", reject); });
+    let exited = false;
+    child.once("exit", () => { exited = true; });
     child.unref();
-    this.setState({ status: "installing", message: "正在启动独立更新器…" });
+    const deadline = Date.now() + 45000;
+    while (Date.now() < deadline) {
+      const statusFile = path.join(session, "status.json");
+      if (fs.existsSync(statusFile)) {
+        const status = JSON.parse(fs.readFileSync(statusFile, "utf8"));
+        if (status.status === "error") throw new Error(status.message);
+      }
+      if (exited) throw new Error("独立更新器提前退出，请查看更新日志");
+      const readyFile = path.join(session, "ready.json");
+      if (fs.existsSync(readyFile)) {
+        const ready = JSON.parse(fs.readFileSync(readyFile, "utf8"));
+        if (ready.session === session && ready.parentPid === settings.parentPid && ready.releaseId === target.releaseId) {
+          this.setState({ status: "installing", message: "更新器校验通过，正在退出并安装…" });
+          return;
+        }
+      }
+      await new Promise((resolve) => setTimeout(resolve, 100));
+    }
+    throw new Error("更新器准备超时，已取消安装，当前软件保持运行");
+    } catch (error) {
+      atomicJson(path.join(session, "cancel.json"), { cancelledAt: Date.now() });
+      this.setState({ status: "error", canDownload: true, message: `更新尚未安装：${error.message}。可重新下载后重试。` });
+      throw error;
+    }
   }
 }
-module.exports = { UpdateService, compareVersions, isNewer, verifyEnvelope, digest, request, atomicJson };
+module.exports = { UpdateService, compareVersions, isNewer, verifyEnvelope, digest, request, atomicJson, prepareUpdater };

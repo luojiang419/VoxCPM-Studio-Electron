@@ -167,9 +167,11 @@ def alive(pid):
         return False
 
 
-def wait_exit(pid, timeout=120):
+def wait_exit(pid, timeout=120, cancel=None):
     deadline = time.monotonic() + timeout
     while alive(pid):
+        if cancel and cancel.exists():
+            raise RuntimeError("主程序已取消本次安装")
         if time.monotonic() >= deadline:
             raise TimeoutError("软件尚未退出，已取消安装，请关闭软件后重新尝试")
         time.sleep(0.2)
@@ -216,6 +218,8 @@ def install(root: Path, session: Path, manifest, fail_after=None):
             temporary = target.with_name(target.name + ".voxcpm-update")
             shutil.copy2(session / "stage" / relative, temporary)
             os.replace(temporary, target)
+            if target.stat().st_size != record["size"] or sha256(target) != record["sha256"]:
+                raise OSError(f"安装后文件校验失败：{relative}")
             emit(f"正在安装 {index + 1}/{len(manifest['files'])}", 30 + int((index + 1) * 55 / len(manifest["files"])))
             if fail_after is not None and index + 1 >= fail_after:
                 raise OSError("测试注入写入失败")
@@ -246,7 +250,7 @@ def restart(root, session, health=True):
     if health:
         env["VOXCPM_UPDATE_HEALTH_FILE"] = str(session / "healthy.json")
         env["VOXCPM_UPDATE_SESSION"] = str(session)
-    return subprocess.Popen([str(root / "VoxCPM Studio.exe")], cwd=root, env=env,
+    return subprocess.Popen([str(root / "VoxCPM Studio.exe"), "--voxcpm-run"], cwd=root, env=env,
                             stdout=subprocess.DEVNULL, stderr=subprocess.DEVNULL)
 
 
@@ -256,21 +260,37 @@ def run(session: Path, recover=False):
     if str(session) != settings["session"] or not (root / "runtime_manifest.json").is_file():
         raise ValueError("更新会话或便携目录无效")
     pending = root / "data/cache/updates/pending.json"
+    result_path = Path(settings.get("resultPath", root / "data/cache/updates/last-result.json"))
+    def result(status, message, manifest=None):
+        value = {"status": status, "message": message, "session": str(session), "finishedAt": time.time(),
+                 "version": (manifest or {}).get("version"), "releaseId": (manifest or {}).get("releaseId"),
+                 "previousVersion": settings["currentVersion"], "previousReleaseId": settings.get("currentReleaseId")}
+        write_json(session / "status.json", value)
+        write_json(result_path, value)
     if recover:
         journal = read_json(session / "journal.json") if (session / "journal.json").exists() else {}
         if journal.get("status") not in ("complete", "rolled-back"):
             rollback(root, session)
+            result("rolled-back", "上次更新中断，已恢复原版本。请查看更新日志后重试。")
         pending.unlink(missing_ok=True)
         return
     emit("正在验证签名与更新文件…", 5)
     manifest = validate(session, settings)
+    if (session / "cancel.json").exists():
+        raise RuntimeError("主程序已取消本次安装")
+    write_json(session / "ready.json", {"session": str(session), "parentPid": settings["parentPid"],
+               "pid": os.getpid(), "releaseId": manifest.get("releaseId")})
     emit("等待主程序退出…", 20)
-    wait_exit(settings["parentPid"])
+    wait_exit(settings["parentPid"], cancel=session / "cancel.json")
+    if (session / "cancel.json").exists():
+        raise RuntimeError("主程序已取消本次安装")
     write_json(pending, {"session": str(session), "pid": os.getpid()})
     write_json(session / "status.json", {"status": "installing", "version": manifest["version"]})
     try:
         install(root, session, manifest)
         emit("正在重启并检查本地服务…", 90)
+        for name in ("healthy.json", "healthy.json.preparing"):
+            (session / name).unlink(missing_ok=True)
         child = restart(root, session)
         deadline = time.monotonic() + 210
         preparation_limit = time.monotonic() + 24 * 3600
@@ -279,8 +299,14 @@ def run(session: Path, recover=False):
                 deadline = preparation_deadline(session, manifest, child.pid, deadline, preparation_limit)
                 if (session / "healthy.json").exists():
                     health = read_json(session / "healthy.json")
-                    if health.get("version") == manifest["version"] and health.get("releaseId", "00000000000000") == manifest.get("releaseId", "00000000000000"):
+                    if (health.get("version") == manifest["version"] and health.get("releaseId", "00000000000000") == manifest.get("releaseId", "00000000000000")
+                            and health.get("pid") == child.pid and child.poll() is None):
                         break
+                preparing = session / "healthy.json.preparing"
+                if preparing.exists():
+                    state = read_json(preparing)
+                    if state.get("pid") == child.pid and state.get("status") in ("error", "cancelled"):
+                        raise RuntimeError("新版启动失败：" + state.get("message", "运行环境或服务未就绪"))
                 if child.poll() is not None:
                     raise RuntimeError("新版软件启动失败")
                 time.sleep(0.5)
@@ -294,11 +320,11 @@ def run(session: Path, recover=False):
         journal = read_json(session / "journal.json")
         journal["status"] = "complete"
         write_json(session / "journal.json", journal)
-        write_json(session / "status.json", {"status": "complete", "version": manifest["version"]})
+        result("complete", "更新安装成功，文件、界面及本地服务检查通过。", manifest)
         emit("更新完成，本地服务已就绪。", 100)
     except BaseException as error:
         rollback(root, session)
-        write_json(session / "status.json", {"status": "error", "message": str(error)})
+        result("rolled-back", f"更新未生效，已恢复原版本：{error}", manifest)
         pending.unlink(missing_ok=True)
         restart(root, session, health=False)
         raise
@@ -316,5 +342,8 @@ if __name__ == "__main__":
     try:
         run(args.session.resolve(strict=True), args.recover)
     except BaseException as error:
+        status_file = args.session / "status.json"
+        if not status_file.exists() or read_json(status_file).get("status") not in ("complete", "rolled-back"):
+            write_json(status_file, {"status": "error", "message": str(error)})
         emit(f"更新失败：{error}。已保留日志与回滚记录。")
         sys.exit(1)

@@ -138,7 +138,7 @@ def test_failed_restart_restores_and_reopens_old_version(tmp_path, monkeypatch):
     root, session, settings = prepare(tmp_path)
     old = root / "resources/app/main.js"
     old.parent.mkdir(parents=True); old.write_bytes(b"working old version")
-    monkeypatch.setattr(u, "wait_exit", lambda *args: None)
+    monkeypatch.setattr(u, "wait_exit", lambda *args, **kwargs: None)
     restarts = []
     class FailedChild:
         pid = 12345
@@ -157,22 +157,24 @@ def test_failed_restart_restores_and_reopens_old_version(tmp_path, monkeypatch):
 
 def test_success_requires_health_ack(tmp_path, monkeypatch):
     root, session, settings = prepare(tmp_path)
-    monkeypatch.setattr(u, "wait_exit", lambda *args: None)
+    monkeypatch.setattr(u, "wait_exit", lambda *args, **kwargs: None)
     class HealthyChild:
         pid = 12345
         def poll(self): return None
     def restart(root, session, health=True):
-        u.write_json(session / "healthy.json", {"version": "2.0.2"})
+        u.write_json(session / "healthy.json", {"version": "2.0.2", "pid": HealthyChild.pid})
         return HealthyChild()
     monkeypatch.setattr(u, "restart", restart)
     u.run(session)
     assert u.read_json(session / "status.json")["status"] == "complete"
     assert u.read_json(session / "journal.json")["status"] == "complete"
+    assert u.read_json(root / "data/cache/updates/last-result.json")["status"] == "complete"
+    assert u.read_json(session / "ready.json")["parentPid"] == settings["parentPid"]
 
 
 def test_failed_rollback_keeps_pending_for_recovery(tmp_path, monkeypatch):
     root, session, settings = prepare(tmp_path)
-    monkeypatch.setattr(u, "wait_exit", lambda *args: None)
+    monkeypatch.setattr(u, "wait_exit", lambda *args, **kwargs: None)
     def fail_install(root, session, manifest):
         u.write_json(session / "journal.json", {"status": "installing", "changes": []})
         raise OSError("写入故障")
@@ -183,3 +185,57 @@ def test_failed_rollback_keeps_pending_for_recovery(tmp_path, monkeypatch):
     with pytest.raises(PermissionError):
         u.run(session)
     assert (root / "data/cache/updates/pending.json").is_file()
+
+
+def test_cancelled_preparation_never_changes_application(tmp_path):
+    root, session, settings = prepare(tmp_path)
+    u.write_json(session / "cancel.json", {})
+    with pytest.raises(RuntimeError, match="取消"):
+        u.run(session)
+    assert not (root / "resources/app").exists()
+    assert not (root / "data/cache/updates/pending.json").exists()
+
+
+@pytest.mark.parametrize("health_pid", [12345, 54321])
+def test_stale_or_foreign_health_cannot_confirm_update(tmp_path, monkeypatch, health_pid):
+    root, session, settings = prepare(tmp_path)
+    old = root / "resources/app/main.js"
+    old.parent.mkdir(parents=True); old.write_bytes(b"original")
+    u.write_json(session / "healthy.json", {"version": "2.0.2", "pid": health_pid})
+    monkeypatch.setattr(u, "wait_exit", lambda *args, **kwargs: None)
+    class Child:
+        pid = 12345
+        def poll(self): return 1
+    def restart(*args, **kwargs):
+        assert not (session / "healthy.json").exists(), "重启前必须清理旧健康回执"
+        # 错误进程即使写了正确版本，也不能被当作本次新版健康。
+        u.write_json(session / "healthy.json", {"version": "2.0.2", "pid": health_pid})
+        return Child()
+    calls = []
+    def counted_restart(*args, **kwargs):
+        calls.append(kwargs.get("health", True))
+        return restart(*args, **kwargs) if len(calls) == 1 else Child()
+    monkeypatch.setattr(u, "restart", counted_restart)
+    with pytest.raises(RuntimeError, match="启动失败"):
+        u.run(session)
+    assert old.read_bytes() == b"original"
+    result = u.read_json(root / "data/cache/updates/last-result.json")
+    assert result["status"] == "rolled-back"
+    assert "启动失败" in result["message"]
+
+
+def test_installed_file_corruption_rolls_back(tmp_path, monkeypatch):
+    root, session, settings = prepare(tmp_path)
+    old = root / "resources/app/main.js"
+    old.parent.mkdir(parents=True); old.write_bytes(b"original")
+    manifest = u.validate(session, settings)
+    copy = u.shutil.copy2
+    def corrupt(source, target):
+        result = copy(source, target)
+        if str(target).endswith("main.js.voxcpm-update"):
+            Path(target).write_bytes(b"corrupted")
+        return result
+    monkeypatch.setattr(u.shutil, "copy2", corrupt)
+    with pytest.raises(OSError, match="安装后文件校验失败"):
+        u.install(root, session, manifest)
+    assert old.read_bytes() == b"original"

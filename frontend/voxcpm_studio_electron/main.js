@@ -801,7 +801,7 @@ ipcMain.handle("runtime:get-bootstrap-state", () => {
   return summarizeBootstrapState();
 });
 
-ipcMain.handle("update:state", () => updateService?.state);
+ipcMain.handle("update:state", () => updateService?.getState());
 ipcMain.handle("runtime:renderer-ready", () => { rendererReadyResolve(); return true; });
 ipcMain.handle("update:check", () => updateService.check());
 ipcMain.handle("update:download", () => updateService.download());
@@ -886,7 +886,7 @@ nativeTheme.on("updated", () => {
   sendRuntimeEvent("theme-updated", summarizeBootstrapState());
 });
 
-if (preparingInstallation || fs.existsSync(path.join(resolveProjectRoot(), ".voxcpm-install.json"))) {
+if (fs.existsSync(path.join(resolveProjectRoot(), "runtime_manifest.json")) || preparingInstallation) {
   const profile = path.join(resolveDataRoot(), "cache", "electron-profile");
   fs.mkdirSync(profile, { recursive: true }); app.setPath("userData", profile);
 }
@@ -916,6 +916,7 @@ app.whenReady().then(async () => {
     }
   }
   updateService = new UpdateService({ root: resolveProjectRoot(), dataRoot: resolveDataRoot(), appDir: __dirname,
+    pythonExecutable: resolvePythonCommand(resolveAppRoot(), resolveProjectRoot()),
     currentVersion: app.getVersion(), onState: (state) => sendRuntimeEvent("update-state", { update: state }) });
   runtimeService = new RuntimeService({ root: resolveProjectRoot(), appRoot: resolveAppRoot(), dataRoot: resolveDataRoot(), appDir: __dirname,
     onState: (preparation) => { installSession?.progress(preparation); sendRuntimeEvent("runtime-preparation", { preparation }); } });
@@ -952,6 +953,12 @@ app.whenReady().then(async () => {
       updateHealthWritten = true;
     }
   } catch (error) {
+    if (process.env.VOXCPM_UPDATE_HEALTH_FILE && !updateHealthWritten) {
+      atomicJson(process.env.VOXCPM_UPDATE_HEALTH_FILE + ".preparing", { version: app.getVersion(),
+        releaseId: updateService.config.releaseId || "00000000000000", pid: process.pid,
+        status: "error", message: String(error), checkedAt: Date.now() });
+      clearInterval(updatePreparationHeartbeat);
+    }
     installSession?.fail(error);
     setBootstrapState({
       status: "error",

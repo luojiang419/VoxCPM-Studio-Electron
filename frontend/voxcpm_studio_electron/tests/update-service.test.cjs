@@ -5,11 +5,14 @@ const os = require("os");
 const path = require("path");
 const http = require("http");
 const crypto = require("crypto");
+const { execFileSync } = require("child_process");
 const { UpdateService, compareVersions, isNewer, verifyEnvelope } = require("../update-service");
 
 const keys = crypto.generateKeyPairSync("ed25519");
 const publicKey = keys.publicKey.export({ type: "spki", format: "der" }).subarray(-32).toString("hex");
-const bytes = Buffer.from("VoxCPM real HTTP download test content".repeat(100));
+const python = process.env.VOXCPM_TEST_PYTHON || "python";
+const updater = Buffer.from("# signed new updater\n".repeat(100));
+const bytes = execFileSync(python, ["-c", "import io,sys,zipfile; b=io.BytesIO(); z=zipfile.ZipFile(b,'w'); z.writestr('resources/app/updater.py',sys.stdin.buffer.read()); z.close(); sys.stdout.buffer.write(b.getvalue())"], { input: updater });
 const hash = crypto.createHash("sha256").update(bytes).digest("hex");
 function sign(manifest) {
   const payload = JSON.stringify(manifest);
@@ -17,7 +20,8 @@ function sign(manifest) {
 }
 function manifest(url) {
   return { protocol: 1, product: "voxcpm-studio", platform: "win32-x64", version: "2.0.2", minVersion: "0.2.0",
-    notes: "中文更新说明", package: { url, sha256: hash, size: bytes.length } };
+    notes: "中文更新说明", package: { url, sha256: hash, size: bytes.length },
+    files: [{ path: "resources/app/updater.py", size: updater.length, sha256: crypto.createHash("sha256").update(updater).digest("hex") }] };
 }
 test("版本按数字比较，拒绝非法版本", () => {
   assert.equal(compareVersions("2.0.10", "2.0.2"), 1);
@@ -56,7 +60,7 @@ test("真实 HTTP 检查、断点续传、哈希失败与并发保护", async (t
   const base = `http://127.0.0.1:${server.address().port}`;
   latest = sign(manifest(base + "/package"));
   fs.writeFileSync(path.join(temp, "updater.py"), "# test helper");
-  const service = new UpdateService({ root: temp, dataRoot: temp, appDir: temp, currentVersion: "2.0.1",
+  const service = new UpdateService({ root: temp, dataRoot: temp, appDir: temp, currentVersion: "2.0.1", pythonExecutable: python,
     config: { manifestUrl: base + "/latest", publicKey, autoCheck: true } });
   const automatic = await service.check({ source: "startup" });
   assert.equal(automatic.status, "available");
@@ -68,6 +72,11 @@ test("真实 HTTP 检查、断点续传、哈希失败与并发保护", async (t
   assert.equal((await service.download()).status, "downloaded");
   assert.equal(rangeSeen, true);
   assert.deepEqual(fs.readFileSync(path.join(service.session, "package.zip")), bytes);
+  assert.deepEqual(fs.readFileSync(path.join(service.session, "updater.py")), updater, "首次升级必须使用签名新版更新器，不能沿用旧脚本");
+  assert.equal((await service.check()).status, "downloaded", "检查不能丢弃已准备更新");
+  service.state.status = "installing";
+  assert.equal((await service.check()).status, "installing");
+  service.state.status = "downloaded";
   assert.equal(service.setAutoCheck(false).autoCheck, false);
   assert.equal(service.getAutoCheck(), false);
   fs.unlinkSync(part);
@@ -77,12 +86,36 @@ test("真实 HTTP 检查、断点续传、哈希失败与并发保护", async (t
   assert.equal((await service.download()).status, "error");
   assert.equal(fs.existsSync(part), false);
   assert.match(service.state.message, /SHA-256/);
+  responseMode = "range";
+  latest = sign({ ...manifest(base + "/package"), files: [{ ...manifest(base + "/package").files[0], sha256: "0".repeat(64) }] });
+  await service.check();
+  assert.equal((await service.download()).status, "error");
+  assert.match(service.state.message, /更新器哈希/);
   service.running = true;
   assert.equal((await service.check()).status, "error");
   service.running = false;
+  service.state.status = "idle";
   latest = sign({ ...manifest(base + "/package"), version: "2.0.1" });
   assert.equal((await service.check()).status, "current");
   await assert.rejects(service.download(), /先检查/);
   latest.signature = "00".repeat(64);
   assert.equal((await service.check()).status, "error");
+});
+
+test("更新器未能启动时保留主程序，并记录取消避免延迟安装", async (t) => {
+  const temp = fs.mkdtempSync(path.join(os.tmpdir(), "voxcpm-update-launch-"));
+  t.after(() => fs.rmSync(temp, { recursive: true, force: true }));
+  const service = new UpdateService({ root: temp, dataRoot: temp, appDir: temp, currentVersion: "2.0.1", config: {} });
+  service.session = path.join(temp, "session"); fs.mkdirSync(service.session);
+  fs.writeFileSync(path.join(temp, "runtime_manifest.json"), "{}");
+  fs.writeFileSync(path.join(service.session, "session.json"), JSON.stringify({ parentPid: process.pid }));
+  fs.writeFileSync(path.join(service.session, "envelope.json"), JSON.stringify(sign(manifest("https://example.com/a.zip"))));
+  service.state.status = "downloaded";
+  await assert.rejects(service.launch(), /ENOENT/);
+  assert.equal(service.state.status, "error");
+  assert.equal(service.state.canDownload, true);
+  assert.equal(fs.existsSync(path.join(service.session, "cancel.json")), true);
+  fs.mkdirSync(service.cache, { recursive: true });
+  fs.writeFileSync(path.join(service.cache, "last-result.json"), JSON.stringify({ status: "rolled-back", message: "服务启动失败", session: service.session }));
+  assert.equal(service.getState().lastResult.status, "rolled-back");
 });

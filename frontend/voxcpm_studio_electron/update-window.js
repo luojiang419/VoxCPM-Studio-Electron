@@ -12,7 +12,7 @@ app.whenReady().then(() => {
   let finished = false;
   win.on("close", (event) => { if (!finished) event.preventDefault(); });
   const loaded = win.loadURL("data:text/html;charset=utf-8," + encodeURIComponent(`<!doctype html><html lang="zh-CN"><meta charset="utf-8"><style>body{background:#181817;color:#eee;font:16px 'Microsoft YaHei',sans-serif;margin:36px}h2{font-size:23px}progress{width:100%;height:18px;accent-color:#f6a66d}p{line-height:1.6;color:#aaa69d}</style><h2>正在更新 VoxCPM Studio</h2><p id="message">正在准备独立更新器…</p><progress id="progress" max="100" value="0"></progress><p>请保持此窗口打开，完成后软件会自动启动。</p></html>`));
-  const python = resolveManagedPython(settings.root) || path.join(settings.root, "runtime", "python", "python.exe");
+  const python = settings.pythonExecutable || resolveManagedPython(settings.root) || path.join(settings.root, "runtime", "python", "python.exe");
   const worker = spawn(python, ["-u", path.join(session, "updater.py"), session], {
     cwd: session, windowsHide: true, stdio: ["ignore", "pipe", "pipe"],
   });
@@ -31,7 +31,18 @@ app.whenReady().then(() => {
   });
   worker.stderr.pipe(log, { end: false });
   async function finish(code, error) {
+    if (finished) return;
     finished = true; log.end();
+    if (code !== 0) {
+      let status = {};
+      try { status = JSON.parse(fs.readFileSync(path.join(session, "status.json"), "utf8")); } catch { /* Python 可能尚未启动。 */ }
+      const message = error || status.message || `更新器退出（${code}）`;
+      const result = { ...status, status: status.status === "rolled-back" ? "rolled-back" : "error", message,
+        session, finishedAt: Date.now() / 1000 };
+      fs.writeFileSync(path.join(session, "status.json"), JSON.stringify(result));
+      fs.writeFileSync(settings.resultPath || path.join(settings.root, "data/cache/updates/last-result.json"), JSON.stringify(result));
+      error = message;
+    }
     if (code !== 0) await dialog.showMessageBox(win, { type: "error", title: "更新未完成",
       message: "更新未完成，原版本已保留或恢复。", detail: `${error || "请查看更新日志"}\n${path.join(session, "updater.log")}` });
     app.quit();

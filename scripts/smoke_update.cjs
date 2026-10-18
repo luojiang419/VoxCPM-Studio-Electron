@@ -65,6 +65,13 @@ async function cdp(port) {
     else if (fs.existsSync(path.join(original, directory))) fs.symlinkSync(path.join(original, directory), path.join(testRoot, directory), "junction");
   }
   const appDir = path.join(testRoot, "resources/app");
+  if (process.argv.includes("--fixed-client")) {
+    const source = path.join(root, "frontend/voxcpm_studio_electron");
+    for (const file of ["main.js", "update-service.js", "update-window.js"]) fs.copyFileSync(path.join(source, file), path.join(appDir, file));
+    fs.cpSync(path.join(source, "dist"), path.join(appDir, "dist"), { recursive: true });
+    // 故意破坏旧脚本，验证首次下载使用签名新版，不能沿用本机旧脚本。
+    fs.writeFileSync(path.join(appDir, "updater.py"), "raise RuntimeError('旧更新器不应执行')\n");
+  }
   const packagePath = path.join(appDir, "package.json");
   const pkg = JSON.parse(fs.readFileSync(packagePath)); pkg.version = fromVersion;
   fs.writeFileSync(packagePath, JSON.stringify(pkg, null, 2));
@@ -130,6 +137,13 @@ async function cdp(port) {
   }, 240000);
   assert.equal(result.version, "2.0.2");
   assert.equal(JSON.parse(fs.readFileSync(packagePath)).version, "2.0.2");
+  const installedConfig = JSON.parse(fs.readFileSync(configPath));
+  const targetManifest = JSON.parse(JSON.parse(fs.readFileSync(path.join(service.session, "envelope.json"))).payload);
+  assert.equal(installedConfig.releaseId, targetManifest.releaseId);
+  const recheck = new UpdateService({ root: testRoot, dataRoot: path.join(testRoot, "data"), appDir, currentVersion: "2.0.2",
+    config: { ...installedConfig, ...(manifestArgument >= 0 ? { manifestUrl: process.argv[manifestArgument + 1] } : {}) } });
+  assert.equal((await recheck.check()).status, "current", "重启后不能重复提示同一发布更新");
+  assert.equal(recheck.getState().lastResult?.status, "complete");
   assert.equal(await digest(sentinel), dataHash);
   assert.equal(await digest(modelConfig), modelHash);
   if (lightweight) assert.ok(fs.readFileSync(path.join(testRoot, "data/cache/runtime-bootstrap.log"), "utf8").includes("已复用验证通过的本地环境"), "更新重启未复用已验证运行时");
@@ -143,6 +157,7 @@ async function cdp(port) {
     assert.equal(music.rules.models.length, 4);
   }
   const report = { result: "passed", fromVersion, toVersion: "2.0.2", testRoot, session: service.session,
+    installedReleaseId: installedConfig.releaseId, recheckStatus: recheck.state.status, signedUpdaterBootstrap: process.argv.includes("--fixed-client"),
     userDataPreserved: true, modelPreserved: true, restartedBackend: backendState.serviceUrl, health,
     ...(componentProfile ? { componentSelectionPreserved: true, musicModels: music.models.length, officialRules: music.rules.models.length } : {}) };
   fs.writeFileSync(path.join(testRoot, "smoke-result.json"), JSON.stringify(report, null, 2));
