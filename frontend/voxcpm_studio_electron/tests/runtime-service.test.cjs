@@ -5,7 +5,7 @@ const os = require("node:os");
 const path = require("node:path");
 const http = require("node:http");
 const crypto = require("node:crypto");
-const { selectProfile, downloadAsset, safePath, validateAsset, resolveManagedPython, offlinePipArgs, RuntimeService } = require("../runtime-service");
+const { selectProfile, downloadAsset, safePath, validateAsset, resolveManagedPython, offlinePipArgs, RuntimeService, PROBE, STARTUP_PROBE } = require("../runtime-service");
 const config = require("../runtime-config.json");
 
 test("50 系及 Blackwell 路由 CUDA 12.8，40 系路由 CUDA 12.6，集显使用 CPU", () => {
@@ -152,4 +152,118 @@ test("三种依赖配置强制本地 wheel 安装，禁止 PyPI 与源码构建"
     assert.ok(args.includes(`torchaudio==${config.profiles[profile].torch}+${profile}`));
     assert.ok(args.includes(path.join(os.tmpdir(), config.wheelhouse.requirements.name)));
   }
+});
+
+async function startupFixture(t, managed = false) {
+  const root = await fs.mkdtemp(path.join(os.tmpdir(), "voxcpm-startup-"));
+  t.after(() => fs.rm(root, { recursive: true, force: true }));
+  const appDir = path.join(root, "shell"), appRoot = path.join(root, "app"), dataRoot = path.join(root, "data");
+  await fs.mkdir(appDir, { recursive: true }); await fs.mkdir(appRoot);
+  await fs.writeFile(path.join(appDir, "runtime-requirements.txt"), "gradio==6.13.0\n");
+  const asset = (name, bytes) => ({ name, size: bytes.length, sha256: crypto.createHash("sha256").update(bytes).digest("hex"), urls: ["https://example.invalid/should-not-download"] });
+  const bytes = Buffer.from("完整模型"), modelConfig = Buffer.from('{"architecture":"voxcpm2"}');
+  const localConfig = { protocol: 1, python: { ...asset("python.zip", bytes), version: "3.12.10" }, pip: asset("pip.whl", bytes),
+    profiles: { cu126: { torch: "2.6.0", wheels: [] } }, models: [] };
+  for (let i = 0; i < 3; i++) {
+    const folder = `model-${i}`, location = path.join(root, "models", folder);
+    await fs.mkdir(location, { recursive: true });
+    const files = [asset("config.json", modelConfig), asset("weights.bin", bytes)];
+    await fs.writeFile(path.join(location, "config.json"), modelConfig); await fs.writeFile(path.join(location, "weights.bin"), bytes);
+    localConfig.models.push({ folder, files });
+  }
+  const directory = path.join(root, managed ? "runtime/managed/py312-cu126" : "existing-python");
+  const python = path.join(directory, "python.exe"), moduleFile = path.join(directory, "Lib/site-packages/torch/__init__.py");
+  await fs.mkdir(path.dirname(moduleFile), { recursive: true });
+  await fs.writeFile(python, "python fixture"); await fs.writeFile(moduleFile, "# package entry");
+  if (managed) await fs.writeFile(path.join(directory, "ready.json"), '{"signature":"legacy-ready-marker"}');
+  const selected = selectProfile([{ index: "0", name: "RTX 3060", driver: "580.97", capability: 8.6 }]);
+  const calls = [], states = [];
+  const create = () => {
+    const service = new RuntimeService({ root, appDir, appRoot, dataRoot, config: localConfig, onState: state => states.push({ ...state }),
+      runProcess: async (_command, args) => {
+        calls.push(args);
+        if (args[1] === STARTUP_PROBE) return JSON.stringify({ files: [moduleFile, path.dirname(moduleFile)] });
+        if (args[1]?.startsWith("import imageio_ffmpeg,shutil")) await fs.writeFile(args[2], "ffmpeg fixture");
+        return "";
+      } });
+    service.detect = async () => selected;
+    return service;
+  };
+  return { root, appDir, appRoot, dataRoot, localConfig, python, moduleFile, selected, calls, states, create,
+    options: { managed, existingPython: python, existingModel: path.join(root, "models/model-0") } };
+}
+
+test("连续启动复用落盘缓存，不重复完整导入、pip 检查或模型哈希，也不进入补齐状态", async t => {
+  const f = await startupFixture(t);
+  await f.create().prepare(f.options);
+  assert.equal(f.calls.filter(args => args[1] === PROBE).length, 1);
+  assert.ok(!f.states.some(state => state.status === "working"));
+  f.calls.length = 0; f.states.length = 0;
+  const restarted = f.create();
+  restarted.prepareModels = async () => { throw new Error("正常重启不应重算模型哈希"); };
+  assert.equal((await restarted.prepare(f.options)).python, f.python);
+  assert.deepEqual(f.calls.map(args => args[1]), [STARTUP_PROBE]);
+  assert.equal(restarted.state.cached, true);
+  assert.ok(!f.states.some(state => state.status === "working"));
+});
+
+test("旧版托管环境迁移一次后快速复用，Python 自动识别路径变化不会使缓存失效", async t => {
+  const f = await startupFixture(t, true);
+  await f.create().prepare({ ...f.options, existingPython: "python" });
+  assert.ok(f.calls.some(args => args[0] === "-m" && args[1] === "pip" && args[2] === "check"));
+  assert.ok(!f.calls.some(args => args.includes("install")));
+  f.calls.length = 0;
+  const restarted = f.create(), result = await restarted.prepare({ ...f.options, managed: false });
+  assert.equal(restarted.state.cached, true);
+  assert.ok(result.env.PATH.startsWith(path.join(path.dirname(f.python), "ffmpeg")));
+  assert.deepEqual(f.calls.map(args => args[1]), [STARTUP_PROBE]);
+});
+
+for (const change of ["模型同大小改写", "模型缺失", "包入口改写", "依赖要求变化", "显卡驱动变化", "缓存损坏"]) {
+  test(`${change}时失效并重新检查，不盲目信任旧就绪记录`, async t => {
+    const f = await startupFixture(t);
+    await f.create().prepare(f.options); f.calls.length = 0;
+    if (change === "模型同大小改写") await fs.writeFile(path.join(f.options.existingModel, "weights.bin"), Buffer.alloc(Buffer.byteLength("完整模型")));
+    if (change === "模型缺失") await fs.rm(path.join(f.options.existingModel, "weights.bin"));
+    if (change === "包入口改写") await fs.appendFile(f.moduleFile, "\n# changed");
+    if (change === "依赖要求变化") await fs.appendFile(path.join(f.appDir, "runtime-requirements.txt"), "# new requirements\n");
+    if (change === "显卡驱动变化") f.selected.gpu.driver = "581.00";
+    if (change === "缓存损坏") await fs.writeFile(path.join(f.dataRoot, "cache/runtime-ready.json"), "{broken");
+    const restarted = f.create(); let rechecked = false;
+    restarted.prepareModels = async () => { rechecked = true; throw new Error("已进入完整复检"); };
+    await assert.rejects(restarted.prepare(f.options), /已进入完整复检/);
+    assert.equal(rechecked, true);
+    assert.ok(f.calls.some(args => args[1] === PROBE));
+  });
+}
+
+test("快速检查异常会回到真实复检，通过时复用依赖而不强制安装", async t => {
+  const f = await startupFixture(t);
+  await f.create().prepare(f.options); f.calls.length = 0;
+  const restarted = f.create(), nativeProbe = restarted.startupProbe.bind(restarted);
+  let failed = false;
+  restarted.startupProbe = async (...args) => {
+    if (!failed) { failed = true; throw new Error("快速检查失败"); }
+    return nativeProbe(...args);
+  };
+  await restarted.prepare(f.options);
+  assert.ok(f.calls.some(args => args[1] === PROBE));
+  assert.ok(!f.calls.some(args => args.includes("install")));
+});
+
+test("丢失单个模型只补齐该文件，保留已可用的 Python 和依赖", async t => {
+  const f = await startupFixture(t, true);
+  await f.create().prepare(f.options); f.calls.length = 0; f.states.length = 0;
+  const target = path.join(f.options.existingModel, "weights.bin"), bytes = await fs.readFile(target);
+  await fs.rm(target);
+  let downloads = 0;
+  t.mock.method(globalThis, "fetch", async () => {
+    downloads++;
+    return new Response(bytes, { status: 200, headers: { "Content-Length": String(bytes.length) } });
+  });
+  await f.create().prepare(f.options);
+  assert.equal(downloads, 1);
+  assert.deepEqual(await fs.readFile(target), bytes);
+  assert.ok(f.states.some(state => state.status === "working" && state.phase === "models"));
+  assert.ok(!f.calls.some(args => args.includes("install")));
 });

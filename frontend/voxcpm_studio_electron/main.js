@@ -599,7 +599,7 @@ async function startBackend() {
   const bundledModelDir = resolveBundledModelDir(projectRoot);
   let modelDir = (process.env.VOXCPM_MODEL_DIR || bundledModelDir || "").trim();
   const cleanedPids = cleanupStaleBackendProcesses(projectRoot, appRoot);
-  setBootstrapState({ status: "preparing", statusText: "正在补齐模型和依赖", detail: "正在检查运行环境，请稍候。" });
+  setBootstrapState({ status: "preparing", statusText: "正在检查本地运行环境", detail: "正在复用已就绪的环境，缺失组件会自动修复。" });
   sendRuntimeEvent("boot", summarizeBootstrapState());
   let runtime;
   try {

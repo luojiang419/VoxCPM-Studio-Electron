@@ -17,7 +17,10 @@ export default function RuntimePreparation({ onRun, backendStatus, backendDetail
     window.voxcpmDesktop.getPreparationState().then(receive).catch(() => {});
     return window.voxcpmDesktop.onRuntimeEvent((event) => { if (event.type === "runtime-preparation") receive(event.preparation); });
   }, []);
-  useEffect(() => { if (backendStatus === "ready") setOpen(false); }, [backendStatus]);
+  useEffect(() => {
+    if (backendStatus === "ready") setOpen(false);
+    else if (backendStatus === "error" && state?.status === "ready") setOpen(true);
+  }, [backendStatus, state?.status]);
   useEffect(() => {
     if (open) { returnFocus.current = document.activeElement as HTMLElement; dialog.current?.showModal(); }
     else { dialog.current?.close(); returnFocus.current?.focus(); }
@@ -28,11 +31,12 @@ export default function RuntimePreparation({ onRun, backendStatus, backendDetail
   const index = stages.findIndex(([key]) => key === phase);
   const percent = state?.size ? Math.min(100, Math.round((state.downloaded || 0) / state.size * 100)) : undefined;
   return <>
-    {!open && ["stopped", "error"].includes(backendStatus) && <button type="button" className="runtime-run-button primary-button" onClick={onRun}>运行 · 自动补齐环境</button>}
+    {!open && ["preparing", "booting"].includes(backendStatus) && <div className="runtime-startup-status" role="status"><span />{state?.status === "ready" ? "正在启动本地引擎…" : "正在检查本地环境…"}</div>}
+    {!open && ["stopped", "error"].includes(backendStatus) && <button type="button" className="runtime-run-button primary-button" onClick={onRun}>运行</button>}
     <dialog ref={dialog} className="runtime-dialog" aria-labelledby="runtime-title" onCancel={(event) => { if (working) event.preventDefault(); else setOpen(false); }}>
-      <div className="runtime-dialog-kicker">VOXCPM STUDIO · 首次运行准备</div>
-      <h2 id="runtime-title">{backendFailed ? "本地服务启动未完成" : state?.status === "error" ? "补齐暂未完成" : state?.status === "cancelled" ? "已暂停补齐" : "正在补齐模型和依赖"}</h2>
-      <p className="runtime-intro">首次运行需要下载运行环境和模型，请保持网络连接。已完成的文件会保留，后续运行自动复用。</p>
+      <div className="runtime-dialog-kicker">VOXCPM STUDIO · 运行环境</div>
+      <h2 id="runtime-title">{backendFailed ? "本地服务启动未完成" : state?.status === "error" ? "运行环境准备未完成" : state?.status === "cancelled" ? "已暂停补齐" : state?.status === "ready" ? "正在启动本地服务" : "正在补齐缺失组件"}</h2>
+      <p className="runtime-intro">{backendFailed ? "运行环境已就绪，请查看本地服务启动日志以定位问题。" : "正在准备缺失或更新的组件，已就绪的运行环境和模型会保留并复用。需要下载时请保持网络连接。"}</p>
       <ol className="runtime-stages">{stages.map(([key, label], i) => <li key={key} className={i === index ? "current" : i < index ? "done" : ""}><span>{i < index ? "✓" : i + 1}</span>{label}</li>)}</ol>
       {state?.label && <div className="runtime-device">{state.label}{state.profile === "cpu" && " · 速度取决于 CPU 性能"}</div>}
       <p className="runtime-message" role="status" aria-live="polite">{backendFailed ? backendDetail : state?.message}</p>
@@ -42,7 +46,7 @@ export default function RuntimePreparation({ onRun, backendStatus, backendDetail
       {showLog && <pre className="runtime-log">{state?.log || "等待输出；下载阶段可查看上方文件进度。"}</pre>}
       <div className="runtime-dialog-actions">{working
         ? <button type="button" className="ghost-button" disabled={state?.status === "ready"} onClick={() => window.voxcpmDesktop.cancelPreparation()}>暂停补齐</button>
-        : <><button type="button" className="ghost-button" onClick={() => setOpen(false)}>稍后再试</button><button type="button" className="primary-button" onClick={onRun}>继续补齐并运行</button></>}
+        : <><button type="button" className="ghost-button" onClick={() => setOpen(false)}>稍后再试</button><button type="button" className="primary-button" onClick={onRun}>{backendFailed ? "重新启动服务" : "继续准备并运行"}</button></>}
       </div>
     </dialog>
   </>;
