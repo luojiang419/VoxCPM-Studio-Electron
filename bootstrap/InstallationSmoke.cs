@@ -39,7 +39,7 @@ public static class InstallationSmoke {
     [STAThread] public static int Main(string[] args) {
         var json = new JavaScriptSerializer();
         var manifest = json.Deserialize<Manifest>(File.ReadAllText(args[0], Encoding.UTF8));
-        string output = Path.GetFullPath(args[5]), root = Path.Combine(output, "fixtures", Guid.NewGuid().ToString("N"));
+        string output = Path.GetFullPath(args[5]), root = Path.Combine(output, "fixtures", Guid.NewGuid().ToString("N"), "Program Files", "VoxCPMStudio");
         string key = Installer.UninstallKey + ".Test." + Guid.NewGuid().ToString("N");
         string runtime = Path.GetFullPath(args[3]), models = Path.GetFullPath(args[4]);
         string pth = Path.Combine(runtime, "managed", "py312-cu126", "python312._pth");
@@ -75,7 +75,14 @@ public static class InstallationSmoke {
                 if (File.Exists(source)) File.Copy(source, Path.Combine(output, log), true);
             }
             File.WriteAllText(Path.Combine(output, "ready-report.json"), ready, Encoding.UTF8);
-            Installer.StopChild(child); child.Dispose(); child = null;
+            // taskkill 返回时，子进程的当前目录句柄仍可能尚未释放。等待本轮 API 和桌面进程真正退出。
+            var apiPid = System.Text.RegularExpressions.Regex.Match(File.ReadAllText(Path.Combine(output,"electron_backend.log")), @"Started server process \[(\d+)\]");
+            Check(apiPid.Success,"没有找到本轮 API 进程记录");
+            using (var api = Process.GetProcessById(Int32.Parse(apiPid.Groups[1].Value))) {
+                Installer.StopChild(child);
+                Check(child.WaitForExit(15000) && api.WaitForExit(15000),"测试进程未完全退出，不能开始卸载验收");
+            }
+            child.Dispose(); child = null;
             Directory.CreateDirectory(Path.Combine(root, "data", "voices")); File.WriteAllText(Path.Combine(root, "data", "voices", "keep.txt"), "personal");
             Installer.Remove(root, state.id, false);
             Check(File.Exists(Path.Combine(root, "data", "voices", "keep.txt")), "卸载未保留个人数据");

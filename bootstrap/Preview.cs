@@ -21,7 +21,7 @@ public static class BootstrapPreview {
                 new InstallDrive { root=@"E:\", ready=true, free=(long)(3.6*1073741824) }
             }) : null;
             if(state=="disk-scroll") {
-                detector=()=>@"D:\VoxCPMStudio";
+                detector=()=>@"D:\Program Files\VoxCPMStudio";
                 survey=()=>new[] { "C","D","E","F","G","H" }.Select(letter=>new InstallDrive { root=letter+@":\",ready=true,free=Installer.RequiredSpace*3 }).ToArray();
             }
             using (var form = new Launcher(manifest, true, dark, detector, survey)) {

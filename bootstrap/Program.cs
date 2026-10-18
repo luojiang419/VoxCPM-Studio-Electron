@@ -333,7 +333,8 @@ namespace VoxBootstrap {
                 string detail = current ? "继续安装 · " + space : problem == null ? space : !drive.ready ? "暂不可用" : drive.root.StartsWith("C:", StringComparison.OrdinalIgnoreCase) && drives.Length > 1 ? "系统盘 · 优先其他分区" : "空间不足 · " + space;
                 string resumableRoot = current ? installPath.Text : null;
                 var card = new DiskCard(drive, diskIcon, dark, detail) { Size = new Size(width,132), Margin = new Padding(0,0,drive == drives.Last() ? 0 : 12,0), Enabled = current || problem == null };
-                driveTips.SetToolTip(card, drive.root + "\n" + space + "\n" + (current ? "继续当前安装" : problem ?? "点击选择，应用将安装到专用 VoxCPMStudio 文件夹"));
+                string folderHint = drive.root.StartsWith("C:",StringComparison.OrdinalIgnoreCase) ? "点击选择，应用将安装到无需提权的用户目录" : "点击选择，应用将安装到 Program Files\\VoxCPMStudio";
+                driveTips.SetToolTip(card, drive.root + "\n" + space + "\n" + (current ? "继续当前安装" : problem ?? folderHint));
                 card.Click += (sender, args) => {
                     try {
                         installPath.Text = resumableRoot ?? Installer.RootOnDrive(card.Drive, drives, !preview);

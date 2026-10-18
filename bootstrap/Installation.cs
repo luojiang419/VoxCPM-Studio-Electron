@@ -47,18 +47,15 @@ namespace VoxBootstrap {
             if (other.Length > 0) {
                 var enough = other.Where(d => d.ready && d.free >= RequiredSpace).OrderByDescending(d => d.free).ToArray();
                 foreach (var drive in enough) {
-                    var candidates = new List<string> { Path.Combine(drive.root, "VoxCPMStudio") };
-                    foreach (string name in new[] { "app", "Apps", "Programs", "Applications", "软件" }) {
-                        string parent = Path.Combine(drive.root, name); if (Directory.Exists(parent)) candidates.Add(Path.Combine(parent, "VoxCPMStudio"));
-                    }
-                    foreach (string candidate in candidates.Distinct(StringComparer.OrdinalIgnoreCase)) if (writable(candidate)) return Canonical(candidate);
+                    string candidate = Path.Combine(drive.root, "Program Files", "VoxCPMStudio");
+                    if (writable(candidate)) return Canonical(candidate);
                 }
                 if (!other.Any(d => d.ready)) throw new IOException("其他分区暂不可用。\n请确认分区可正常访问，再点击重新检测。");
                 if (enough.Length == 0) {
                     string detail = String.Join("，", other.Where(d => d.ready).Select(d => d.root.Substring(0, 1) + "盘 " + (d.free / 1073741824.0).ToString("0.0") + " GB"));
                     throw new IOException("其他分区空间均不足。\n至少需要 25 GiB；" + detail.Replace(" GB", " GiB") + "。请释放空间后重新检测。不会自动安装到 C 盘。");
                 }
-                throw new IOException("其他分区没有合适的可写位置。\n请手动选择非 C 盘的可写目录，或调整权限后重新检测。");
+                throw new IOException("其他分区的 Program Files 目录无法安装。\n请确认目录可读写且没有同名目录冲突，或通过“更改”选择非 C 盘的可写专用目录，再重新检测。");
             }
             var system = list.FirstOrDefault(d => String.Equals(Path.GetPathRoot(d.root), @"C:\", StringComparison.OrdinalIgnoreCase));
             if (system == null || !system.ready || system.free < RequiredSpace) throw new IOException("C 盘空间不足或不可用。\n当前仅有 C 盘，需要至少 25 GiB 可用空间。请释放空间后重新检测。");

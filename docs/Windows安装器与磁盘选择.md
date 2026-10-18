@@ -5,7 +5,8 @@
 ## 安装位置
 
 - 自动选择当前用户可读写、剩余空间至少 25 GiB 的非 C 本地固定分区，优先剩余空间最多的分区。
-- 磁盘卡片显示盘符、可用空间和不可选原因。点击后使用该盘下的 `VoxCPMStudio` 专用目录；已有标准应用目录可作为备选，不能直接安装在磁盘根目录。
+- 磁盘卡片显示盘符、可用空间和不可选原因。点击非 C 盘后默认安装到 `盘符:\Program Files\VoxCPMStudio`，例如 `D:\Program Files\VoxCPMStudio`；需要时创建目录，不能直接安装在磁盘根目录。自动选择也使用同一规则。
+- 非 C 盘的 `Program Files` 无读写权限或有同名目录冲突时，跳过该分区；全部不满足条件时明确提示，可通过“更改”手动选择可写专用目录，不自动改用磁盘根目录。已有本产品的安装继续原位恢复，不迁移数据。
 - 仅有 C 分区时，使用 `LocalAppData/Programs/VoxCPMStudio`。存在其他分区但全都不满足条件时，明确提示，阻止新安装，不自动回退 C。释放空间后可重新检测，也可修改专用目录。
 - 手动路径仍检查分区、容量、归属和写入权限。已有本产品的准备中/已完成目录可继续恢复，卸载后的重装重新检查容量。
 - 所有操作使用当前用户权限，不安装 Windows 系统服务或显卡驱动，不要求管理员权限。
@@ -38,6 +39,6 @@ python scripts/render_bootstrap.py
 
 `render_bootstrap.py` 渲染实际 WinForms 窗口，输出深浅主题、空间不足、多磁盘滚动预览和真实卡片缩放动图；不下载或安装应用。`build_bootstrap.py --demo` 构建可点击的独立演示 EXE。
 
-`scripts/smoke_installation.py` 可显式验收完整握手，借用 `builds/bootstrap-validation` 中的专用测试运行时和模型，并在隔离快捷方式目录和 HKCU 测试键中完成安装、展示窗口和卸载。大型模型不重复下载，借用的运行时 `_pth` 在结束时恢复，目录连接只移除连接本身。证据为 `builds/installer-live-validation/result.json`。
+`scripts/smoke_installation.py` 可显式验收完整握手，借用 `builds/bootstrap-validation` 中的专用测试运行时和模型，并在隔离快捷方式目录和 HKCU 测试键中完成安装、展示窗口和卸载；测试安装根包含 `Program Files`，同时验证空格路径。大型模型不重复下载，借用的运行时 `_pth` 在结束时恢复，目录连接只移除连接本身。证据为 `builds/installer-live-validation/result.json`。
 
 本机 RTX 4070 Ti SUPER/cu126 已完成真实验收。RTX 50/Blackwell 自动分流 cu128 和最低驱动规则已测试；没有 50 系硬件，尚未实机验收。
