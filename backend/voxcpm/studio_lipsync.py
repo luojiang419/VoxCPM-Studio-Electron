@@ -253,9 +253,8 @@ class LipSyncService:
             selected = status["selectedVersion"]
             minimum_free = (6144 if requested == "1.6" else 7168) if selected == "1.6" else 4096
             if status["hardware"]["freeMB"] < minimum_free:
-                raise ValueError(f"当前空闲显存不足 {minimum_free // 1024} GB，请关闭其他占用显卡的程序后重试。")
+                raise ValueError(f"LatentSync {selected} 当前空闲显存不足 {minimum_free // 1024} GB，任务已停止并保留模型选择。请关闭其他占用显卡的程序后重试。")
             initial_version = selected
-            fallback_reason = ""
             job_id = uuid.uuid4().hex
             work = self.data_root / "lipsync-jobs" / job_id
             work.mkdir(parents=True)
@@ -285,23 +284,10 @@ class LipSyncService:
                                    "--guidance", str(payload.guidance), "--seed", str(payload.seed)], work, progress, cancelled, log)
                 try:
                     infer(selected)
-                except LipSyncOutOfMemory:
+                except LipSyncOutOfMemory as exc:
                     if cancelled():
                         raise LipSyncCancelled()
-                    if requested != "auto" or selected != "1.6" or "1.5" not in status["installedVersions"]:
-                        raise
-                    if self.hardware().get("freeMB", 0) < 4096:
-                        raise
-                    selected = "1.5"
-                    fallback_reason = "1.6 显存不足，已自动回退到 1.5（256px）重新生成。"
-                    log.write(fallback_reason + "\n")
-                    log.flush()
-                    progress(1, fallback_reason)
-                    # 第一次子进程已经退出；清理未完成输出，避免读取上次的半成品。
-                    for name in ("synced.mp4", "inference.json"):
-                        (work / name).unlink(missing_ok=True)
-                    shutil.rmtree(work / "render", ignore_errors=True)
-                    infer(selected)
+                    raise LipSyncOutOfMemory(f"LatentSync {selected} 显存不足，任务已停止并保留模型选择。请关闭其他占用显卡的程序后重试；详细信息见本次任务日志。") from exc
                 progress(99, "合并高质量配音")
                 output_dir = Path(self.studio.settings_payload()["output_dir"]) / "lipsync"
                 output_dir.mkdir(parents=True, exist_ok=True)
@@ -319,7 +305,7 @@ class LipSyncService:
                 if report.get("engine") != f"LatentSync {selected}" or report.get("resolution") != PROFILES[selected]["resolution"]:
                     raise RuntimeError("生成结果与所选 LatentSync 配置不匹配。")
                 report.update({"requestedVersion": requested, "initialVersion": initial_version,
-                               "selectedVersion": selected, "fallbackReason": fallback_reason,
+                               "selectedVersion": selected, "fallbackReason": "",
                                "selectionReason": status["selectionReason"], "hardware": status["hardware"]})
                 result = {"status": "视频生成完成。", "outputPath": str(output), "previewUrl": f"/media?path={quote(str(output))}",
                           "duration": float(metadata["format"]["duration"]), "logPath": str(log_path), "report": report,

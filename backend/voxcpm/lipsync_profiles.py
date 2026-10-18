@@ -79,12 +79,9 @@ def select_profile(hardware, installed, requested="auto"):
         if requested not in installed:
             return "", f"尚未安装 LatentSync {requested}，请选择完整模型环境。"
         return requested, f"手动使用 {requested} 低显存模式；生成前将重新检查可用显存。"
-    # 忙碌时回退到轻量版本；最终在释放 TTS 后重新检测，而非只看显卡标称容量。
+    # 空闲显存只决定是否能启动，不改变按总容量选定的模型版本。
     if recommended == "1.6" and free < 7168:
-        if "1.5" not in installed and "1.6" in installed:
-            return "1.6", "仅安装了 1.6；生成前先释放语音模型并重新检查，空闲显存仍不足 7 GB 时停止。"
-        recommended = "1.5"
-        reason = "当前空闲显存不足 7 GB，优先使用 1.5；生成前释放语音模型后重新检测。"
+        reason = "已选择 1.6；生成前释放语音模型并复检，空闲显存仍不足 7 GB 时停止，保留 1.6。"
     else:
         reason = "16 GB 及以上优先使用 1.6 高清低显存模式。" if recommended == "1.6" else "8～不足 16 GB 显存优先使用 1.5 低显存模式。"
     if recommended in installed:

@@ -196,7 +196,7 @@ def test_video_queue_cancel_and_gpu_conflicts(service, monkeypatch):
     (14336, 13000, ["1.5", "1.6"], "auto", "1.5"),
     (16380, 9000, ["1.5", "1.6"], "auto", "1.6"),
     (24576, 16000, ["1.5", "1.6"], "auto", "1.6"),
-    (16384, 6000, ["1.5", "1.6"], "auto", "1.5"),
+    (16384, 6000, ["1.5", "1.6"], "auto", "1.6"),
     (16384, 5000, ["1.6"], "auto", "1.6"),
     (16384, 9000, ["1.5"], "auto", "1.5"),
     (12288, 11000, ["1.6"], "auto", ""),
@@ -224,7 +224,7 @@ def test_wddm_memory_matches_visible_device_by_uuid_and_uses_lower_value(monkeyp
     monkeypatch.setattr(lipsync_profiles.subprocess, "run", lambda *a, **k: SimpleNamespace(returncode=0, stdout="GPU-aaa, 24000\nGPU-bbb, 5000\n"))
     detected = lipsync_profiles.detect_hardware()
     assert detected["freeMB"] == 5000 and detected["cudaFreeMB"] == 15360
-    assert select_profile(detected, ["1.5", "1.6"])[0] == "1.5"
+    assert select_profile(detected, ["1.5", "1.6"])[0] == "1.6"
 
 
 def test_low_free_memory_rejected_before_starting_media_processing(service, tmp_path, monkeypatch):
@@ -244,7 +244,7 @@ def test_selection_rechecks_after_tts_unloads(service, tmp_path, monkeypatch):
     hardware = {"cuda": True, "totalMB": 16384, "freeMB": 5000}
     monkeypatch.setattr(service, "hardware", lambda: dict(hardware))
     service.studio.reset_runtime = lambda: hardware.update(freeMB=14000)
-    assert service.status()["selectedVersion"] == "1.5"
+    assert service.status()["selectedVersion"] == "1.6"
     payload = SimpleNamespace(mode="video", source_path=str(source), audio_path=str(audio), short_video="loop", steps=20, guidance=1.5, seed=1247)
     result = service.generate(payload, lambda *args: None, lambda: False)
     assert result["report"]["selectedVersion"] == "1.6" and result["report"]["resolution"] == 512
@@ -271,11 +271,11 @@ def test_versioned_manifest_and_manual_api_validation(service):
     assert not service.status(model_version="1.6")["ready"]
 
 
-@pytest.mark.parametrize("requested,failure,fallback", [
-    ("auto", LipSyncOutOfMemory, True), ("1.6", LipSyncOutOfMemory, False),
-    ("auto", RuntimeError, False),
+@pytest.mark.parametrize("requested,failure", [
+    ("auto", LipSyncOutOfMemory), ("1.6", LipSyncOutOfMemory),
+    ("auto", RuntimeError),
 ])
-def test_oom_retries_once_only_in_auto_and_preserves_truthful_report(service, tmp_path, monkeypatch, requested, failure, fallback):
+def test_failure_stops_without_retry_or_version_change(service, tmp_path, monkeypatch, requested, failure):
     install_16(service)
     source, audio = media(tmp_path)
     cpu_runner(service, monkeypatch)
@@ -292,16 +292,25 @@ def test_oom_retries_once_only_in_auto_and_preserves_truthful_report(service, tm
         return original(command, work, *args)
     monkeypatch.setattr(service, "_process", process)
     payload = SimpleNamespace(mode="video", model_version=requested, source_path=str(source), audio_path=str(audio), short_video="loop", steps=20, guidance=1.5, seed=1247)
-    if fallback:
-        result = service.generate(payload, lambda *args: None, lambda: False)
-        assert calls == ["1.6", "1.5"]
-        assert result["report"]["engine"] == "LatentSync 1.5" and result["report"]["resolution"] == 256
-        assert result["report"]["fallbackReason"] and result["report"]["initialVersion"] == "1.6"
-    else:
-        with pytest.raises(failure):
-            service.generate(payload, lambda *args: None, lambda: False)
-        assert calls == ["1.6"] and not service.results()
+    with pytest.raises(failure) as caught:
+        service.generate(payload, lambda *args: None, lambda: False)
+    if failure is LipSyncOutOfMemory:
+        assert "1.6" in str(caught.value) and "保留模型选择" in str(caught.value)
+    assert calls == ["1.6"] and not service.results()
+    assert service.status(model_version=requested)["selectedVersion"] == "1.6"
     assert not service.active
+
+
+def test_16gb_low_free_memory_preserves_16_and_does_not_start_15(service, tmp_path, monkeypatch):
+    install_16(service)
+    source, audio = media(tmp_path)
+    monkeypatch.setattr(service, "hardware", lambda: {"cuda": True, "totalMB": 16384, "freeMB": 5000})
+    monkeypatch.setattr(service, "_process", lambda *args: pytest.fail("显存不足时不应启动任何模型"))
+    assert service.status()["selectedVersion"] == "1.6"
+    payload = SimpleNamespace(mode="video", source_path=str(source), audio_path=str(audio), short_video="loop", steps=20, guidance=1.5, seed=1247)
+    with pytest.raises(ValueError, match="1.6.*空闲显存不足"):
+        service.generate(payload, lambda *args: None, lambda: False)
+    assert service.status()["selectedVersion"] == "1.6" and not service.results() and not service.active
 
 
 def test_cuda_oom_from_real_subprocess_is_typed(service, tmp_path):

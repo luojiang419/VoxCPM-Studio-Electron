@@ -100,7 +100,7 @@ if __name__ == "__main__":
     parser = argparse.ArgumentParser(description=__doc__)
     parser.add_argument("--root", type=Path, required=True)
     parser.add_argument("--model-version", choices=["auto", "1.5", "1.6", "both"], default="auto",
-                        help="默认按硬件安装；both 同时安装两套权重以支持显存不足回退")
+                        help="默认按硬件安装；both 同时安装两套权重以便手动切换")
     parser.add_argument("--reuse-installed-torch", action="store_true")
     parser.add_argument("--download-only", action="store_true", help=argparse.SUPPRESS)
     args = parser.parse_args()
