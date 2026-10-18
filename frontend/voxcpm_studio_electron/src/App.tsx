@@ -156,8 +156,8 @@ type TrainingForm = {
 };
 
 const NAV_ITEMS: Array<{ key: PageKey; label: string }> = [
-  { key: "production", label: "配音工作台" },
   { key: "workspace", label: "声音设计与克隆" },
+  { key: "production", label: "配音工作台" },
   { key: "voices", label: "音色库" },
   { key: "history", label: "作品记录" },
   { key: "batch", label: "批量生成" },
@@ -449,6 +449,8 @@ function App() {
   const [workspaceOutputPath, setWorkspaceOutputPath] = useState("");
   const [designedVoice, setDesignedVoice] = useState<DesignedVoice | null>(null);
   const [saveVoiceOpen, setSaveVoiceOpen] = useState(false);
+  const [saveVoiceReferenceOnly, setSaveVoiceReferenceOnly] = useState(false);
+  const [editingVoiceId, setEditingVoiceId] = useState("");
   const [voiceInitialName, setVoiceInitialName] = useState("");
   const [voiceInitialTags, setVoiceInitialTags] = useState<string[]>([]);
   const [workspaceStatus, setWorkspaceStatus] = useState("等待生成。");
@@ -777,7 +779,7 @@ function App() {
     }
   }
 
-  function openVoiceDesigner(voice?: StudioVoice) {
+  function openVoiceDesigner(voice?: StudioVoice, edit = false) {
     if (busy) return;
     const config = voice?.designConfig || voice?.config;
     const form: SingleForm = config ? { ...config, text: voice?.sampleText || DEFAULT_SINGLE_FORM.text } : { ...DEFAULT_SINGLE_FORM };
@@ -786,22 +788,33 @@ function App() {
     setWorkspaceOutputPath(voice?.previewAudio || "");
     setDesignedVoice(voice?.previewUrl && voice.previewAudio && voice.sampleText?.trim() ? { form, outputPath: voice.previewAudio, previewUrl: voice.previewUrl } : null);
     setWorkspaceTask(null); setWorkspaceTaskStartedAt(0); setWorkspaceTaskElapsedSeconds(0);
-    setWorkspaceStatus(voice ? `已载入「${voice.name}」，可试听或调整后保存为新音色。` : "等待生成。");
-    setVoiceInitialName(voice ? `${voice.name.slice(0, 55)}（新版本）` : "");
+    setEditingVoiceId(edit && voice ? voice.id : "");
+    setWorkspaceStatus(voice ? `已载入「${voice.name}」，${edit ? "修改后保存将更新此音色" : "可试听或调整后保存为新音色"}。` : "等待生成。");
+    setVoiceInitialName(voice ? (edit ? voice.name : `${voice.name.slice(0, 55)}（新版本）`) : "");
     setVoiceInitialTags(voice?.tags || []);
     setPage("workspace");
   }
 
   async function saveDesignedVoice(name: string, tags: string[]) {
-    if (!designedVoice || busy || voiceDesignSignature(designedVoice.form) !== voiceDesignSignature(singleForm)) {
+    if (busy || (saveVoiceReferenceOnly ? !singleForm.referenceAudio.trim() :
+      !designedVoice || voiceDesignSignature(designedVoice.form) !== voiceDesignSignature(singleForm))) {
       throw new Error("设置或文案已修改，请重新生成后保存音色。");
     }
-    const { text, ...config } = designedVoice.form;
-    await apiJson(backendBaseUrl, "/api/workspace/voices", {
-      method: "POST", body: JSON.stringify({ name, tags, config, previewAudio: designedVoice.outputPath, sampleText: text }),
+    const { text, ...config } = saveVoiceReferenceOnly ? singleForm : designedVoice!.form;
+    if (saveVoiceReferenceOnly && config.mode === "声音设计") config.mode = "可控克隆";
+    await apiJson(backendBaseUrl, `/api/workspace/voices${editingVoiceId ? `/${editingVoiceId}` : ""}`, {
+      method: editingVoiceId ? "PUT" : "POST", body: JSON.stringify({ name, tags, config,
+        previewAudio: saveVoiceReferenceOnly ? "" : designedVoice!.outputPath, sampleText: text }),
     });
     setSaveVoiceOpen(false);
+    setEditingVoiceId("");
     setPage("voices");
+  }
+
+  function openSaveVoice(referenceOnly: boolean) {
+    setSaveVoiceReferenceOnly(referenceOnly);
+    if (!voiceInitialName && referenceOnly) setVoiceInitialName(pathTail(singleForm.referenceAudio).replace(/\.[^.]+$/, "").slice(0, 60));
+    setSaveVoiceOpen(true);
   }
 
   async function handlePickWorkspaceReferenceAudio() {
@@ -982,7 +995,8 @@ function App() {
       ? "正在根据输入文本进行合成。"
       : workspaceStatus;
   const designMatchesPreview = !!designedVoice && voiceDesignSignature(designedVoice.form) === voiceDesignSignature(singleForm);
-  const canSaveDesignedVoice = !!backendBaseUrl && !busy && designMatchesPreview;
+  const canSaveReferenceVoice = !!backendBaseUrl && !busy && !!singleForm.referenceAudio.trim();
+  const canSaveDesignedVoice = !!backendBaseUrl && !busy && (designMatchesPreview || (isCloneMode(singleForm.mode) && canSaveReferenceVoice));
   const workspaceShouldShowProgress = workspaceTaskStartedAt > 0 && (workspaceTaskActive || workspaceTask?.status === "succeeded" || workspaceTask?.status === "failed");
   const brandMarkClassName = [
     "brand-mark",
@@ -1301,6 +1315,8 @@ function App() {
                               <span title={singleForm.referenceAudio}>{singleForm.referenceAudio}</span>
                             </div>
                             <div className="reference-audio-actions">
+                              <button type="button" className="ghost-button workspace-save-reference" disabled={!canSaveReferenceVoice}
+                                onClick={(event) => { event.stopPropagation(); openSaveVoice(true); }}>保存参考音</button>
                               <button
                                 type="button"
                                 className="ghost-button"
@@ -1682,12 +1698,12 @@ function App() {
           src={workspacePreviewUrl ? `${backendBaseUrl}${workspacePreviewUrl}` : ""}
           fileName={workspaceOutputPath ? pathTail(workspaceOutputPath) : ""}
           canGenerate={!busy && !!backendBaseUrl} hasOutput={!!workspaceOutputPath} generating={workspaceTaskActive}
-          canSaveVoice={canSaveDesignedVoice} onSaveVoice={() => setSaveVoiceOpen(true)}
-          saveVoiceHint={designedVoice && !designMatchesPreview ? "设置或文案已修改，请重新生成后保存音色" : "生成并试听后，保存到音色库"}
+          canSaveVoice={canSaveDesignedVoice} onSaveVoice={() => openSaveVoice(!designMatchesPreview)}
+          saveVoiceHint={isCloneMode(singleForm.mode) && canSaveReferenceVoice && !designMatchesPreview ? "保存参考音频和当前克隆配置，无需生成" : designedVoice && !designMatchesPreview ? "设置或文案已修改，请重新生成后保存音色" : "生成并试听后，保存到音色库"}
           onGenerate={() => void handleGenerate()} onSave={() => void handleSaveAudio()} onOpenDirectory={() => void handleOpenWorkspaceOutputDirectory()}
           status={workspaceShouldShowProgress || workspaceStatus !== "等待生成。" ? (
             <div role="status" aria-live="polite" className={`workspace-status-panel ${workspaceTaskActive ? "workspace-status-panel-active" : ""}`}>
-              <p className="status-text">{workspaceStatusTitle}{designedVoice && !designMatchesPreview ? "（设置或文案已修改，请重新生成后保存音色）" : ""}</p>
+              <p className="status-text">{workspaceStatusTitle}{designedVoice && !designMatchesPreview ? (isCloneMode(singleForm.mode) && canSaveReferenceVoice ? "（设置已修改，可直接保存参考音与当前配置）" : "（设置或文案已修改，请重新生成后保存音色）") : ""}</p>
               {workspaceShouldShowProgress ? (
                 <div className="workspace-status-meta">
                   <span>{workspaceTaskActive ? "生成计时" : "总耗时"} {formatDuration(workspaceTaskElapsedSeconds)}</span>
@@ -1703,8 +1719,9 @@ function App() {
           ) : undefined}
         />}
       </main>
-      {saveVoiceOpen && designedVoice && <SaveVoiceDialog initialName={voiceInitialName} initialTags={voiceInitialTags}
-        mode={designedVoice.form.mode} onCancel={() => setSaveVoiceOpen(false)} onSave={saveDesignedVoice} />}
+      {saveVoiceOpen && <SaveVoiceDialog initialName={voiceInitialName} initialTags={voiceInitialTags}
+        mode={singleForm.mode} editing={!!editingVoiceId} referenceOnly={saveVoiceReferenceOnly}
+        onCancel={() => setSaveVoiceOpen(false)} onSave={saveDesignedVoice} />}
     </div>
   );
 }

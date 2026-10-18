@@ -8,8 +8,8 @@ import RoleAvatar from "./RoleAvatar";
 import RoleDeleteDialog from "./RoleDeleteDialog";
 import { getRoleAppearance, ROLE_APPEARANCES } from "./role-appearance";
 
-type Props = { backendBaseUrl: string; view?: StudioView; onNavigate?: (view: StudioView) => void; headerTools?: ReactNode; onOpenVoiceDesigner?: (voice?: StudioVoice) => void; designerBusy?: boolean };
-type IconName = "play" | "pause" | "plus" | "upload" | "download" | "check" | "chevron" | "copy" | "up" | "down" | "trash" | "spark" | "close" | "search" | "folder" | "music" | "mic" | "refresh" | "stop";
+type Props = { backendBaseUrl: string; view?: StudioView; onNavigate?: (view: StudioView) => void; headerTools?: ReactNode; onOpenVoiceDesigner?: (voice?: StudioVoice, edit?: boolean) => void; designerBusy?: boolean };
+type IconName = "play" | "pause" | "plus" | "upload" | "download" | "check" | "chevron" | "copy" | "up" | "down" | "trash" | "spark" | "close" | "search" | "folder" | "music" | "mic" | "refresh" | "stop" | "more";
 const PATHS: Record<IconName, ReactNode> = {
   play: <path d="m9 5 10 7-10 7Z" />,
   pause: <><path d="M8 5v14M16 5v14" /></>,
@@ -29,6 +29,7 @@ const PATHS: Record<IconName, ReactNode> = {
   music: <><path d="M9 18V5l11-2v13M9 8l11-2" /><ellipse cx="6" cy="18" rx="3" ry="2" /><ellipse cx="17" cy="16" rx="3" ry="2" /></>,
   mic: <><rect x="9" y="3" width="6" height="12" rx="3" /><path d="M5 10v2a7 7 0 0 0 14 0v-2M12 19v3M8 22h8" /></>,
   refresh: <><path d="M20 8A8 8 0 1 0 20 16M20 3v5h-5" /></>,
+  more: <><circle cx="5" cy="12" r="1" /><circle cx="12" cy="12" r="1" /><circle cx="19" cy="12" r="1" /></>,
   stop: <rect x="6" y="6" width="12" height="12" rx="1" />,
 };
 function Icon({ name, size = 17 }: { name: IconName; size?: number }) {
@@ -87,6 +88,7 @@ export default function ProductionStudio({ backendBaseUrl, view = "editor", onNa
   const projectRef = useRef<StudioProject | null>(null);
   const [projects, setProjects] = useState<StudioProject[]>([]);
   const [voices, setVoices] = useState<StudioVoice[]>([]);
+  const [expandedVoiceId, setExpandedVoiceId] = useState("");
   const [history, setHistory] = useState<StudioHistory[]>([]);
   const [loras, setLoras] = useState<Array<{ id: string; label: string }>>([]);
   const [selectedRoleId, setSelectedRoleId] = useState("");
@@ -128,6 +130,26 @@ export default function ProductionStudio({ backendBaseUrl, view = "editor", onNa
   const allReady = segments.length > 0 && completed === segments.length;
   const filteredVoices = voices.filter(voice => `${voice.name} ${voice.tags.join(" ")} ${voice.config.control}`.toLowerCase().includes(voiceSearch.toLowerCase()));
   const audioUrl = (value: string) => value.startsWith("/") ? `${backendBaseUrl}${value}` : value;
+
+  useEffect(() => {
+    const dismissActions = (event: Event) => {
+      const card = document.querySelector('.ps-voice-card[data-actions-open="true"]');
+      if (card && !card.contains(event.target as Node)) setExpandedVoiceId("");
+    };
+    const handleEscape = (event: KeyboardEvent) => {
+      if (event.key !== "Escape") return;
+      const toggle = document.querySelector<HTMLButtonElement>('.ps-voice-card[data-actions-open="true"] .ps-voice-more-toggle');
+      setExpandedVoiceId(""); toggle?.focus();
+    };
+    document.addEventListener("pointerdown", dismissActions);
+    document.addEventListener("focusin", dismissActions);
+    document.addEventListener("keydown", handleEscape);
+    return () => {
+      document.removeEventListener("pointerdown", dismissActions);
+      document.removeEventListener("focusin", dismissActions);
+      document.removeEventListener("keydown", handleEscape);
+    };
+  }, []);
 
   useEffect(() => {
     if (project && selectedRoleId && project.roles.some(role => role.id === selectedRoleId)) {
@@ -522,7 +544,28 @@ export default function ProductionStudio({ backendBaseUrl, view = "editor", onNa
         </aside>
       </div>}
 
-      {view === "voices" && <section className="ps-library"><div className="ps-library-heading"><div><h2>收藏你的声音灵感<span>{voices.length} 个音色</span></h2><p>在声音设计与克隆中创建音色，在这里试听、管理并应用到配音角色。</p></div><div className="ps-library-tools"><button className="ps-button ps-small ps-create-voice" disabled={locked || designerBusy || !onOpenVoiceDesigner} onClick={() => onOpenVoiceDesigner?.()}><Icon name="plus" size={14} />设计新音色</button><div className="ps-search"><Icon name="search" /><input aria-label="搜索音色" value={voiceSearch} onChange={event => setVoiceSearch(event.target.value)} placeholder="搜索名称、标签或声音描述" /></div></div></div><div className="ps-library-target"><span>应用到当前项目</span><select aria-label="选择应用音色的角色" value={selectedRole?.id || ""} onChange={event => setSelectedRoleId(event.target.value)} disabled={locked}>{project.roles.map(role => <option key={role.id} value={role.id}>{role.name}</option>)}</select><button className="ps-text-button" onClick={() => onNavigate?.("editor")}>前往配音工作台<Icon name="chevron" size={12} /></button></div>{filteredVoices.length ? <div className="ps-voice-grid">{filteredVoices.map(voice => <article className="ps-voice-card" key={voice.id} style={roleStyle(getRoleAppearance(voice.id).color)}><div className="ps-voice-card-top"><div className="ps-voice-avatar"><RoleAvatar color={getRoleAppearance(voice.id).color} name={voice.name} /></div><span>{voice.sourceMode || voice.config.mode}</span><IconButton icon="trash" label={`删除音色 ${voice.name}`} disabled={locked} onClick={() => void run("删除音色", async () => { await request(backendBaseUrl, `/api/workspace/voices/${voice.id}`, { method: "DELETE" }); setVoices(items => items.filter(item => item.id !== voice.id)); setNotice(`已删除音色「${voice.name}」。项目里已使用的配置继续保留。`); })} /></div><h3>{voice.name}</h3><p>{voice.config.control || (voice.config.referenceAudio ? `参考音频：${basename(voice.config.referenceAudio)}` : "使用模型默认表达")}</p><div className="ps-voice-tags">{voice.tags.map(tag => <span key={tag}>{tag}</span>)}</div><div className="ps-voice-card-footer"><span>{dateText(voice.createdAt)}</span><div className="ps-voice-card-actions">{voice.previewUrl && <button className="ps-button ps-small" onClick={() => void playAudio(voice.previewUrl!, voice.name)}><Icon name="play" size={12} />试听</button>}<button className="ps-button ps-small" disabled={locked || designerBusy || !onOpenVoiceDesigner} onClick={() => onOpenVoiceDesigner?.(voice)}>继续设计</button><button className="ps-button ps-small" disabled={locked} onClick={() => applyVoice(voice)}>应用到{selectedRole?.name || "角色"}<Icon name="chevron" size={12} /></button></div></div></article>)}</div> : <div className="ps-empty ps-library-empty"><Icon name="mic" size={37} /><h2>{voiceSearch ? "没有找到匹配的音色" : "为喜欢的声音，留一个位置"}</h2><p>{voiceSearch ? "试试另一个关键词。" : "在「声音设计与克隆」中设计并试听，保存后即可在这里管理和应用。"}</p><button className="ps-button" disabled={!voiceSearch && (locked || designerBusy || !onOpenVoiceDesigner)} onClick={() => voiceSearch ? setVoiceSearch("") : onOpenVoiceDesigner?.()}>{voiceSearch ? "清除搜索" : "设计新音色"}</button></div>}</section>}
+      {view === "voices" && <section className="ps-library"><div className="ps-library-heading"><div><h2>收藏你的声音灵感<span>{voices.length} 个音色</span></h2><p>在声音设计与克隆中收藏参考音或生成音色，在这里试听、编辑并应用到配音角色。</p></div><div className="ps-library-tools"><button className="ps-button ps-small ps-create-voice" disabled={locked || designerBusy || !onOpenVoiceDesigner} onClick={() => onOpenVoiceDesigner?.()}><Icon name="plus" size={14} />设计新音色</button><div className="ps-search"><Icon name="search" /><input aria-label="搜索音色" value={voiceSearch} onChange={event => setVoiceSearch(event.target.value)} placeholder="搜索名称、标签或声音描述" /></div></div></div><div className="ps-library-target"><span>目标角色</span><select aria-label="选择应用音色的角色" value={selectedRole?.id || ""} onChange={event => setSelectedRoleId(event.target.value)} disabled={locked}>{project.roles.map(role => <option key={role.id} value={role.id}>{role.name}</option>)}</select><button className="ps-text-button" onClick={() => onNavigate?.("editor")}>前往配音工作台<Icon name="chevron" size={12} /></button></div>{filteredVoices.length ? <div className="ps-voice-grid">{filteredVoices.map(voice => <article className="ps-voice-card" data-actions-open={expandedVoiceId === voice.id} key={voice.id} style={roleStyle(getRoleAppearance(voice.id).color)}>
+          <div className="ps-voice-card-top">
+            <button className="ps-voice-avatar ps-voice-preview" disabled={!voice.previewUrl} aria-label={`试听 ${voice.name}`} title={voice.previewUrl ? "试听音色" : "暂无试听音频"} onClick={() => voice.previewUrl && void playAudio(voice.previewUrl, voice.name)}>
+              <RoleAvatar color={getRoleAppearance(voice.id).color} name={voice.name} />
+              {voice.previewUrl && <span className="ps-voice-preview-icon"><Icon name="play" size={10} /></span>}
+              <span className="ps-sr-only">试听</span>
+            </button>
+            <div className="ps-voice-identity"><h3 title={voice.name}>{voice.name}</h3><span>{voice.sourceMode || voice.config.mode}</span></div>
+            <button type="button" className="ps-icon-button ps-voice-more-toggle" aria-label={`更多操作 ${voice.name}`} aria-expanded={expandedVoiceId === voice.id} aria-controls={`voice-actions-${voice.id}`} title="更多操作" onClick={() => setExpandedVoiceId(current => current === voice.id ? "" : voice.id)}><Icon name="more" size={18} /></button>
+          </div>
+          <p>{voice.config.control || (voice.config.referenceAudio ? `参考音频：${basename(voice.config.referenceAudio)}` : "使用模型默认表达")}</p>
+          <div className="ps-voice-tags">{voice.tags.map(tag => <span key={tag}>{tag}</span>)}</div>
+          {expandedVoiceId === voice.id && <div id={`voice-actions-${voice.id}`} className="ps-voice-more-actions" aria-label="更多音色操作">
+            <button disabled={locked || designerBusy || !onOpenVoiceDesigner} onClick={() => { setExpandedVoiceId(""); onOpenVoiceDesigner?.(voice); }}><Icon name="spark" size={14} />继续设计</button>
+            <button className="ps-voice-delete" aria-label={`删除音色 ${voice.name}`} disabled={locked} onClick={() => { setExpandedVoiceId(""); void run("删除音色", async () => { await request(backendBaseUrl, `/api/workspace/voices/${voice.id}`, { method: "DELETE" }); setVoices(items => items.filter(item => item.id !== voice.id)); setNotice(`已删除音色「${voice.name}」。项目里已使用的配置继续保留。`); }); }}><Icon name="trash" size={14} />删除音色</button>
+          </div>}
+          <div className="ps-voice-card-meta"><time>{dateText(voice.createdAt)}</time></div>
+          <div className="ps-voice-card-footer ps-voice-card-actions">
+            <button className="ps-button ps-small" disabled={locked || designerBusy || !onOpenVoiceDesigner} onClick={() => onOpenVoiceDesigner?.(voice, true)}>编辑音色</button>
+            <button className="ps-button ps-small ps-primary" disabled={locked} title={`应用到「${selectedRole?.name || "当前角色"}」`} onClick={() => applyVoice(voice)}>应用音色<Icon name="chevron" size={12} /></button>
+          </div>
+        </article>)}</div> : <div className="ps-empty ps-library-empty"><Icon name="mic" size={37} /><h2>{voiceSearch ? "没有找到匹配的音色" : "为喜欢的声音，留一个位置"}</h2><p>{voiceSearch ? "试试另一个关键词。" : "在「声音设计与克隆」中保存参考音或设计音色，即可在这里编辑和应用。"}</p><button className="ps-button" disabled={!voiceSearch && (locked || designerBusy || !onOpenVoiceDesigner)} onClick={() => voiceSearch ? setVoiceSearch("") : onOpenVoiceDesigner?.()}>{voiceSearch ? "清除搜索" : "设计新音色"}</button></div>}</section>}
 
       {view === "history" && <section className="ps-library"><div className="ps-library-heading"><div><h2>每一次创作，都有迹可循<span>{history.length} 条记录</span></h2><p>试听历史生成与完整作品，返回项目继续打磨。</p></div><button className="ps-button ps-small" disabled={locked} onClick={() => void run("刷新记录", refreshAssets)}><Icon name="refresh" size={14} />刷新记录</button></div>{history.length ? <div className="ps-history-list"><div className="ps-history-columns"><span>作品与台词</span><span>时长</span><span>生成时间</span><span>操作</span></div>{history.map(item => <article className="ps-history-row" key={item.id}><div className="ps-history-info"><div className="ps-history-icon"><Icon name={item.segmentId ? "mic" : "music"} size={20} /></div><div><h3>{item.projectName}<span>{item.kind === "single" ? "单条创作" : item.segmentId ? "分段音频" : "完整作品"}</span></h3><p title={item.text || basename(item.audioPath)}>{item.text || basename(item.audioPath)}</p></div></div><span>{durationText(item.duration)}</span><time>{dateText(item.createdAt)}</time><div className="ps-history-actions"><IconButton icon="play" label="试听历史音频" onClick={() => void playAudio(item.previewUrl, item.projectName)} /><IconButton icon="folder" label="显示音频文件" onClick={() => void window.voxcpmDesktop.showItemInFolder(item.audioPath).catch(() => setError("无法打开文件位置。"))} />{item.projectId ? <button className="ps-text-button" disabled={locked} onClick={() => void run("打开历史项目", async () => { await flushProject(); const next = await request<StudioProject>(backendBaseUrl, `/api/workspace/projects/${item.projectId}`); acceptProject(next); setExportResult(next.lastExport?.stale ? null : next.lastExport || null); onNavigate?.("editor"); })}>打开项目<Icon name="chevron" size={12} /></button> : item.config ? <button className="ps-text-button" disabled={locked} onClick={() => { updateRole({ config: { ...item.config! } }, true); setNotice(`已应用历史音色配置到「${selectedRole?.name}」。`); }}>应用配置<Icon name="chevron" size={12} /></button> : null}</div></article>)}</div> : <div className="ps-empty ps-library-empty"><Icon name="music" size={37} /><h2>你的第一部作品，即将诞生</h2><p>真实生成的音频与导出作品会保存在这里。</p><button className="ps-button" onClick={() => onNavigate?.("editor")}>开始创作</button></div>}</section>}
 

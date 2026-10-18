@@ -283,12 +283,22 @@ class WorkspaceStore:
     @staticmethod
     def _voice_view(voice: dict) -> dict:
         result = copy.deepcopy(voice)
-        preview = result.get("previewAudio", "")
+        preview = result.get("previewAudio") or result.get("config", {}).get("referenceAudio", "")
         if preview:
             result["previewUrl"] = media_url(preview) if Path(preview).is_file() else ""
         return result
 
     def add_voice(self, payload: dict) -> dict:
+        return self._write_voice(payload)
+
+    def update_voice(self, voice_id: str, payload: dict) -> dict:
+        with self.lock:
+            previous = next((voice for voice in self.db["voices"] if voice["id"] == voice_id), None)
+            if previous is None:
+                raise KeyError("音色不存在。")
+            return self._write_voice(payload, previous)
+
+    def _write_voice(self, payload: dict, previous: dict | None = None) -> dict:
         config = clean_config(payload.get("config"))
         design_config = copy.deepcopy(config)
         reference = Path(config["referenceAudio"]) if config["referenceAudio"] else None
@@ -297,8 +307,9 @@ class WorkspaceStore:
             raise ValueError("参考音频文件不存在。")
         if preview and not preview.is_file():
             raise ValueError("试听音频文件不存在，请重新生成后保存。")
-        voice_id = uid()
-        folder = self.root / "voices" / voice_id
+        voice_id = previous["id"] if previous else uid()
+        # 更新使用新目录，保留已应用角色使用的历史参考，也避免失败时破坏旧音色。
+        folder = self.root / "voices" / (uid() if previous else voice_id)
         written: list[Path] = []
         created_folder = False
         try:
@@ -317,7 +328,11 @@ class WorkspaceStore:
                     shutil.copy2(reference, target)
                 config["referenceAudio"] = design_config["referenceAudio"] = str(target)
             voice = {"id": voice_id, "name": str(payload.get("name", "")).strip()[:100] or "新音色",
-                     "tags": [str(t)[:40] for t in payload.get("tags", [])][:20], "config": config, "createdAt": timestamp()}
+                     "tags": [str(t)[:40] for t in payload.get("tags", [])][:20], "config": config,
+                     "createdAt": previous["createdAt"] if previous else timestamp(),
+                     "sampleText": str(payload.get("sampleText") or "")[:50000]}
+            if previous:
+                voice["updatedAt"] = timestamp()
             if preview_target:
                 voice.update(previewAudio=str(preview_target), sampleText=str(payload.get("sampleText") or "")[:50000],
                              sourceMode=design_config["mode"], designConfig=design_config)
@@ -326,11 +341,13 @@ class WorkspaceStore:
                     config["mode"] = "可控克隆"
                     config["referenceAudio"] = str(preview_target)
             with self.lock:
-                self.db["voices"].insert(0, voice)
+                old_voices = self.db["voices"]
+                self.db["voices"] = ([voice if item["id"] == voice_id else item for item in old_voices]
+                                     if previous else [voice, *old_voices])
                 try:
                     self._save()
                 except BaseException:
-                    self.db["voices"] = [item for item in self.db["voices"] if item["id"] != voice_id]
+                    self.db["voices"] = old_voices
                     raise
             return self._voice_view(voice)
         except BaseException:

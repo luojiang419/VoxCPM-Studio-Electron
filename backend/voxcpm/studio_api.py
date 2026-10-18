@@ -297,6 +297,10 @@ def create_api_app(studio: Optional[Any] = None, model_dir: Optional[str] = None
     def add_voice(payload: dict):
         return workspace_call(workspace.add_voice, payload)
 
+    @app.put("/api/workspace/voices/{voice_id}")
+    def update_voice(voice_id: str, payload: dict):
+        return workspace_call(workspace.update_voice, voice_id, payload)
+
     @app.delete("/api/workspace/voices/{voice_id}")
     def delete_voice(voice_id: str):
         return workspace.delete_voice(voice_id)

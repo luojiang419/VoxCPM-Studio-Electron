@@ -448,3 +448,74 @@ def test_single_and_batch_only_load_requested_denoiser(tmp_path, batch):
     with pytest.raises(ValueError, match="系统设置中禁用"):
         run()
     assert len(calls) == previous_count  # 全局禁用与本次增强冲突在加载前报错。
+
+
+@pytest.mark.parametrize("mode", ["可控克隆", "极致克隆"])
+def test_reference_voice_without_generation_can_preview_reload_and_apply(setup, tmp_path, mode):
+    client, studio, store = setup
+    reference = tmp_path / "导入参考.wav"
+    sf.write(reference, np.full(1200, .1), 24000)
+    original = reference.read_bytes()
+    config = {**DEFAULT_CONFIG, "mode": mode, "referenceAudio": str(reference), "promptText": "原参考文本"}
+    response = client.post("/api/workspace/voices", json={"name": "直接收藏", "tags": ["参考音"],
+        "config": config, "sampleText": "下次合成的文案"})
+    assert response.status_code == 200
+    voice = response.json()
+    assert "previewAudio" not in voice and studio.calls == []
+    reference.unlink()
+    assert client.get(voice["previewUrl"]).content == original
+    assert WorkspaceStore(store.root, studio).voices()["items"][0] == voice
+    project = prepared(client)
+    project["roles"][1]["config"] = voice["config"]
+    project = client.put(f"/api/workspace/projects/{project['id']}", json=project).json()
+    assert generate(client, project)["status"] == "succeeded"
+    assert studio.calls[0]["reference_audio"] == voice["config"]["referenceAudio"]
+    assert studio.calls[0]["mode"] == mode
+    assert studio.calls[0]["prompt_text"] == "原参考文本"
+    assert voice["sampleText"] == "下次合成的文案"
+
+
+def test_edit_voice_keeps_id_and_applied_reference_and_replaces_old_preview(setup, tmp_path):
+    client, studio, store = setup
+    original, replacement, preview = [tmp_path / name for name in ("old.wav", "new.wav", "preview.wav")]
+    for file, length in ((original, 1200), (replacement, 2400), (preview, 3600)):
+        sf.write(file, np.zeros(length), 24000)
+    config = {**DEFAULT_CONFIG, "mode": "极致克隆", "referenceAudio": str(original), "promptText": "原文本"}
+    voice = client.post("/api/workspace/voices", json={"name": "原音色", "config": config, "previewAudio": str(preview)}).json()
+    old_reference = Path(voice["config"]["referenceAudio"])
+    project = prepared(client)
+    project["roles"][0]["config"] = voice["config"]
+    client.put(f"/api/workspace/projects/{project['id']}", json=project)
+    config.update(referenceAudio=str(replacement), promptText="新参考文本", control="新描述", cfgValue=2.6)
+    response = client.put(f"/api/workspace/voices/{voice['id']}", json={"name": "编辑后", "tags": ["修改"],
+        "config": config, "previewAudio": "", "sampleText": "新文案"})
+    assert response.status_code == 200
+    edited = response.json()
+    assert edited["id"] == voice["id"] and edited["createdAt"] == voice["createdAt"]
+    assert edited["updatedAt"] and edited["name"] == "编辑后" and edited["tags"] == ["修改"]
+    assert edited["sampleText"] == "新文案" and "previewAudio" not in edited and "designConfig" not in edited
+    assert edited["config"]["promptText"] == "新参考文本" and edited["config"]["cfgValue"] == 2.6
+    assert client.get(edited["previewUrl"]).content == replacement.read_bytes()
+    assert Path(edited["config"]["referenceAudio"]).read_bytes() == replacement.read_bytes()
+    assert old_reference.is_file() and Path(voice["previewAudio"]).is_file()
+    assert client.get(f"/api/workspace/projects/{project['id']}").json()["roles"][0]["config"] == voice["config"]
+    assert WorkspaceStore(store.root, studio).voices()["items"] == [edited]
+    assert client.put("/api/workspace/voices/missing", json={"config": config}).status_code == 404
+
+
+def test_edit_voice_failure_preserves_previous_record_and_files(setup, tmp_path, monkeypatch):
+    client, studio, store = setup
+    reference = tmp_path / "reference.wav"
+    sf.write(reference, np.zeros(1200), 24000)
+    config = {**DEFAULT_CONFIG, "mode": "可控克隆", "referenceAudio": str(reference)}
+    voice = store.add_voice({"name": "原音色", "config": config})
+    folders = set((store.root / "voices").iterdir())
+    def fail():
+        raise OSError("模拟磁盘失败")
+    monkeypatch.setattr(store, "_save", fail)
+    with pytest.raises(OSError, match="模拟磁盘失败"):
+        store.update_voice(voice["id"], {"name": "不应保存", "config": config})
+    assert store.voices()["items"] == [voice]
+    assert WorkspaceStore(store.root, studio).voices()["items"] == [voice]
+    assert set((store.root / "voices").iterdir()) == folders
+    assert Path(voice["config"]["referenceAudio"]).is_file()
