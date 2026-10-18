@@ -5,6 +5,7 @@ from pathlib import Path
 from types import SimpleNamespace
 import os
 import subprocess
+import sys
 
 import pytest
 from cryptography.hazmat.primitives.asymmetric.ed25519 import Ed25519PrivateKey
@@ -50,6 +51,73 @@ def test_running_owned_apps_block_without_affecting_other_installs(tmp_path):
     e.assert_stopped(root, [{"Name": "python.exe", "ExecutablePath": None}])
     with pytest.raises(RuntimeError, match="无法确认"):
         e.assert_stopped(root, [{"Name": "VoxCPM Studio.exe", "ExecutablePath": None}])
+
+
+def test_process_selection_respects_directory_arguments_and_descendant_identity(tmp_path):
+    root = tmp_path / "one"
+    records = [
+        {"ProcessId": 10, "Created": 100, "ExecutablePath": str(root / "VoxCPM Studio.exe")},
+        {"ProcessId": 11, "ParentProcessId": 10, "Created": 101, "ExecutablePath": str(tmp_path / "shared/helper.exe")},
+        {"ProcessId": 12, "ParentProcessId": 10, "Created": 99, "ExecutablePath": str(tmp_path / "other/helper.exe")},
+        {"ProcessId": 13, "ExecutablePath": str(tmp_path / "one-other/VoxCPM Studio.exe")},
+        {"ProcessId": 14, "ExecutablePath": str(tmp_path / "shared/python.exe"), "CommandLine": f'python.exe "{root / "app/desktop_api.py"}"'},
+        {"ProcessId": 15, "ExecutablePath": str(tmp_path / "shared/python.exe"), "CommandLine": f'python.exe -c "print(\'{root / "app/desktop_api.py"}\')"'},
+        {"ProcessId": 16, "ExecutablePath": str(root / "runtime/python/pythonw.exe")},
+    ]
+    assert {p["ProcessId"] for p in e.owned_processes(root, records)[0]} == {10, 11, 14, 16}
+
+
+def test_process_selection_excludes_repairer_worker_and_ancestors_even_inside_root(tmp_path):
+    root = tmp_path / "one"
+    records = [{"ProcessId": os.getpid(), "ParentProcessId": os.getppid(), "ExecutablePath": str(root / "runtime/python/python.exe")},
+               {"ProcessId": os.getppid(), "ExecutablePath": str(root / "VoxCPM Studio.exe")}]
+    assert e.owned_processes(root, records) == ([], [])
+
+
+def test_stop_processes_rechecks_and_records_forced_exit(tmp_path, monkeypatch):
+    root, work = tmp_path / "one", tmp_path / "work"
+    target = {"ProcessId": 10, "ExecutablePath": str(root / "VoxCPM Studio.exe")}
+    inventories = iter([[target], []])
+    monkeypatch.setattr(e, "process_inventory", lambda: next(inventories))
+    monkeypatch.setattr(e.time, "sleep", lambda _: None)
+    ticks = iter([0, 3]); monkeypatch.setattr(e.time, "monotonic", lambda: next(ticks))
+    actions = []
+    class Handle:
+        def __init__(self, item): self.item, self.handle = item, 1
+        def exited(self): return False
+        def request_close(self): actions.append("close")
+        def terminate(self): actions.append("force")
+        def close(self): actions.append("release")
+    monkeypatch.setattr(e, "ProcessHandle", Handle)
+    result = e.stop_owned_processes(root, work)
+    assert actions == ["close", "force", "release"]
+    assert result[0]["ProcessId"] == 10 and result[0]["forced"] is True
+    assert e.read(work / "stopped-processes.json") == result
+
+
+def test_stop_process_access_denied_reports_pid_and_never_continues(tmp_path, monkeypatch):
+    root = tmp_path / "one"
+    target = {"ProcessId": 10, "ExecutablePath": str(root / "VoxCPM Studio.exe")}
+    monkeypatch.setattr(e, "process_inventory", lambda: [target])
+    def denied(item): raise PermissionError("Access denied")
+    monkeypatch.setattr(e, "ProcessHandle", denied)
+    with pytest.raises(RuntimeError, match="PID 10.*管理员"):
+        e.stop_owned_processes(root, tmp_path / "work")
+
+
+def test_real_process_handle_does_not_terminate_reused_or_changed_identity():
+    child = subprocess.Popen([sys.executable, "-B", "-c", "import time; time.sleep(30)"], creationflags=subprocess.CREATE_NO_WINDOW)
+    try:
+        item = next(p for p in e.process_inventory() if p.get("ProcessId") == child.pid)
+        for changed in ({**item, "Created": item["Created"] - 10000000}, {**item, "ExecutablePath": str(ROOT / "different/python.exe")}):
+            handle = e.ProcessHandle(changed)
+            try:
+                assert handle.handle is None
+                handle.terminate()
+                assert child.poll() is None
+            finally: handle.close()
+    finally:
+        child.terminate(); child.wait(timeout=10)
 
 
 def test_incomplete_backups_plan_forward_repair_without_erasing_records(tmp_path):

@@ -36,6 +36,8 @@ def run(args):
     import locale
     if os.name == "nt":
         locale.setlocale(locale.LC_CTYPE, ".UTF8")
+    # 本地推理不使用Arrow；隔离共享音频环境中可能要求NumPy 2的可选依赖。
+    sys.modules["pyarrow"] = None
     import cv2
     import numpy as np
     import torch

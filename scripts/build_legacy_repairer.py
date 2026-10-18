@@ -62,8 +62,8 @@ def build(snapshot, output=None):
         "/resource:"+str(archive)+",repair-payload.zip","/resource:"+str(bundle)+",repair-bundle.json",
         "/reference:System.Windows.Forms.dll","/reference:System.Drawing.dll","/reference:Accessibility.dll","/reference:System.Web.Extensions.dll","/reference:System.IO.Compression.dll","/reference:System.IO.Compression.FileSystem.dll",
         str(ROOT/"bootstrap/SharedTheme.cs"),str(ROOT/"updater/Program.cs"),str(ROOT/"repair/Program.cs")],check=True)
-    (output/"使用说明.txt").write_text("关闭原软件和更新窗口后，双击 VoxCPM更新修复器.exe。\n自动识别原安装位置，也可以手动选择。点击“开始修复并升级”。\n自带修复环境，不需要安装Python或开发工具。保留模型、配置、音色和作品。\n修复完成后直接在软件内检查更新，不需要每次运行修复器。\n请勿卸载或删除旧目录；若失败，使用“查看更新日志”保留错误记录。\n",encoding="utf-8-sig")
-    report={"version":manifest["version"],"releaseId":manifest["releaseId"],"buildId":build_id,"executable":str(executable),"size":executable.stat().st_size,"sha256":sha(executable),"runtimeId":profile["id"],"payload":str(payload)}
+    (output/"使用说明.txt").write_text("请先保存作品并停止生成或训练，双击 VoxCPM更新修复器.exe。\n自动识别原安装位置，也可以手动选择。点击“开始修复并升级”。\n会自动关闭本目录工作台及更新器，隐藏进程无法正常退出时会强制结束；未保存内容和进行中的任务可能丢失。\n自带修复环境，不需要安装Python或开发工具。保留已保存的模型、配置、音色和作品。\n修复完成后直接在软件内检查更新，不需要每次运行修复器。\n请勿卸载或删除旧目录；若失败，使用“查看更新日志”保留错误记录。权限不足可右键以管理员身份运行。\n",encoding="utf-8-sig")
+    report={"version":manifest["version"],"releaseId":manifest["releaseId"],"buildId":build_id,"executable":str(executable),"size":executable.stat().st_size,"sha256":sha(executable),"runtimeId":profile["id"],"payload":str(payload),"autoTerminateOwnedProcesses":True}
     (output/"构建记录.json").write_text(json.dumps(report,ensure_ascii=False,indent=2),encoding="utf-8")
     print(json.dumps(report,ensure_ascii=False,indent=2))
     return report

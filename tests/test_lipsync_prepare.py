@@ -84,6 +84,11 @@ def test_ready_cache_invalidates_missing_or_changed_file_and_new_config(tmp_path
     (tmp_path / "ready-1.6.json").write_text(json.dumps(ready), encoding="utf-8")
     assert cached_ready(tmp_path, "1.6", config, sys.executable)
     assert not cached_ready(tmp_path, "1.6", {"revision": "two"}, sys.executable)
+    ready["fingerprint"].pop("videoPolicy")
+    (tmp_path / "ready-1.6.json").write_text(json.dumps(ready), encoding="utf-8")
+    assert not cached_ready(tmp_path, "1.6", config, sys.executable), "旧环境必须重新执行隔离后的真实探测"
+    ready["fingerprint"] = fingerprint(config, sys.executable)
+    (tmp_path / "ready-1.6.json").write_text(json.dumps(ready), encoding="utf-8")
     file.write_bytes(b"changed")
     assert not cached_ready(tmp_path, "1.6", config, sys.executable)
     file.unlink()

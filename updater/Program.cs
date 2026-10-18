@@ -98,7 +98,7 @@ namespace VoxStandaloneUpdater {
                 } };
                 Controls.Add(repairRoot); Controls.Add(browseRoot);
                 message.Visible = false; close.Enabled = windowClose.Enabled = true; close.Text = "开始修复并升级  →";
-                detail.Text = "请先关闭原软件和更新窗口，再开始修复。";
+                detail.Text = "请先保存任务；修复会自动关闭并强制结束本目录残留进程。";
             }
             FormClosing += delegate(object sender, FormClosingEventArgs e) { if (!finished && (!repairMode || repairStarted)) e.Cancel = true; };
             Shown += delegate {
@@ -206,7 +206,7 @@ namespace VoxStandaloneUpdater {
 
         void UpdateProgress(string text, int percent) {
             message.Text=text; progressValue=Math.Max(0,Math.Min(100,percent));
-            detail.Text=progressValue>=90?"首次准备可能需要一些时间，请保持窗口打开。":progressValue>=30?"正在替换应用文件，个人数据会保留。":"更新器准备完成后，工作台会自动关闭。";
+            detail.Text=progressValue>=90?"首次准备可能需要一些时间，请保持窗口打开。":progressValue>=30?"正在替换应用文件，个人数据会保留。":repairMode?"正在自动清理本目录的工作台与隐藏进程，请稍候。":"更新器准备完成后，工作台会自动关闭。";
             tips.SetToolTip(message,text); AccessibleDescription=text; Invalidate();
         }
 

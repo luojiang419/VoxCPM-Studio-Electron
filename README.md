@@ -1,6 +1,6 @@
 # VoxCPM Studio Electron
 
-2026-10-19 已发布单文件老用户更新修复器及应用 `2.0.2 / 20261018163242`。更新失败的老用户可[直接下载修复器 EXE](https://modelscope.cn/api/v1/models/jiangjiang419/voxcpm-studio-updates/repo?Revision=master&FilePath=repairers%2F2.0.2%2F20261018161307-0158a2b60e%2FVoxCPM-Update-Repairer.exe)，关闭原软件、确认原目录、点击「开始修复并升级」。自带修复环境，保留模型、配置、音色、作品和功能选择，支持同发布损坏修复。修复后直接使用内置更新；独立更新运行环境缺失或损坏时自动补齐。修复器及独立更新器均复用安装器样式，工作台关闭后仍可独立执行。详见[老用户修复器使用说明](./docs/老用户更新修复器使用说明.md)与[自动更新与故障恢复](./docs/自动更新说明.md)。
+2026-10-19 已发布单文件老用户更新修复器及应用 `2.0.2 / 20261018235215`。更新失败的老用户可[直接下载修复器 EXE](https://modelscope.cn/api/v1/models/jiangjiang419/voxcpm-studio-updates/repo?Revision=master&FilePath=repairers%2F2.0.2%2F20261018235215-0f71f753d9%2FVoxCPM-Update-Repairer.exe)，保存任务、确认原目录、点击「开始修复并升级」，自动关闭并强制结束原目录残留进程。同时修复视频环境Arrow/NumPy冲突导致重启回滚。自带修复环境，保留已保存的模型、配置、音色、作品和功能选择，支持同发布损坏修复。修复后直接使用内置更新；独立更新运行环境缺失或损坏时自动补齐。修复器及独立更新器均复用安装器样式，工作台关闭后仍可独立执行。详见[老用户修复器使用说明](./docs/老用户更新修复器使用说明.md)与[自动更新与故障恢复](./docs/自动更新说明.md)。
 
 现已提供[轻量分发与自动补齐](./docs/轻量版与自动补齐.md)：可仅分发约 36 KB 的 Windows 原生启动器，点击运行后从魔搭补齐 Electron 桌面、Python、固定依赖和模型，为 RTX 50 系自动选择 CUDA 12.8。也保留完整 Electron 壳的轻量 ZIP。
 

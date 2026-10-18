@@ -43,7 +43,8 @@ def publish_repairer(snapshot: Path, executable: Path, activate=False):
         raise ValueError("修复器匿名回读不一致，未激活更新")
     report = {"version": manifest["version"], "releaseId": manifest["releaseId"], "embeddedReleaseId": built["releaseId"],
               "buildId": built["buildId"], "repository": repo, "repairUrl": url, "remotePath": remote,
-              "size": len(downloaded), "sha256": built["sha256"], "anonymousVerification": True, "executable": str(executable)}
+              "size": len(downloaded), "sha256": built["sha256"], "anonymousVerification": True, "executable": str(executable),
+              "autoTerminateOwnedProcesses": built.get("autoTerminateOwnedProcesses", False)}
     write_json(snapshot / "repairer-publication.json", report)
     write_json(executable.parent / "发布记录.json", report)
     print(json.dumps(report, ensure_ascii=False, indent=2))

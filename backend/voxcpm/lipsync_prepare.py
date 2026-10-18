@@ -142,6 +142,9 @@ PROBE = r'''
 import sys,json,locale
 from pathlib import Path
 if sys.platform=='win32': locale.setlocale(locale.LC_CTYPE,'.UTF8')
+# 本地视频推理不读Arrow数据集；不要从共享音频环境引入可选pyarrow及其NumPy ABI。
+# pandas/sklearn会将ImportError视为可选依赖未安装，不改动磁盘上的任何依赖。
+sys.modules['pyarrow']=None
 import torch,torchvision,cv2,onnxruntime,numpy,diffusers,transformers,kornia
 assert torch.cuda.is_available(),'CUDA不可用，请检查驱动和运行控制中的运行时'
 x=torch.ones((8,8),device='cuda'); assert (x@x)[0,0].item()==8
@@ -163,7 +166,7 @@ print('__VOXCPM_PROBE__'+json.dumps({'torch':torch.__version__,'files':files}))
 
 def fingerprint(config, base_python):
     path = Path(base_python).resolve()
-    return {"config": hashlib.sha256(json.dumps(config, sort_keys=True).encode()).hexdigest(),
+    return {"config": hashlib.sha256(json.dumps(config, sort_keys=True).encode()).hexdigest(), "videoPolicy": "no-optional-arrow-v1",
             "basePython": str(path), "baseSize": path.stat().st_size, "baseTime": path.stat().st_mtime_ns}
 
 

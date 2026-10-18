@@ -56,6 +56,24 @@
 
 最终EXE buildId 0158a2b60e已在魔搭发布，匿名完整回读通过；损坏r8副本从公网修复到20261018163242、真实启动和已安装通道current通过，报告builds/legacy-repairer-validation/1792341273228661800/report.json。修复器内置B序号为20261018161307，公网验收明确断言安装及最新序号都是最终发布，防止只验证内置旧快照。
 
+## 用户提供的启动失败日志：视频Arrow依赖冲突
+
+2026-10-19用户补充`../错误/status.json`和`updater.log`，异机`D:\Program Files\VoxCPMStudio`安装109/109完成，但视频启动探测报`pyarrow requires NumPy 2.0 or newer, found 1.26.4`，导致新版健康验收失败回滚。不能仅凭前一张进程占用截图把这次失败也归因于隐藏进程。
+
+视频环境固定NumPy 1.26.4，并从主音频环境复用CUDA/Torch及缺失依赖。transformers的生成模块经sklearn/pandas发现共享路径中的可选pyarrow，后者要求NumPy 2，打断整个导入链。局部视频推理不使用Arrow数据集，因此在视频PROBE及实际runner导入第三方库前设置`sys.modules['pyarrow']=None`，让可选导入按未安装处理。仅影响视频子进程，不全局改NumPy、卸载Arrow或修改用户磁盘依赖；就绪指纹加入videoPolicy让旧环境重新探测。
+
+验证：`builds/lipsync-arrow-validation/1792367440813551300/report.json`使用真实Windows视频Python，注入同样报错的可选Arrow模块；旧PROBE复现用户完整导入失败链，新PROBE完整CUDA矩阵计算、torchvision NMS、LatentSync管线及InsightFace模型通过。测试只更改隔离夹具的sys.path，不修改真实环境。
+
+## 修复前自动结束隐藏进程
+
+用户明确要求自动强制结束。修复器先排除自身工作进程和祖先，再按原目录、精确Python脚本参数及创建时间有效的父子关系确定进程。打开固定Windows句柄，核对映像和创建时间，避免PID复用；先WM_CLOSE等待两秒，再TerminateProcess并等待退出，重复扫描捕获新生成的子进程。不会按进程名全局taskkill。权限不足报告名称/PID/路径及管理员重试方式。界面明确先保存任务，未保存内容和正在运行的任务可能丢失。
+
+在修复锁内清理进程，随后恢复被终止的旧更新事务；正式替换前再次清理。每个已关闭或强制结束的进程写入stopped-processes.json，完成报告包含stoppedProcesses。
+
+验证：`builds/legacy-repairer-validation/1792367410490180700/report.json`先启动真实隐藏原生更新器、无界面子进程和外部共享Python（精确指向原目录脚本），三者均被自动强制结束，pending中的旧PID已退出后成功修复；另一份同名前缀安装的进程保留。59项相关Python测试通过，包括目录边界、伪造路径字符串、修复器自身、权限拒绝、复用PID/映像身份变化及旧视频缓存失效。
+
+最终联合验收`builds/legacy-repairer-validation/1792367601057384300/report.json`还复制独立视频环境并注入用户Arrow错误，保持lipsync选中，自动清理→修复→实际视频准备→重启成功；不是通过取消视频功能绕过失败。新版20261018235215和0f71f753d9修复器已魔搭发布并匿名完整回读。同目录public-live-validation.json实测真实工作台打开时自动正常关闭6个进程、同发布修复、重启和公网current均通过。
+
 ## 自绘按钮文字变化需要重绘
 
 表现：实际窗口已显示“修复完成”，主按钮却残留“正在修复，请稍候”。业务完成状态和关闭行为正确，仅截图暴露文字未刷新。

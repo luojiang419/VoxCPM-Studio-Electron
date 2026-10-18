@@ -121,30 +121,173 @@ def validate_root(root):
 def process_inventory():
     result = subprocess.run(["powershell.exe", "-NoProfile", "-Command",
         "[Console]::OutputEncoding=[System.Text.UTF8Encoding]::new($false); "
-        "@(Get-CimInstance Win32_Process | Where-Object { $_.Name -in @('VoxCPM Studio.exe','VoxCPM Updater.exe','electron.exe','python.exe') } | "
-        "Select-Object ProcessId,Name,ExecutablePath,CommandLine) | ConvertTo-Json -Compress"],
-        capture_output=True, text=True, encoding="utf-8", check=True)
+        "@(Get-CimInstance Win32_Process | Select-Object ProcessId,ParentProcessId,Name,ExecutablePath,CommandLine,"
+        "@{Name='Created';Expression={$_.CreationDate.ToFileTimeUtc()}}) | ConvertTo-Json -Compress"],
+        capture_output=True, text=True, encoding="utf-8", check=True, timeout=30, creationflags=subprocess.CREATE_NO_WINDOW)
     parsed = json.loads(result.stdout or "[]")
     return parsed if isinstance(parsed, list) else [parsed]
 
 
-def assert_stopped(root, processes=None):
-    for item in processes if processes is not None else process_inventory():
-        executable = item.get("ExecutablePath")
-        if not executable:
-            if item.get("Name", "").lower() in ("voxcpm studio.exe", "voxcpm updater.exe", "electron.exe"):
-                raise RuntimeError("检测到无法确认归属的软件进程，请先关闭工作台和更新窗口后重试")
+def process_label(item):
+    return f"{item.get('Name') or Path(item.get('ExecutablePath') or '?').name} (PID {item.get('ProcessId', '?')})，路径：{item.get('ExecutablePath') or '无权限读取'}"
+
+
+def owned_processes(root, processes):
+    # 先排除本修复工作进程及全部祖先，即使修复器恰好放在原安装目录内。
+    indexed = {p.get("ProcessId"): p for p in processes}
+    protected, current = set(), os.getpid()
+    while current and current not in protected:
+        protected.add(current)
+        current = indexed.get(current, {}).get("ParentProcessId")
+    protected.add(os.getppid())
+    names = {"voxcpm studio.exe", "voxcpm updater.exe", "electron.exe", "python.exe", "pythonw.exe", "ffmpeg.exe", "ffprobe.exe", "node.exe"}
+    targets, unknown = {}, []
+    for item in processes:
+        pid = item.get("ProcessId")
+        if pid in protected or (isinstance(pid, int) and pid <= 4):
             continue
-        path = Path(executable)
+        executable = item.get("ExecutablePath")
+        name = (item.get("Name") or Path(executable or "").name).lower()
+        if name not in names:
+            continue
+        if not executable:
+            if name in {"voxcpm studio.exe", "voxcpm updater.exe"}:
+                unknown.append(item)
+            continue
+        # 不解析junction：共享音频运行时的进程路径仍可能通过当前安装的junction启动。
+        owned = Path(os.path.abspath(executable)).is_relative_to(root)
+        if not owned and name in {"python.exe", "pythonw.exe"}:
+            # 外部/共享Python必须有精确脚本参数，不能仅匹配包含安装路径的任意字符串。
+            command = item.get("CommandLine") or ""
+            arguments = re.findall(r'"([^"\r\n]*)"|([^\s"]+)', command)
+            for quoted, bare in arguments:
+                arg = quoted or bare
+                if not os.path.isabs(arg):
+                    continue
+                script = Path(os.path.abspath(arg))
+                if script.is_relative_to(root) and script.suffix.lower() == ".py" and script.name in {"desktop_api.py", "updater.py", "train_voxcpm_finetune.py", "train_voxcpm_lora.py"}:
+                    owned = True
+                    break
+        if owned:
+            targets[pid] = item
+    # 子进程仅在父进程确属本目录且创建时间不早于父进程时纳入，避免复用的父PID。
+    changed = True
+    while changed:
+        changed = False
+        for item in processes:
+            pid, parent = item.get("ProcessId"), targets.get(item.get("ParentProcessId"))
+            if pid in targets or pid in protected or not isinstance(pid, int) or pid <= 4:
+                continue
+            if parent and item.get("ExecutablePath") and item.get("Created", 0) >= parent.get("Created", 0) > 0:
+                targets[pid] = item; changed = True
+    return list(targets.values()), unknown
+
+
+def assert_stopped(root, processes=None):
+    targets, unknown = owned_processes(root, processes if processes is not None else process_inventory())
+    if targets:
+        raise RuntimeError("请先关闭该目录的工作台和独立更新窗口：" + "; ".join(map(process_label, targets)))
+    if unknown:
+        raise RuntimeError("无法确认软件进程归属：" + "; ".join(map(process_label, unknown)) + "。请以管理员身份重新运行修复器。")
+
+
+class ProcessHandle:
+    """固定Windows进程句柄并核对映像、创建时间，避免按名称或复用PID误结束。"""
+    def __init__(self, item):
+        import ctypes
+        from ctypes import wintypes
+        self.ctypes, self.item = ctypes, item
+        self.kernel = ctypes.WinDLL("kernel32", use_last_error=True)
+        self.kernel.OpenProcess.argtypes = [wintypes.DWORD, wintypes.BOOL, wintypes.DWORD]
+        self.kernel.OpenProcess.restype = wintypes.HANDLE
+        self.kernel.CloseHandle.argtypes = [wintypes.HANDLE]
+        self.kernel.WaitForSingleObject.argtypes = [wintypes.HANDLE, wintypes.DWORD]
+        self.kernel.WaitForSingleObject.restype = wintypes.DWORD
+        self.kernel.TerminateProcess.argtypes = [wintypes.HANDLE, wintypes.UINT]
+        self.kernel.QueryFullProcessImageNameW.argtypes = [wintypes.HANDLE, wintypes.DWORD, wintypes.LPWSTR, ctypes.POINTER(wintypes.DWORD)]
+        self.kernel.GetProcessTimes.argtypes = [wintypes.HANDLE] + [ctypes.POINTER(wintypes.FILETIME)] * 4
+        self.handle = self.kernel.OpenProcess(0x1000 | 0x100000 | 1, False, item["ProcessId"])
+        if not self.handle:
+            if ctypes.get_last_error() == 87: return  # 枚举后已退出。
+            raise OSError(ctypes.get_last_error(), "无法打开进程")
         try:
-            owned = path.resolve().is_relative_to(root)
-        except OSError:
-            owned = False
-        if owned and path.name.lower() in ("voxcpm studio.exe", "voxcpm updater.exe", "electron.exe"):
-            raise RuntimeError("请先关闭该目录的工作台和独立更新窗口，再点击重新检测并修复。不会强制结束生成或训练任务。")
-        command = item.get("CommandLine") or ""
-        if "updater.py" in command.lower() and str(root / "data/cache/updates").casefold() in command.casefold():
-            raise RuntimeError("该目录的旧更新任务仍在运行，请等待原更新器结束后重试")
+            name, size = ctypes.create_unicode_buffer(32768), wintypes.DWORD(32768)
+            if not self.kernel.QueryFullProcessImageNameW(self.handle, 0, name, ctypes.byref(size)):
+                raise ctypes.WinError(ctypes.get_last_error())
+            times = [wintypes.FILETIME() for _ in range(4)]
+            if not self.kernel.GetProcessTimes(self.handle, *(ctypes.byref(t) for t in times)):
+                raise ctypes.WinError(ctypes.get_last_error())
+            created = (times[0].dwHighDateTime << 32) | times[0].dwLowDateTime
+            if (os.path.normcase(os.path.realpath(name.value)) != os.path.normcase(os.path.realpath(item["ExecutablePath"]))
+                    or not item.get("Created") or abs(created - item["Created"]) >= 10):
+                self.close()  # 进程身份变化，由下一轮枚举重新判断归属。
+        except BaseException:
+            self.close(); raise
+
+    def close(self):
+        if self.handle: self.kernel.CloseHandle(self.handle); self.handle = None
+
+    def exited(self):
+        return not self.handle or self.kernel.WaitForSingleObject(self.handle, 0) == 0
+
+    def request_close(self):
+        from ctypes import wintypes
+        ctypes = self.ctypes
+        user = ctypes.WinDLL("user32", use_last_error=True)
+        callback_type = ctypes.WINFUNCTYPE(wintypes.BOOL, wintypes.HWND, wintypes.LPARAM)
+        user.EnumWindows.argtypes = [callback_type, wintypes.LPARAM]
+        user.GetWindowThreadProcessId.argtypes = [wintypes.HWND, ctypes.POINTER(wintypes.DWORD)]
+        user.PostMessageW.argtypes = [wintypes.HWND, wintypes.UINT, wintypes.WPARAM, wintypes.LPARAM]
+        def visit(window, _):
+            pid = wintypes.DWORD()
+            user.GetWindowThreadProcessId(window, ctypes.byref(pid))
+            if pid.value == self.item["ProcessId"] and not self.exited():
+                user.PostMessageW(window, 0x10, 0, 0)
+            return True
+        user.EnumWindows(callback_type(visit), 0)
+
+    def terminate(self):
+        if not self.exited() and not self.kernel.TerminateProcess(self.handle, 1) and not self.exited():
+            raise self.ctypes.WinError(self.ctypes.get_last_error())
+        if self.handle and self.kernel.WaitForSingleObject(self.handle, 5000) != 0:
+            raise RuntimeError("等待进程退出超时")
+
+
+def stop_owned_processes(root, work):
+    report = work / "stopped-processes.json"
+    stopped = read(report) if report.exists() else []
+    for _ in range(4):
+        targets, unknown = owned_processes(root, process_inventory())
+        if unknown:
+            raise RuntimeError("无法确认软件进程归属：" + "; ".join(map(process_label, unknown)) + "。请右键以管理员身份运行修复器。")
+        if not targets: return stopped
+        handles = []
+        try:
+            # 打开并校验所有句柄后再发关闭消息，避免父退出后漏掉后台子进程。
+            for item in targets:
+                try: handles.append(ProcessHandle(item))
+                except OSError as error:
+                    raise RuntimeError("无法自动结束 " + process_label(item) + "。请右键以管理员身份运行修复器。" + str(error)) from error
+            emit(f"正在关闭本目录的 {len(handles)} 个工作台与后台进程…", 1)
+            for handle in handles:
+                if not handle.exited(): handle.request_close()
+            deadline = time.monotonic() + 2
+            while any(not h.exited() for h in handles) and time.monotonic() < deadline:
+                time.sleep(0.1)
+            for handle in handles:
+                if not handle.handle: continue
+                forced = not handle.exited()
+                if forced: emit("正在强制结束 " + process_label(handle.item), 1)
+                try: handle.terminate()
+                except (OSError, RuntimeError) as error:
+                    raise RuntimeError("无法结束 " + process_label(handle.item) + "。请以管理员身份运行修复器后重试。" + str(error)) from error
+                record = {**{k: handle.item.get(k) for k in ("ProcessId", "Name", "ExecutablePath", "Created")}, "forced": forced}
+                stopped.append(record); write(report, stopped)
+                emit(("已强制结束 " if forced else "已关闭 ") + process_label(handle.item), 1)
+        finally:
+            for handle in handles: handle.close()
+    assert_stopped(root)
+    return stopped
 
 
 @contextmanager
@@ -398,8 +541,8 @@ def repair(request):
     config = read(payload / "repair-config.json")
     transaction = load_transaction(payload)
     root = validate_root(request["root"])
-    assert_stopped(root)
     with repair_lock(root, transaction):
+        stop_owned_processes(root, work)
         return perform_repair(request, work, payload, config, transaction, root)
 
 
@@ -442,7 +585,7 @@ def perform_repair(request, work, payload, config, transaction, root):
             backup = session / "metadata-backup/runtime_manifest.json"
             backup.parent.mkdir(parents=True, exist_ok=True); shutil.copy2(bootstrap, backup)
         write(bootstrap, {"protocol": 1, "mode": "repair-migrated", "platform": "win32-x64", "version": previous_version})
-    assert_stopped(root)
+    stopped = stop_owned_processes(root, work)
     latest_version, latest_release = installed_identity(root)
     if release_order({"version": latest_version or baseline, "releaseId": latest_release}) > release_order(manifest):
         raise RuntimeError("修复期间检测到更高版本已安装，已停止覆盖")
@@ -473,7 +616,7 @@ def perform_repair(request, work, payload, config, transaction, root):
         "previousVersion": previous_version, "baselineVersion": baseline, "previousVersionKnown": previous_version is not None,
         "previousReleaseId": previous_release, "version": manifest["version"], "releaseId": manifest["releaseId"],
         "recoveredInterruptedUpdate": recovered, "forwardRepair": bool(superseded), "dedicatedRuntime": str(python), "updateChannelVerified": True, "channel": channel,
-        "componentSelectionMigrated": migrated, "entryRepairs": entries, "catalogNetworkError": network_error, "finishedAt": time.time()}
+        "componentSelectionMigrated": migrated, "entryRepairs": entries, "stoppedProcesses": stopped, "catalogNetworkError": network_error, "finishedAt": time.time()}
     write(work / "status.json", report)
     write(request["resultPath"], report)
     emit("修复完成，后续可直接在软件内检查更新。", 100)
