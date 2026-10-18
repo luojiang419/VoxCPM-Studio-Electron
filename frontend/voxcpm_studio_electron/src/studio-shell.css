@@ -25,8 +25,10 @@ html, body, #root { height: 100%; overflow: hidden; background: var(--bg); font-
 .studio-brand .brand-copy strong { font-size: 18px; letter-spacing: -.4px; }
 .studio-brand .brand-copy span { font-size: 9px; letter-spacing: 1.15px; }
 .studio-nav-caption { padding: 0 14px 7px; font-size: 10px; color: var(--muted); letter-spacing: 2px; }
-.studio-shell .sidebar-top { gap: 0; }
-.studio-shell .nav-list { gap: 5px; }
+.studio-shell .sidebar-top { gap: 0; flex: 1; min-height: 0; grid-template-rows: auto auto minmax(0, 1fr); }
+.studio-shell .nav-list { gap: 4px; min-height: 0; overflow-y: auto; align-content: start; }
+.studio-shell .nav-item:disabled { opacity: .55; cursor: wait; }
+.studio-shell .studio-sidebar-foot { flex: none; }
 .studio-shell .nav-item { min-height: 42px; display: flex; justify-content: flex-start; gap: 13px; padding: 10px 13px; border: 1px solid transparent; border-radius: 7px; background: transparent; }
 .studio-shell .nav-item:hover { transform: none; background: var(--panel-soft); }
 .studio-shell .nav-item-active { background: var(--accent-soft); border-color: transparent; box-shadow: inset 2px 0 var(--accent); }

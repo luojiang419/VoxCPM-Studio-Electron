@@ -466,6 +466,10 @@ function App() {
   const [trainingMessage, setTrainingMessage] = useState("等待训练任务。");
   const [globalMessage, setGlobalMessage] = useState("");
   const [updateNotice, setUpdateNotice] = useState("");
+  const [updateStatus, setUpdateStatus] = useState("");
+  const [manualUpdateChecking, setManualUpdateChecking] = useState(false);
+  const [updateFocusRequest, setUpdateFocusRequest] = useState(0);
+  const updateBusy = manualUpdateChecking || ["checking", "downloading"].includes(updateStatus);
   const [busy, setBusy] = useState(false);
   const [workspaceTaskStartedAt, setWorkspaceTaskStartedAt] = useState(0);
   const [workspaceTaskElapsedSeconds, setWorkspaceTaskElapsedSeconds] = useState(0);
@@ -525,6 +529,9 @@ function App() {
 
   useEffect(() => {
     let active = true;
+    window.voxcpmDesktop.getUpdateState().then((state) => {
+      if (active) setUpdateStatus(state?.status || "");
+    }).catch(() => {});
     window.voxcpmDesktop.getBootstrapState().then((state) => {
       if (!active) {
         return;
@@ -537,6 +544,7 @@ function App() {
       if (payload.type === "runtime-preparation") return;
       if (payload.type === "update-state") {
         const update = payload.update;
+        setUpdateStatus(update.status);
         if (update.status === "available") setUpdateNotice(`有可用更新：VoxCPM Studio ${update.latestVersion}`);
         else if (update.status === "downloaded") setUpdateNotice("更新已下载，可前往设置重启安装。");
         else if (update.status === "current") setUpdateNotice("");
@@ -552,6 +560,21 @@ function App() {
       unsubscribe();
     };
   }, []);
+
+  async function handleCheckUpdate() {
+    if (updateBusy) return;
+    setPage("settings");
+    setUpdateFocusRequest(value => value + 1);
+    setManualUpdateChecking(true);
+    try {
+      const state = await window.voxcpmDesktop.checkUpdate();
+      setUpdateStatus(state?.status || "");
+    } catch (error) {
+      setGlobalMessage(`检查更新失败：${(error as Error).message || String(error)}`);
+    } finally {
+      setManualUpdateChecking(false);
+    }
+  }
 
   useEffect(() => {
     if (!backendBaseUrl) {
@@ -1053,6 +1076,11 @@ function App() {
                 <span className="nav-text">{item.label}</span>
               </button>
             ))}
+            <button type="button" className="nav-item" data-action="check-update" aria-controls="software-update-panel"
+              aria-busy={updateBusy} disabled={updateBusy} title="手动检查软件更新" onClick={() => void handleCheckUpdate()}>
+              <span className="nav-icon"><NavIcon page="update" /></span>
+              <span className="nav-text">{manualUpdateChecking || updateStatus === "checking" ? "正在检查…" : "检查更新"}</span>
+            </button>
           </div>
         </div>
         <div className="studio-sidebar-foot">
@@ -1664,7 +1692,7 @@ function App() {
                 </div>
               </section>
               <section className="panel-card settings-tools-card">
-                <UpdatePanel />
+                <UpdatePanel focusRequest={updateFocusRequest} />
                 <div className="panel-head panel-head-compact">
                   <div>
                     <p className="panel-kicker">界面与工具</p>
@@ -1809,7 +1837,7 @@ function RuntimeList(props: { runtime: RuntimeSummary | null; large?: boolean })
   );
 }
 
-function NavIcon(props: { page: PageKey }) {
+function NavIcon(props: { page: PageKey | "update" }) {
   const common = {
     fill: "none",
     stroke: "currentColor",
@@ -1871,6 +1899,8 @@ function NavIcon(props: { page: PageKey }) {
           <path {...common} d="M4 18h16" />
         </svg>
       );
+    case "update":
+      return <svg viewBox="0 0 24 24" aria-hidden="true"><path {...common} d="M20 11a8 8 0 0 0-14-5L3 9m0-5v5h5M4 13a8 8 0 0 0 14 5l3-3m0 5v-5h-5" /></svg>;
     case "settings":
       return (
         <svg viewBox="0 0 24 24" aria-hidden="true">
