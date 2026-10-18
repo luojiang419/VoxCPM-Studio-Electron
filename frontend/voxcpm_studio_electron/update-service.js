@@ -5,7 +5,7 @@ const http = require("http");
 const https = require("https");
 const { spawn, execFile } = require("child_process");
 const { promisify } = require("util");
-const { resolveManagedPython } = require("./runtime-service");
+const { resolveManagedPython, downloadAsset } = require("./runtime-service");
 const { pipeline } = require("stream/promises");
 
 function versionParts(value) {
@@ -115,6 +115,7 @@ class UpdateService {
     this.currentVersion = currentVersion; this.onState = onState;
     this.getTheme = getTheme;
     this.python = pythonExecutable || resolveManagedPython(root) || path.join(root, "runtime", "python", "python.exe");
+    this.backendPython = this.python;
     this.config = config || JSON.parse(fs.readFileSync(path.join(appDir, "update-config.json"), "utf8"));
     this.cache = path.join(dataRoot, "cache", "updates");
     this.settingsPath = path.join(dataRoot, "config", "update-settings.json");
@@ -135,6 +136,68 @@ class UpdateService {
   getState() {
     try { this.state.lastResult = JSON.parse(fs.readFileSync(path.join(this.cache, "last-result.json"), "utf8")); } catch { /* 无更新记录。 */ }
     return { ...this.state };
+  }
+  async ensureUpdaterPython() {
+    let dedicated = "";
+    const configFile = path.join(this.appDir, "updater-runtime-config.json");
+    if (fs.existsSync(configFile)) {
+      const runtime = JSON.parse(fs.readFileSync(configFile, "utf8"));
+      if (runtime.protocol !== 1 || !/^[a-zA-Z0-9._-]{1,80}$/.test(runtime.id) || !Array.isArray(runtime.files) || !runtime.files.length || runtime.files.length > 2000) throw new Error("独立更新环境清单无效");
+      const folder = path.join(this.dataRoot, "tools", "updater-runtime", runtime.id);
+      for (const item of runtime.files) {
+        if (typeof item.path !== "string" || /[\\:]/.test(item.path) || !path.resolve(folder, item.path).startsWith(path.resolve(folder) + path.sep) ||
+            !/^[a-f0-9]{64}$/.test(item.sha256) || !Number.isSafeInteger(item.size) || item.size < 0 || item.size > 128 * 1024 ** 2) throw new Error("独立更新环境文件清单无效");
+      }
+      const verified = async directory => {
+        if (!fs.existsSync(path.join(directory, "python.exe"))) return false;
+        for (const item of runtime.files) {
+          const file = path.resolve(directory, item.path);
+          if (!fs.existsSync(file) || fs.lstatSync(file).isSymbolicLink() || fs.statSync(file).size !== item.size || await digest(file) !== item.sha256) return false;
+        }
+        return true;
+      };
+      for (let cursor = folder; cursor !== path.dirname(this.dataRoot); cursor = path.dirname(cursor)) {
+        if (fs.existsSync(cursor) && fs.lstatSync(cursor).isSymbolicLink()) throw new Error("独立更新环境路径包含目录链接，未自动替换");
+        if (cursor === this.dataRoot || cursor === path.dirname(cursor)) break;
+      }
+      if (!await verified(folder)) {
+        if (!runtime.package) throw new Error("独立更新环境需要修复，请运行更新修复器");
+        this.setState({ message: "正在补齐独立更新环境，已准备好的环境会自动复用…", progress: 0 });
+        const cache = path.join(this.cache, "runtime");
+        const archive = await downloadAsset(runtime.package, cache, { progress: info => {
+          if (info.size && info.downloaded !== undefined) this.setState({ progress: Math.floor(info.downloaded * 100 / info.size), message: `正在准备独立更新环境 ${Math.floor(info.downloaded * 100 / info.size)}%` });
+        } });
+        const stage = folder + ".new-" + crypto.randomUUID();
+        fs.mkdirSync(stage, { recursive: true });
+        const inventory = stage + ".json";
+        atomicJson(inventory, runtime);
+        const script = "$ErrorActionPreference='Stop'; Add-Type -AssemblyName System.IO.Compression.FileSystem; " +
+          "$manifest=Get-Content -LiteralPath $env:VOXCPM_UPDATE_RUNTIME_MANIFEST -Raw -Encoding UTF8 | ConvertFrom-Json; " +
+          "$zip=[IO.Compression.ZipFile]::OpenRead($env:VOXCPM_UPDATE_RUNTIME_ARCHIVE); try { foreach($record in $manifest.files) { " +
+          "$entry=$zip.GetEntry($record.path); if(!$entry -or $entry.Length -ne $record.size){throw 'Runtime archive mismatch'}; " +
+          "$target=[IO.Path]::GetFullPath((Join-Path $env:VOXCPM_UPDATE_RUNTIME_STAGE $record.path)); " +
+          "if(!$target.StartsWith($env:VOXCPM_UPDATE_RUNTIME_STAGE+[IO.Path]::DirectorySeparatorChar,[StringComparison]::OrdinalIgnoreCase)){throw 'Unsafe runtime path'}; " +
+          "[IO.Directory]::CreateDirectory([IO.Path]::GetDirectoryName($target)) | Out-Null; $runtimeInput=$entry.Open(); $runtimeOutput=[IO.File]::Create($target); " +
+          "try{$runtimeInput.CopyTo($runtimeOutput)}finally{$runtimeInput.Dispose();$runtimeOutput.Dispose()} } } finally{$zip.Dispose()}";
+        try {
+          await promisify(execFile)("powershell.exe", ["-NoProfile", "-NonInteractive", "-Command", script], { windowsHide: true, timeout: 120000,
+            env: { ...process.env, VOXCPM_UPDATE_RUNTIME_MANIFEST: inventory, VOXCPM_UPDATE_RUNTIME_ARCHIVE: archive, VOXCPM_UPDATE_RUNTIME_STAGE: stage } });
+          if (!await verified(stage)) throw new Error("独立更新环境解压校验失败");
+          const previous = folder + ".previous-" + crypto.randomUUID();
+          if (fs.existsSync(folder)) fs.renameSync(folder, previous);
+          try { fs.renameSync(stage, folder); } catch (error) { if (fs.existsSync(previous)) fs.renameSync(previous, folder); throw error; }
+        } finally { fs.rmSync(inventory, { force: true }); }
+      }
+      dedicated = path.join(folder, "python.exe");
+    }
+    this.python = dedicated || this.backendPython;
+    try {
+      await promisify(execFile)(this.python, ["-B", "-c", "from cryptography.hazmat.primitives.asymmetric.ed25519 import Ed25519PublicKey; import zipfile"], { windowsHide: true, timeout: 30000 });
+    } catch (error) {
+      throw new Error(`更新运行环境不可用，请运行 VoxCPM 更新修复器补齐更新通道。${error.message}`);
+    }
+    this.state.updaterRuntime = dedicated ? "dedicated" : "audio";
+    return this.python;
   }
   async check({ source = "manual" } = {}) {
     if (this.running || ["downloaded", "installing"].includes(this.state.status)) return this.state;
@@ -162,6 +225,7 @@ class UpdateService {
     this.setState({ status: "downloading", progress: 0, message: "正在下载更新包…" });
     const meta = this.manifest.package;
     try {
+      await this.ensureUpdaterPython();
       fs.mkdirSync(this.cache, { recursive: true });
       const part = path.join(this.cache, meta.sha256 + ".part");
       let offset = fs.existsSync(part) ? fs.statSync(part).size : 0;
@@ -205,9 +269,13 @@ class UpdateService {
     if (this.state.status !== "downloaded" || !this.session) throw new Error("尚无已校验的更新包");
     if (!fs.existsSync(path.join(this.root, "runtime_manifest.json"))) throw new Error("开发环境不支持安装，请使用便携版测试更新");
     this.setState({ status: "installing", message: "正在校验更新器，完成后自动重启…" });
+    this.running = true;
     const session = this.session;
     try {
+    await this.ensureUpdaterPython();
     const settings = JSON.parse(fs.readFileSync(path.join(session, "session.json"), "utf8"));
+    settings.pythonExecutable = this.python;
+    atomicJson(path.join(session, "session.json"), settings);
     const target = JSON.parse(JSON.parse(fs.readFileSync(path.join(session, "envelope.json"), "utf8")).payload);
     for (const name of ["ready.json", "host-ready.json", "cancel.json", "status.json"]) fs.rmSync(path.join(session, name), { force: true });
     const child = spawn(path.join(session, "VoxCPM Updater.exe"), ["--session", session], {
@@ -244,7 +312,7 @@ class UpdateService {
       atomicJson(path.join(session, "cancel.json"), { cancelledAt: Date.now() });
       this.setState({ status: "error", canDownload: true, message: `更新尚未安装：${error.message}。可重新下载后重试。` });
       throw error;
-    }
+    } finally { this.running = false; }
   }
 }
 module.exports = { UpdateService, compareVersions, isNewer, verifyEnvelope, digest, request, atomicJson, prepareUpdater };

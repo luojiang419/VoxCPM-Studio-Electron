@@ -58,7 +58,7 @@ async function downloadAsset(asset, directory, { signal, progress = () => {}, fe
       const touch = () => { clearTimeout(watchdog); watchdog = setTimeout(() => controller.abort(new Error("下载超过 60 秒没有数据，请检查网络后重试")), 60000); };
       try {
         touch();
-        const response = await fetchImpl(url, { headers: offset ? { Range: `bytes=${offset}-` } : {}, signal: controller.signal });
+        const response = await fetchImpl(url, { headers: { "User-Agent": "VoxCPM-Studio-Runtime/1.0", ...(offset ? { Range: `bytes=${offset}-` } : {}) }, signal: controller.signal });
         if (![200, 206].includes(response.status)) { await response.body?.cancel(); throw new Error(`HTTP ${response.status}`); }
         const range = response.headers.get("content-range");
         if (response.status === 206 && range !== `bytes ${offset}-${asset.size - 1}/${asset.size}`) {

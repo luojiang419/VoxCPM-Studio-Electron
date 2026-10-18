@@ -40,6 +40,11 @@ namespace VoxStandaloneUpdater {
         readonly Stopwatch clock = Stopwatch.StartNew();
         readonly object logLock = new object();
         readonly bool preview;
+        readonly bool repairMode;
+        readonly TextBox repairRoot = new TextBox();
+        readonly SoftButton browseRoot = new SoftButton();
+        bool repairStarted;
+        public int ResultCode { get; private set; }
         Bitmap brandMark;
         bool dark;
         int progressValue;
@@ -49,12 +54,14 @@ namespace VoxStandaloneUpdater {
         bool finished;
         Dictionary<string, object> settings;
 
-        public UpdateForm(string folder, bool previewMode = false, bool? forceDark = null) {
+        public UpdateForm(string folder, bool previewMode = false, bool? forceDark = null, bool repair = false) {
             session = folder;
             preview = previewMode;
+            repairMode = repair;
+            ResultCode = 1;
             try { settings = Read(Path.Combine(session, "session.json")); } catch { }
             dark = forceDark ?? (settings != null && settings.ContainsKey("theme") && Convert.ToString(settings["theme"]) == "dark");
-            Text = "VoxCPM Studio · 独立更新器";
+            Text = repairMode ? "VoxCPM Studio · 更新修复器" : "VoxCPM Studio · 独立更新器";
             ClientSize = new Size(720, 580);
             AutoScaleMode = AutoScaleMode.None;
             FormBorderStyle = FormBorderStyle.None;
@@ -73,7 +80,7 @@ namespace VoxStandaloneUpdater {
             logs.Text = "查看更新日志"; logs.AccessibleName = "打开本次更新日志目录";
             logs.Click += delegate { Process.Start(new ProcessStartInfo("explorer.exe", Quote(session)) { UseShellExecute = true }); };
             close.Text = "正在更新，请稍候"; close.Enabled = false;
-            close.Click += delegate { Close(); };
+            close.Click += delegate { if (repairMode && (!repairStarted || (finished && ResultCode != 0))) BeginRepair(); else Close(); };
             theme.Glyph = dark ? ButtonGlyph.Sun : ButtonGlyph.Moon; theme.AccessibleName = "切换更新器主题";
             minimize.Glyph = ButtonGlyph.Minimize; minimize.AccessibleName = "最小化更新器";
             windowClose.Glyph = ButtonGlyph.Close; windowClose.AccessibleName = "关闭更新器"; windowClose.Enabled = false;
@@ -81,8 +88,23 @@ namespace VoxStandaloneUpdater {
             minimize.Click += delegate { WindowState = FormWindowState.Minimized; };
             windowClose.Click += delegate { Close(); };
             Controls.AddRange(new Control[] { message, detail, logs, close, theme, minimize, windowClose });
-            FormClosing += delegate(object sender, FormClosingEventArgs e) { if (!finished) e.Cancel = true; };
-            Shown += delegate { if (!preview) StartWorker(); };
+            if (repairMode) {
+                repairRoot.BorderStyle = BorderStyle.None; repairRoot.AccessibleName = "原软件安装目录";
+                repairRoot.Text = settings != null && settings.ContainsKey("repairRoot") ? Convert.ToString(settings["repairRoot"]) : "";
+                browseRoot.Text = "选择目录"; browseRoot.AccessibleName = "选择原软件安装目录";
+                browseRoot.Click += delegate { using(var picker=new FolderBrowserDialog { Description="请选择包含 VoxCPM Studio.exe 的原安装目录，不要新建目录",ShowNewFolderButton=false }) {
+                    if(Directory.Exists(repairRoot.Text)) picker.SelectedPath=repairRoot.Text;
+                    if(picker.ShowDialog(this)==DialogResult.OK) repairRoot.Text=picker.SelectedPath;
+                } };
+                Controls.Add(repairRoot); Controls.Add(browseRoot);
+                message.Visible = false; close.Enabled = windowClose.Enabled = true; close.Text = "开始修复并升级  →";
+                detail.Text = "请先关闭原软件和更新窗口，再开始修复。";
+            }
+            FormClosing += delegate(object sender, FormClosingEventArgs e) { if (!finished && (!repairMode || repairStarted)) e.Cancel = true; };
+            Shown += delegate {
+                if (!preview && !repairMode) StartWorker();
+                else if (!preview && repairMode && settings != null && settings.ContainsKey("autoRepair") && (bool)settings["autoRepair"]) BeginRepair();
+            };
             animation.Tick += delegate { if (!finished && progressValue >= 90) Invalidate(new Rectangle(40, 268, 640, 160)); };
             animation.Start();
             Resize += delegate { LayoutContent(); };
@@ -91,14 +113,15 @@ namespace VoxStandaloneUpdater {
 
         void ApplyTheme(bool value) {
             dark = value; BackColor = StudioTheme.Paper(dark); ForeColor = StudioTheme.Ink(dark);
-            message.BackColor = detail.BackColor = StudioTheme.Card(dark);
+            message.BackColor = detail.BackColor = repairRoot.BackColor = StudioTheme.Card(dark);
+            repairRoot.ForeColor = StudioTheme.Ink(dark);
             message.ForeColor = StudioTheme.Ink(dark); detail.ForeColor = StudioTheme.Muted(dark);
-            foreach (var button in new[] { logs, close, theme, minimize, windowClose }) {
+            foreach (var button in new[] { logs, close, theme, minimize, windowClose, browseRoot }) {
                 button.Dark = dark; button.BackColor = BackColor; button.Invalidate();
             }
             theme.Glyph = dark ? ButtonGlyph.Sun : ButtonGlyph.Moon;
             tips.SetToolTip(theme, dark ? "切换浅色主题" : "切换深色主题");
-            tips.SetToolTip(windowClose, finished ? "关闭更新器" : "安装完成后可关闭");
+            tips.SetToolTip(windowClose, finished || (repairMode && !repairStarted) ? "关闭窗口" : "完成后可关闭");
             Invalidate();
         }
 
@@ -113,7 +136,10 @@ namespace VoxStandaloneUpdater {
             theme.SetBounds((int)(594*sx), (int)(27*sy), (int)(28*sx), (int)(28*sy));
             minimize.SetBounds((int)(630*sx), (int)(27*sy), (int)(28*sx), (int)(28*sy));
             windowClose.SetBounds((int)(666*sx), (int)(27*sy), (int)(28*sx), (int)(28*sy));
-            foreach (var button in new[] { logs, close, theme, minimize, windowClose }) button.Font = new Font("Microsoft YaHei UI", 10*sx);
+            repairRoot.SetBounds((int)(64*sx),(int)(321*sy),(int)(485*sx),(int)(25*sy));
+            browseRoot.SetBounds((int)(562*sx),(int)(311*sy),(int)(94*sx),(int)(38*sy));
+            repairRoot.Font = new Font("Microsoft YaHei UI",13*sx,FontStyle.Regular,GraphicsUnit.Pixel);
+            foreach (var button in new[] { logs, close, theme, minimize, windowClose, browseRoot }) button.Font = new Font("Microsoft YaHei UI", 10*sx);
             using (var shape = StudioTheme.Round(new RectangleF(0,0,ClientSize.Width,ClientSize.Height),22*sx)) {
                 var old = Region; Region = new Region(shape); if (old != null) old.Dispose();
             }
@@ -145,9 +171,9 @@ namespace VoxStandaloneUpdater {
             using (var shape=StudioTheme.Round(new RectangleF(.5f,.5f,719,579),22)) using(var pen=new Pen(StudioTheme.Border(dark))) g.DrawPath(pen,shape);
             if (brandMark != null) g.DrawImage(brandMark,new Rectangle(36,28,50,50));
             TextAt(g,"VOXCPM",14,ink,new RectangleF(92,35,160,22),true); TextAt(g,"STUDIO",10,muted,new RectangleF(93,57,140,20));
-            TextAt(g,"独立更新器",11,muted,new RectangleF(470,43,112,20));
-            TextAt(g,view=="error"?"更新暂未完成。":finished?"更新完成，继续创作。":"更新交给我们。",31,ink,new RectangleF(40,133,420,48));
-            TextAt(g,view=="error"?"请保留原目录，查看日志了解原因。":"独立完成更新，准备好后自动回到工作台。",14,muted,new RectangleF(43,184,390,42));
+            TextAt(g,repairMode?"更新修复器":"独立更新器",11,muted,new RectangleF(470,43,112,20));
+            TextAt(g,view=="error"?(repairMode?"修复需要处理。":"更新暂未完成。"):finished?(repairMode?"修复完成，安心创作。":"更新完成，继续创作。"):repairMode?"修好更新，安心创作。":"更新交给我们。",31,ink,new RectangleF(40,133,420,48));
+            TextAt(g,view=="error"?"请保留原目录，查看日志了解原因。":repairMode?"修复旧版更新通道，保留模型与作品。":"独立完成更新，准备好后自动回到工作台。",14,muted,new RectangleF(43,184,390,42));
             using(var pen=new Pen(dark?Color.FromArgb(48,52,46):Color.FromArgb(234,232,221))) { g.DrawEllipse(pen,470,109,150,150); g.DrawEllipse(pen,493,132,104,104); }
             for(int i=0;i<37;i++) {
                 double envelope=Math.Pow(Math.Sin((i+1)*Math.PI/38),1.8);
@@ -155,8 +181,8 @@ namespace VoxStandaloneUpdater {
                 using(var pen=new Pen(i>14&&i<24?accent:(dark?Color.FromArgb(115,120,108):Color.FromArgb(181,186,171)),2.8f) { StartCap=LineCap.Round,EndCap=LineCap.Round }) g.DrawLine(pen,444+i*5.7f,184-height/2,444+i*5.7f,184+height/2);
             }
             using(var shape=StudioTheme.Round(new RectangleF(42,268,636,158),18)) using(var brush=new SolidBrush(StudioTheme.Card(dark))) g.FillPath(brush,shape);
-            TextAt(g,view=="error"?"需要处理":"软件更新",12,muted,new RectangleF(64,286,380,22));
-            TextAt(g,view=="error"?"未完成":finished?"已完成":progressValue>=90?"启动检查":progressValue+"%",12,muted,new RectangleF(578,286,78,22));
+            TextAt(g,view=="error"?"需要处理":repairMode&&!repairStarted?"原软件安装目录":repairMode?"修复与升级":"软件更新",12,muted,new RectangleF(64,286,380,22));
+            TextAt(g,view=="error"?"未完成":finished?"已完成":repairMode&&!repairStarted?"待开始":progressValue>=90?"验证中":progressValue+"%",12,muted,new RectangleF(578,286,78,22));
             RectangleF bar=new RectangleF(64,391,592,5);
             using(var shape=StudioTheme.Round(bar,2.5f)) using(var brush=new SolidBrush(StudioTheme.Track(dark))) g.FillPath(brush,shape);
             if(!finished && progressValue>=90) {
@@ -164,9 +190,9 @@ namespace VoxStandaloneUpdater {
                 float moving=(float)((clock.Elapsed.TotalSeconds%2.8)/2.8*740)-148;
                 using(var brush=new SolidBrush(accent)) g.FillRectangle(brush,64+moving,391,148,5); g.Restore(saved);
             } else if(progressValue>0) using(var shape=StudioTheme.Round(new RectangleF(64,391,(float)(592*progressValue/100.0),5),2.5f)) using(var brush=new SolidBrush(accent)) g.FillPath(brush,shape);
-            TextAt(g,view=="error"?"查看日志了解原因，原目录与个人数据会保留。":"独立运行 · 安装完成后自动打开新版",10,muted,new RectangleF(64,405,592,18));
+            TextAt(g,view=="error"?"查看日志了解原因，原目录与个人数据会保留。":repairMode?"自带修复环境 · 无需安装开发工具":"独立运行 · 安装完成后自动打开新版",10,muted,new RectangleF(64,405,592,18));
             int phase=finished&&view!="error"?3:progressValue<30?0:progressValue<90?1:2;
-            string[] steps={"核验更新","安装文件","启动检查","更新完成"};
+            string[] steps=repairMode?new[] {"检查旧版","修复升级","启动验证","通道验证"}:new[] {"核验更新","安装文件","启动检查","更新完成"};
             for(int i=0;i<4;i++) {
                 int x=44+i*159; bool active=i==phase;
                 using(var brush=new SolidBrush(active?accent:StudioTheme.Track(dark))) g.FillEllipse(brush,x,450,20,20);
@@ -182,6 +208,25 @@ namespace VoxStandaloneUpdater {
             message.Text=text; progressValue=Math.Max(0,Math.Min(100,percent));
             detail.Text=progressValue>=90?"首次准备可能需要一些时间，请保持窗口打开。":progressValue>=30?"正在替换应用文件，个人数据会保留。":"更新器准备完成后，工作台会自动关闭。";
             tips.SetToolTip(message,text); AccessibleDescription=text; Invalidate();
+        }
+
+        void BeginRepair() {
+            string root=repairRoot.Text.Trim().Trim('"');
+            if(File.Exists(root)) root=Path.GetDirectoryName(root);
+            if(String.IsNullOrWhiteSpace(root) || !Directory.Exists(root)) {
+                detail.Text="请先选择原软件安装目录。";
+                if(settings.ContainsKey("exitOnComplete") && (bool)settings["exitOnComplete"]) Finish(1,detail.Text);
+                return;
+            }
+            settings["repairRoot"]=Path.GetFullPath(root);
+            Write(Path.Combine(session,"session.json"),settings);
+            Write(Path.Combine(session,"repair-request.json"),new { root=Path.GetFullPath(root), work=session,
+                payload=Convert.ToString(settings["payload"]), resultPath=Convert.ToString(settings["resultPath"]) });
+            foreach(string name in new[] {"status.json","host-ready.json"}) if(File.Exists(Path.Combine(session,name))) File.Delete(Path.Combine(session,name));
+            finished=false; repairStarted=true; view="working"; ResultCode=1;
+            repairRoot.Visible=browseRoot.Visible=false; message.Visible=true;
+            close.Enabled=windowClose.Enabled=false; close.Text="正在修复，请稍候";
+            UpdateProgress("正在检查原安装与更新通道…",0); animation.Start(); StartWorker();
         }
 
         public void SetPreview(string state, int percent) {
@@ -227,9 +272,11 @@ namespace VoxStandaloneUpdater {
                 settings = Read(Path.Combine(session, "session.json"));
                 if (!String.Equals(Path.GetFullPath(Convert.ToString(settings["session"])), session, StringComparison.OrdinalIgnoreCase)) throw new IOException("更新会话身份不匹配");
                 string python = Convert.ToString(settings["pythonExecutable"]);
-                if (!File.Exists(python) || !File.Exists(Path.Combine(session, "updater.py"))) throw new IOException("已校验的更新脚本或Python运行环境不存在");
+                string script = repairMode ? Convert.ToString(settings["workerScript"]) : Path.Combine(session,"updater.py");
+                if (!File.Exists(python) || !File.Exists(script)) throw new IOException("已校验的更新脚本或Python运行环境不存在");
                 log = new StreamWriter(new FileStream(Path.Combine(session, "updater.log"), FileMode.Append, FileAccess.Write, FileShare.ReadWrite), new UTF8Encoding(false)); log.AutoFlush = true;
-                var start = new ProcessStartInfo(python, "-u " + Quote(Path.Combine(session, "updater.py")) + " " + Quote(session) + " --worker") {
+                string arguments = repairMode ? "-B -u " + Quote(script) + " --request " + Quote(Path.Combine(session,"repair-request.json")) : "-B -u " + Quote(script) + " " + Quote(session) + " --worker";
+                var start = new ProcessStartInfo(python, arguments) {
                     WorkingDirectory = session, UseShellExecute = false, CreateNoWindow = true,
                     RedirectStandardOutput = true, RedirectStandardError = true,
                     StandardOutputEncoding = Encoding.UTF8, StandardErrorEncoding = Encoding.UTF8
@@ -266,14 +313,16 @@ namespace VoxStandaloneUpdater {
         void Finish(int code, string error) {
             if (finished) return;
             finished = true;
+            ResultCode = code;
             animation.Stop();
             lock (logLock) { if (log != null) { log.Dispose(); log = null; } }
             close.Enabled = true; close.Text = "关闭";
             windowClose.Enabled = true; tips.SetToolTip(windowClose,"关闭更新器");
             if (code == 0) {
-                Text = "VoxCPM Studio · 更新完成";
-                message.Text = "更新完成，新版软件已启动。"; progressValue = 100;
-                detail.Text = "所有检查已通过，可以继续创作。"; view = "complete"; Invalidate();
+                Text = repairMode ? "VoxCPM Studio · 修复完成" : "VoxCPM Studio · 更新完成";
+                message.Text = repairMode ? "修复完成，更新通道已验证。" : "更新完成，新版软件已启动。"; progressValue = 100;
+                detail.Text = repairMode ? "后续请在软件内检查更新，无需重复运行修复器。" : "所有检查已通过，可以继续创作。"; view = "complete"; Invalidate();
+                if(repairMode && (!settings.ContainsKey("exitOnComplete") || !(bool)settings["exitOnComplete"])) return;
                 var timer = new Timer { Interval = 1800 };
                 timer.Tick += delegate { timer.Stop(); timer.Dispose(); Close(); }; timer.Start();
                 return;
@@ -290,9 +339,13 @@ namespace VoxStandaloneUpdater {
                 if (settings != null && settings.ContainsKey("resultPath")) Write(Convert.ToString(settings["resultPath"]), state);
             } catch { }
             Text = "VoxCPM Studio · 更新未完成";
+            if(repairMode) { Text="VoxCPM Studio · 修复需要处理"; close.Text="重新检测并修复"; }
             message.Text = "更新未完成：" + reason;
             detail.Text = Convert.ToString(state["status"]) == "rolled-back" ? "已恢复原版本，请查看日志后重试。" : "请保留原目录，按日志提示处理后重试。";
             view = "error"; tips.SetToolTip(message,reason); AccessibleDescription=reason+" 日志："+Path.Combine(session,"updater.log"); Invalidate();
+            if(repairMode && settings.ContainsKey("exitOnComplete") && (bool)settings["exitOnComplete"]) {
+                var timer=new Timer { Interval=1200 }; timer.Tick+=delegate { timer.Stop(); timer.Dispose(); Close(); }; timer.Start();
+            }
         }
     }
 }

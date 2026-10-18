@@ -121,6 +121,26 @@ def test_reject_downgrade(tmp_path):
         u.validate(session, settings)
 
 
+def test_explicit_same_release_repair_does_not_allow_downgrade(tmp_path):
+    _, session, settings = prepare(tmp_path)
+    settings.update(currentVersion="2.0.2", repair=True)
+    assert u.validate(session, settings)["version"] == "2.0.2"
+    settings["currentReleaseId"] = "20261018000001"
+    with pytest.raises(ValueError, match="相同或更旧"):
+        u.validate(session, settings)
+
+
+def test_repair_with_unknown_version_requires_explicit_verified_baseline(tmp_path):
+    _, session, settings = prepare(tmp_path)
+    settings.update(currentVersion=None, repair=True, repairIdentityUnknown=True, baselineVersion="2.0.1")
+    assert u.validate(session, settings)["version"] == "2.0.2"
+    settings["repair"] = False
+    with pytest.raises(ValueError): u.validate(session, settings)
+    settings.update(currentVersion="2.0.3", currentReleaseId="00000000000000")
+    with pytest.raises(ValueError, match="相同或更旧"):
+        u.validate(session, settings)
+
+
 def test_reject_junction(tmp_path):
     root, session, settings = prepare(tmp_path)
     external = tmp_path / "用户 外部目录"

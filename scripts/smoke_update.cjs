@@ -140,9 +140,8 @@ __updateTestDialog.showMessageBox=(...args)=>['启动独立更新器','重启并
   const latestSession = () => fs.readdirSync(cache).filter((name) => name.startsWith("session-")).sort((a, b) => fs.statSync(path.join(cache, a)).mtimeMs - fs.statSync(path.join(cache, b)).mtimeMs).at(-1);
   let nativeFailurePreservedMain = false;
   if (process.argv.includes("--native-failure-first")) {
-    const failedSession = path.join(cache, latestSession()), settingsPath = path.join(failedSession, "session.json");
-    const settings = JSON.parse(fs.readFileSync(settingsPath));
-    fs.writeFileSync(settingsPath, JSON.stringify({ ...settings, pythonExecutable: path.join(testRoot, "missing-python.exe") }));
+    const failedSession = path.join(cache, latestSession());
+    fs.renameSync(path.join(failedSession, "updater.py"), path.join(failedSession, "updater.py.disabled"));
     const failureClient = await cdp(19228);
     const failure = await failureClient.evaluate("window.voxcpmDesktop.installUpdate().then(()=>({ok:true})).catch(e=>({error:String(e)}))");
     assert.ok(failure.error);

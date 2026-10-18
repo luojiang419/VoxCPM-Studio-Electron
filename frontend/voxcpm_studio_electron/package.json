@@ -11,7 +11,7 @@
     "build": "vite build",
     "start": "npm run build && electron .",
     "dev": "npm run build && electron .",
-    "build:updater": "python ../../scripts/build_standalone_updater.py",
+    "build:updater": "python ../../scripts/build_updater_runtime.py && python ../../scripts/build_standalone_updater.py",
     "package:dir": "npm run build:updater && npm run build && electron-builder --dir",
     "package:win": "npm run build:updater && npm run build && electron-builder --win portable"
   },
@@ -43,6 +43,7 @@
       "update-config.json",
       "updater.py",
       "standalone-updater.exe",
+      "updater-runtime-config.json",
       "runtime-service.js",
       "runtime-config.json",
       "runtime-requirements.txt",

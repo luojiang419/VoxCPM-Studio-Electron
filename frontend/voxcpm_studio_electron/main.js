@@ -807,10 +807,6 @@ ipcMain.handle("update:check", () => updateService.check());
 ipcMain.handle("update:download", () => updateService.download());
 ipcMain.handle("update:auto-check", (_event, enabled) => updateService.setAutoCheck(enabled));
 ipcMain.handle("update:install", async () => {
-  if (!fs.existsSync(resolvePythonCommand(resolveAppRoot(), resolveProjectRoot()))) {
-    await dialog.showMessageBox(mainWindow, { type: "info", title: "请先准备运行环境", message: "请先点击运行，完成环境补齐后再安装更新。" });
-    return false;
-  }
   const answer = await dialog.showMessageBox(mainWindow, { type: "question", title: "启动独立更新器",
     message: "即将打开独立更新器。请确认生成与训练任务已结束。",
     detail: "更新器准备完成后工作台会关闭，独立窗口将继续安装并自动打开新版。模型、配置与已有作品会保留。",
@@ -908,9 +904,14 @@ app.whenReady().then(async () => {
         dialog.showErrorBox("正在更新", "独立更新器正在安装，请等待更新完成。");
         app.quit(); return;
       }
-      const result = spawnSync(resolvePythonCommand(resolveAppRoot(), resolveProjectRoot()),
+      const recoveryService = new UpdateService({ root: resolveProjectRoot(), dataRoot: resolveDataRoot(), appDir: __dirname,
+        currentVersion: app.getVersion(), pythonExecutable: resolvePythonCommand(resolveAppRoot(), resolveProjectRoot()) });
+      const recoveryPython = await recoveryService.ensureUpdaterPython();
+      const result = spawnSync(recoveryPython,
         [path.join(__dirname, "updater.py"), pending.session, "--recover"], { windowsHide: true, encoding: "utf8" });
       if (result.status !== 0) throw new Error(result.stdout || result.stderr || "更新恢复失败");
+      // 回滚后重新加载完整旧版本，避免当前进程继续使用已经缓存的新旧混合模块。
+      app.relaunch(); app.quit(); return;
     } catch (error) {
       dialog.showErrorBox("更新恢复失败", String(error)); app.quit(); return;
     }

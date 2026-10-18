@@ -95,12 +95,16 @@ def validate(session: Path, settings):
     release_id = manifest.get("releaseId", "00000000000000")
     if not re.fullmatch(r"\d{14}", release_id):
         raise ValueError("发布序号无效")
-    if version(manifest["version"]) < version(settings["currentVersion"]) or (
-        version(manifest["version"]) == version(settings["currentVersion"]) and
-        release_id <= settings.get("currentReleaseId", "00000000000000")
+    reference_version = settings["currentVersion"]
+    if reference_version is None and settings.get("repair") is True and settings.get("repairIdentityUnknown") is True:
+        reference_version = settings["baselineVersion"]
+    same_repair = settings.get("repair") is True and settings["currentVersion"] is not None and version(manifest["version"]) == version(reference_version) and release_id == settings.get("currentReleaseId", "00000000000000")
+    if version(manifest["version"]) < version(reference_version) or (
+        version(manifest["version"]) == version(reference_version) and
+        release_id <= settings.get("currentReleaseId", "00000000000000") and not same_repair
     ):
         raise ValueError("拒绝安装相同或更旧的版本")
-    if version(settings["currentVersion"]) < version(manifest["minVersion"]):
+    if version(reference_version) < version(manifest["minVersion"]):
         raise ValueError("需要先升级完整便携基线")
     package = session / "package.zip"
     meta = manifest["package"]

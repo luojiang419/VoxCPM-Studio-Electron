@@ -49,7 +49,7 @@ def keys():
 
 def sources():
     for name in ("main.js", "preload.js", "package.json", "update-service.js", "update-window.js", "update-config.json", "updater.py",
-                 "standalone-updater.exe",
+                 "standalone-updater.exe", "updater-runtime-config.json",
                  "runtime-service.js", "runtime-config.json", "runtime-requirements.txt", "install-protocol.js", "component-service.js", "music-config.json", "app.ico", "app-icon.png"):
         yield FRONTEND / name, "resources/app/" + name
     for file in sorted((FRONTEND / "dist").rglob("*")):
@@ -72,6 +72,8 @@ def sources():
 
 
 def build(notes, min_version):
+    from build_updater_runtime import build as build_update_runtime
+    build_update_runtime()
     from build_standalone_updater import build as build_updater
     build_updater()
     key, config = keys()
@@ -161,8 +163,25 @@ def publish(output):
         "此仓库仅存放 VoxCPM Studio 桌面更新，不包含模型权重或用户数据。\n\n"
         "客户端通过 public/latest.json 验证 Ed25519 签名，下载后校验 SHA-256。\n"
         "已有旧版首次接入请参阅源码仓库 docs/自动更新说明.md。\n", "utf-8")
+    repairer_report = output / "repairer-publication.json"
     repair_report = output / "repair-publication.json"
-    if repair_report.exists():
+    if repairer_report.exists():
+        repair = read_json(repairer_report)
+        if repair.get("releaseId") != manifest.get("releaseId") or not repair.get("anonymousVerification"):
+            raise ValueError("单文件修复器发布记录与本次更新不一致")
+        with (activation / "README.md").open("a", encoding="utf-8") as stream:
+            stream.write(
+                f"\n## 当前正式更新\n\n版本：{manifest['version']}，发布序号：{manifest['releaseId']}。\n\n"
+                "已安装用户可在软件内检查更新，通过原生独立更新器安装。更新运行环境独立于音频 Python，缺失或损坏时自动补齐。\n\n"
+                f"## 老用户一键修复\n\n[下载独立更新修复器 EXE]({repair['repairUrl']})（约 {repair['size'] / 1024 ** 2:.1f} MB），可直接转发给老用户。\n\n"
+                "1. 关闭原软件和更新窗口，双击修复器，无需解压或安装 Python。\n"
+                "2. 确认自动找到的原安装目录；找不到时选择包含 VoxCPM Studio.exe 的原目录。\n"
+                "3. 点击“开始修复并升级”，等待修复成功并自动打开软件。\n\n"
+                "修复器联网选择最新可信签名应用，支持同一发布的损坏文件修复，保留模型、配置、音色、作品和已有功能选择。"
+                "修复完成后直接使用软件内置更新，不需要每次运行修复器。\n\n"
+                "不要卸载、删除旧目录或手动清除更新备份。若失败，请保留窗口显示的日志和会话目录供维护者定位。\n\n"
+                f"修复器 SHA256：`{repair['sha256']}`。\n")
+    elif repair_report.exists():
         repair = read_json(repair_report)
         if repair.get("releaseId") != manifest.get("releaseId") or not repair.get("anonymousVerification"):
             raise ValueError("修复包发布记录与本次更新不一致")
