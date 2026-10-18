@@ -15,7 +15,9 @@ import soundfile as sf
 from fastapi.testclient import TestClient
 
 from voxcpm.studio_api import create_api_app
-from voxcpm.studio_lipsync import LipSyncCancelled, LipSyncService
+from voxcpm.studio_lipsync import LipSyncCancelled, LipSyncOutOfMemory, LipSyncService
+from voxcpm.lipsync_profiles import PROFILES, select_profile
+from voxcpm import lipsync_profiles
 
 
 @pytest.fixture
@@ -34,7 +36,9 @@ def service(tmp_path, monkeypatch):
     (root / "runtime.json").write_text(json.dumps({"version": "1.5", "resolution": 256}), encoding="utf-8")
     studio = SimpleNamespace(runtime_summary_payload=lambda: {"data_root": str(tmp_path), "ffmpeg_path": shutil.which("ffmpeg")},
                              settings_payload=lambda: {"output_dir": str(tmp_path / "outputs")})
-    return LipSyncService(tmp_path, studio)
+    service = LipSyncService(tmp_path, studio)
+    monkeypatch.setattr(LipSyncService, "hardware", lambda self: {"cuda": True, "name": "fixture 16GB", "totalMB": 16384, "freeMB": 14336})
+    return service
 
 
 def test_profile_and_invalid_configuration_preserve_working_root(service, tmp_path):
@@ -98,7 +102,8 @@ def cpu_runner(service, monkeypatch):
     def process(command, work, *args):
         if "--root" in command:
             shutil.copyfile(work / "input.mp4", work / "synced.mp4")
-            (work / "inference.json").write_text(json.dumps({"engine": "LatentSync 1.5", "resolution": 256}), encoding="utf-8")
+            version = command[command.index("--model-version") + 1]
+            (work / "inference.json").write_text(json.dumps({"engine": f"LatentSync {version}", "resolution": PROFILES[version]["resolution"]}), encoding="utf-8")
         else:
             return original(command, work, *args)
     monkeypatch.setattr(service, "_process", process)
@@ -157,7 +162,7 @@ def test_video_queue_cancel_and_gpu_conflicts(service, monkeypatch):
     studio = service.studio
     app = create_api_app(studio)
     lipsync = app.state.lipsync
-    monkeypatch.setattr(lipsync, "status", lambda: {"ready": True})
+    monkeypatch.setattr(lipsync, "status", lambda **kwargs: {"ready": True})
     monkeypatch.setattr(lipsync, "validate", lambda payload: None)
     started = threading.Event()
     def generate(payload, progress, cancelled):
@@ -181,3 +186,126 @@ def test_video_queue_cancel_and_gpu_conflicts(service, monkeypatch):
         lipsync.active = True
         assert client.post("/api/asr/recognize", json={"audioPath": "test.wav"}).status_code == 409
         assert client.post("/api/training/start", json={"pretrainedPath":"model","trainManifest":"train.jsonl","valManifest":"val.jsonl"}).status_code == 409
+
+
+@pytest.mark.parametrize("total,free,installed,requested,expected", [
+    (6144, 6000, ["1.5", "1.6"], "auto", ""),
+    (8192, 7000, ["1.5", "1.6"], "auto", "1.5"),
+    (10240, 9000, ["1.5", "1.6"], "auto", "1.5"),
+    (12288, 11000, ["1.5", "1.6"], "auto", "1.5"),
+    (14336, 13000, ["1.5", "1.6"], "auto", "1.5"),
+    (16380, 9000, ["1.5", "1.6"], "auto", "1.6"),
+    (24576, 16000, ["1.5", "1.6"], "auto", "1.6"),
+    (16384, 6000, ["1.5", "1.6"], "auto", "1.5"),
+    (16384, 5000, ["1.6"], "auto", "1.6"),
+    (16384, 9000, ["1.5"], "auto", "1.5"),
+    (12288, 11000, ["1.6"], "auto", ""),
+    (16384, 9000, ["1.5", "1.6"], "1.5", "1.5"),
+    (12288, 11000, ["1.5", "1.6"], "1.6", ""),
+    (16384, 9000, ["1.5"], "1.6", ""),
+])
+def test_hardware_selection_boundaries(total, free, installed, requested, expected):
+    selected, reason = select_profile({"cuda": True, "totalMB": total, "freeMB": free}, installed, requested)
+    assert selected == expected and reason
+
+
+def test_no_cuda_does_not_choose_cpu_or_integrated_gpu():
+    assert select_profile({"cuda": False, "totalMB": 32768, "freeMB": 32768}, ["1.5", "1.6"])[0] == ""
+
+
+def test_wddm_memory_matches_visible_device_by_uuid_and_uses_lower_value(monkeypatch):
+    import torch
+    monkeypatch.setattr(torch.cuda, "is_available", lambda: True)
+    monkeypatch.setattr(torch.version, "hip", None)
+    monkeypatch.setattr(torch.cuda, "mem_get_info", lambda device: (15 * 1024 ** 3, 16 * 1024 ** 3))
+    monkeypatch.setattr(torch.cuda, "get_device_properties", lambda device: SimpleNamespace(uuid="bbb"))
+    monkeypatch.setattr(torch.cuda, "get_device_name", lambda device: "second visible GPU")
+    monkeypatch.setattr(lipsync_profiles.shutil, "which", lambda name: "nvidia-smi")
+    monkeypatch.setattr(lipsync_profiles.subprocess, "run", lambda *a, **k: SimpleNamespace(returncode=0, stdout="GPU-aaa, 24000\nGPU-bbb, 5000\n"))
+    detected = lipsync_profiles.detect_hardware()
+    assert detected["freeMB"] == 5000 and detected["cudaFreeMB"] == 15360
+    assert select_profile(detected, ["1.5", "1.6"])[0] == "1.5"
+
+
+def test_low_free_memory_rejected_before_starting_media_processing(service, tmp_path, monkeypatch):
+    source, audio = media(tmp_path)
+    monkeypatch.setattr(service, "hardware", lambda: {"cuda": True, "totalMB": 16384, "freeMB": 3000})
+    monkeypatch.setattr(service, "_process", lambda *args: pytest.fail("低空闲显存不应启动子进程"))
+    payload = SimpleNamespace(mode="video", source_path=str(source), audio_path=str(audio), short_video="loop", steps=20, guidance=1.5, seed=1247)
+    with pytest.raises(ValueError, match="空闲显存"):
+        service.generate(payload, lambda *args: None, lambda: False)
+    assert not service.active
+
+
+def test_selection_rechecks_after_tts_unloads(service, tmp_path, monkeypatch):
+    install_16(service)
+    source, audio = media(tmp_path)
+    cpu_runner(service, monkeypatch)
+    hardware = {"cuda": True, "totalMB": 16384, "freeMB": 5000}
+    monkeypatch.setattr(service, "hardware", lambda: dict(hardware))
+    service.studio.reset_runtime = lambda: hardware.update(freeMB=14000)
+    assert service.status()["selectedVersion"] == "1.5"
+    payload = SimpleNamespace(mode="video", source_path=str(source), audio_path=str(audio), short_video="loop", steps=20, guidance=1.5, seed=1247)
+    result = service.generate(payload, lambda *args: None, lambda: False)
+    assert result["report"]["selectedVersion"] == "1.6" and result["report"]["resolution"] == 512
+
+
+def install_16(service):
+    root = service.root()
+    for name in ("config", "checkpoint"):
+        target = root / "source" / PROFILES["1.6"][name]
+        target.parent.mkdir(parents=True, exist_ok=True)
+        target.write_bytes(b"fixture")
+    (root / "runtime-1.6.json").write_text(json.dumps({"version": "1.6", "resolution": 512}), encoding="utf-8")
+
+
+def test_versioned_manifest_and_manual_api_validation(service):
+    install_16(service)
+    with TestClient(create_api_app(service.studio)) as client:
+        assert client.get("/api/lipsync/status").json()["selectedVersion"] == "1.6"
+        assert client.get("/api/lipsync/status?modelVersion=1.5").json()["selectedVersion"] == "1.5"
+        assert client.get("/api/lipsync/status?modelVersion=2.0").status_code == 422
+        assert client.post("/api/lipsync/generate", json={"modelVersion": "2.0", "sourcePath": "a.mp4", "audioPath": "b.wav"}).status_code == 422
+    (service.root() / "runtime-1.6.json").write_text(json.dumps({"version": "1.6", "resolution": 512, "checkpoint": PROFILES["1.5"]["checkpoint"]}), encoding="utf-8")
+    assert service.status()["selectedVersion"] == "1.5"
+    assert not service.status(model_version="1.6")["ready"]
+
+
+@pytest.mark.parametrize("requested,failure,fallback", [
+    ("auto", LipSyncOutOfMemory, True), ("1.6", LipSyncOutOfMemory, False),
+    ("auto", RuntimeError, False),
+])
+def test_oom_retries_once_only_in_auto_and_preserves_truthful_report(service, tmp_path, monkeypatch, requested, failure, fallback):
+    install_16(service)
+    source, audio = media(tmp_path)
+    cpu_runner(service, monkeypatch)
+    original = service._process
+    calls = []
+    def process(command, work, *args):
+        if "--model-version" in command:
+            version = command[command.index("--model-version") + 1]
+            calls.append(version)
+            if version == "1.6":
+                (work / "synced.mp4").write_bytes(b"partial")
+                raise failure("CUDA out of memory" if failure is LipSyncOutOfMemory else "bad media")
+            assert not (work / "synced.mp4").exists()
+        return original(command, work, *args)
+    monkeypatch.setattr(service, "_process", process)
+    payload = SimpleNamespace(mode="video", model_version=requested, source_path=str(source), audio_path=str(audio), short_video="loop", steps=20, guidance=1.5, seed=1247)
+    if fallback:
+        result = service.generate(payload, lambda *args: None, lambda: False)
+        assert calls == ["1.6", "1.5"]
+        assert result["report"]["engine"] == "LatentSync 1.5" and result["report"]["resolution"] == 256
+        assert result["report"]["fallbackReason"] and result["report"]["initialVersion"] == "1.6"
+    else:
+        with pytest.raises(failure):
+            service.generate(payload, lambda *args: None, lambda: False)
+        assert calls == ["1.6"] and not service.results()
+    assert not service.active
+
+
+def test_cuda_oom_from_real_subprocess_is_typed(service, tmp_path):
+    with (tmp_path / "oom.log").open("w", encoding="utf-8") as log:
+        with pytest.raises(LipSyncOutOfMemory):
+            service._process([sys.executable, "-c", "raise RuntimeError('CUDA out of memory')"], tmp_path,
+                             lambda *args: None, lambda: False, log, 10)

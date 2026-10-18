@@ -14,8 +14,14 @@ import time
 import uuid
 from urllib.parse import quote
 
+from .lipsync_profiles import PROFILES, detect_hardware, load_manifest, select_profile
+
 
 class LipSyncCancelled(Exception):
+    pass
+
+
+class LipSyncOutOfMemory(RuntimeError):
     pass
 
 
@@ -26,6 +32,9 @@ class LipSyncService:
         self.config_path = data_root / "lipsync-settings.json"
         self.active = False
         self.lock = threading.Lock()
+
+    def hardware(self):
+        return detect_hardware()
 
     def root(self):
         override = os.environ.get("VOXCPM_LIPSYNC_ROOT", "").strip()
@@ -54,8 +63,8 @@ class LipSyncService:
             if self.active:
                 raise ValueError("视频任务进行中，暂不能切换模型目录。")
             status = self.status(target.resolve())
-            if not status["ready"]:
-                raise ValueError("请选择完整的 LatentSync 1.5 低显存环境。缺少：" + "、".join(status["missing"]))
+            if not status["installedVersions"]:
+                raise ValueError("请选择完整的 LatentSync 1.5 / 1.6 环境。缺少：" + "、".join(status["missing"]))
             self.config_path.parent.mkdir(parents=True, exist_ok=True)
             temporary = self.config_path.with_suffix(".tmp")
             temporary.write_text(json.dumps({"root": str(target.resolve())}, ensure_ascii=False), encoding="utf-8")
@@ -74,31 +83,44 @@ class LipSyncService:
         sibling = Path(ffmpeg or self.ffmpeg()).with_name("ffprobe.exe" if os.name == "nt" else "ffprobe") if ffmpeg or self.ffmpeg() else None
         return str(bundled) if bundled.is_file() else str(sibling) if sibling and sibling.is_file() else shutil.which("ffprobe") or ""
 
-    def status(self, root=None):
+    def status(self, root=None, model_version="auto"):
         root = root or self.root()
-        required = ["env/Scripts/python.exe", "runtime.json", "source/configs/unet/stage2.yaml",
-                    "source/checkpoints/latentsync-1.5/latentsync_unet.pt", "source/checkpoints/whisper/tiny.pt",
+        required = ["env/Scripts/python.exe", "source/checkpoints/whisper/tiny.pt",
                     "source/checkpoints/vae/config.json", "source/checkpoints/vae/diffusion_pytorch_model.safetensors",
                     "source/checkpoints/auxiliary/models/buffalo_l/det_10g.onnx",
                     "source/checkpoints/auxiliary/models/buffalo_l/2d106det.onnx"]
-        missing = [name for name in required if not (root / name).is_file()]
-        manifest = {}
-        if not missing:
-            try:
-                manifest = json.loads((root / "runtime.json").read_text(encoding="utf-8"))
-            except (OSError, ValueError):
-                missing.append("runtime.json（无法读取）")
-        if manifest and (manifest.get("version") != "1.5" or manifest.get("resolution") != 256):
-            missing.append("LatentSync 1.5 运行清单（当前为旧版本）")
+        common_missing = [name for name in required if not (root / name).is_file()]
+        models = {}
+        manifests = {}
+        for version, profile in PROFILES.items():
+            missing = list(common_missing)
+            for name in (profile["config"], profile["checkpoint"]):
+                if not (root / "source" / name).is_file():
+                    missing.append("source/" + name)
+            manifest = load_manifest(root, version)
+            if not manifest:
+                missing.append(f"LatentSync {version} 运行清单（缺失或不匹配）")
+            manifests[version] = manifest
+            models[version] = {"ready": not missing, "missing": missing, "resolution": profile["resolution"]}
         ffmpeg = self.ffmpeg(root)
         probe = self.ffprobe(ffmpeg, root)
         if not ffmpeg:
-            missing.append("ffmpeg.exe")
+            common_missing.append("ffmpeg.exe")
         if not probe:
-            missing.append("ffprobe.exe")
-        return {"ready": not missing, "engine": "LatentSync 1.5", "root": str(root),
+            common_missing.append("ffprobe.exe")
+        installed = [v for v, m in models.items() if m["ready"] and not common_missing]
+        hardware = self.hardware()
+        selected, reason = select_profile(hardware, installed, model_version)
+        missing = list(common_missing) + ([] if selected else [reason])
+        if not installed:
+            missing = list(dict.fromkeys(missing + [item for m in models.values() for item in m["missing"]]))
+        profile = PROFILES.get(selected, {})
+        return {"ready": bool(selected) and not missing, "engine": f"LatentSync {selected}" if selected else "LatentSync",
+                "root": str(root), "selectedVersion": selected, "requestedVersion": model_version,
+                "installedVersions": installed, "models": models, "hardware": hardware, "selectionReason": reason,
                 "missing": missing, "ffmpeg": ffmpeg, "ffprobe": probe, "active": self.active,
-                "profile": "256px · 16帧 · VAE分帧 · CPU人脸检测", "validation": manifest.get("validation"),
+                "profile": f"{profile.get('resolution', '—')}px · 16帧 · VAE分帧 · CPU人脸检测",
+                "validation": manifests.get(selected, {}).get("validation"),
                 "maxDuration": 120}
 
     def probe(self, path: Path):
@@ -191,8 +213,8 @@ class LipSyncService:
                     progress(int(event.get("progress", 0)), event.get("text", "推理中"))
             if process.returncode:
                 detail = "".join(tail)[-3500:]
-                if "out of memory" in detail.lower():
-                    raise RuntimeError("显存不足。请关闭其他占用显卡的程序，再重试；详细信息见本次任务日志。")
+                if "cuda out of memory" in detail.lower() or "cuda error: out of memory" in detail.lower():
+                    raise LipSyncOutOfMemory("显存不足。请关闭其他占用显卡的程序，再重试；详细信息见本次任务日志。")
                 if "Face not detected" in detail:
                     raise ValueError("部分画面未检测到人脸。请使用单人、正面或轻微侧脸、无遮挡的连续镜头。")
                 raise RuntimeError("视频处理失败：" + detail)
@@ -212,8 +234,10 @@ class LipSyncService:
             training = getattr(self.studio, "training_status_payload", lambda: {})()
             if training.get("running") or getattr(self.studio, "_training_is_running", lambda: False)():
                 raise ValueError("LoRA训练正在占用显卡，请先停止训练。")
-            if not self.status()["ready"]:
-                raise ValueError("视频模型尚未就绪，请先安装并选择 LatentSync 1.5 低显存环境。")
+            requested = getattr(payload, "model_version", "auto")
+            status = self.status(model_version=requested)
+            if not status["ready"]:
+                raise ValueError("视频模型尚未就绪：" + "、".join(status["missing"]))
             source, audio, duration = self.validate(payload)
             # 与TTS共用单线程队列；视频子进程启动前释放主进程的语音模型。
             reset = getattr(self.studio, "reset_runtime", None)
@@ -223,6 +247,15 @@ class LipSyncService:
                 import torch
                 if torch.cuda.is_available():
                     torch.cuda.empty_cache()
+            status = self.status(model_version=requested)
+            if not status["ready"]:
+                raise ValueError(status["selectionReason"])
+            selected = status["selectedVersion"]
+            minimum_free = (6144 if requested == "1.6" else 7168) if selected == "1.6" else 4096
+            if status["hardware"]["freeMB"] < minimum_free:
+                raise ValueError(f"当前空闲显存不足 {minimum_free // 1024} GB，请关闭其他占用显卡的程序后重试。")
+            initial_version = selected
+            fallback_reason = ""
             job_id = uuid.uuid4().hex
             work = self.data_root / "lipsync-jobs" / job_id
             work.mkdir(parents=True)
@@ -243,9 +276,32 @@ class LipSyncService:
                 video_args += ["-vf", filters, "-c:v", "libx264", "-crf", "18", "-pix_fmt", "yuv420p", "input.mp4"]
                 self._process(video_args, work, progress, cancelled, log, 300)
                 runner = Path(__file__).with_name("lipsync_runner.py")
-                self._process([str(root / "env/Scripts/python.exe"), "-u", str(runner), "--root", str(root),
-                               "--work", str(work), "--steps", str(payload.steps), "--guidance", str(payload.guidance),
-                               "--seed", str(payload.seed)], work, progress, cancelled, log)
+                def infer(version):
+                    if cancelled():
+                        raise LipSyncCancelled()
+                    progress(2, f"使用 LatentSync {version} 低显存模式")
+                    self._process([str(root / "env/Scripts/python.exe"), "-u", str(runner), "--root", str(root),
+                                   "--work", str(work), "--model-version", version, "--steps", str(payload.steps),
+                                   "--guidance", str(payload.guidance), "--seed", str(payload.seed)], work, progress, cancelled, log)
+                try:
+                    infer(selected)
+                except LipSyncOutOfMemory:
+                    if cancelled():
+                        raise LipSyncCancelled()
+                    if requested != "auto" or selected != "1.6" or "1.5" not in status["installedVersions"]:
+                        raise
+                    if self.hardware().get("freeMB", 0) < 4096:
+                        raise
+                    selected = "1.5"
+                    fallback_reason = "1.6 显存不足，已自动回退到 1.5（256px）重新生成。"
+                    log.write(fallback_reason + "\n")
+                    log.flush()
+                    progress(1, fallback_reason)
+                    # 第一次子进程已经退出；清理未完成输出，避免读取上次的半成品。
+                    for name in ("synced.mp4", "inference.json"):
+                        (work / name).unlink(missing_ok=True)
+                    shutil.rmtree(work / "render", ignore_errors=True)
+                    infer(selected)
                 progress(99, "合并高质量配音")
                 output_dir = Path(self.studio.settings_payload()["output_dir"]) / "lipsync"
                 output_dir.mkdir(parents=True, exist_ok=True)
@@ -260,8 +316,11 @@ class LipSyncService:
                 if cancelled():
                     raise LipSyncCancelled()
                 report = json.loads((work / "inference.json").read_text(encoding="utf-8"))
-                if report.get("engine") != "LatentSync 1.5" or report.get("resolution") != 256:
-                    raise RuntimeError("生成结果与 LatentSync 1.5 配置不匹配。")
+                if report.get("engine") != f"LatentSync {selected}" or report.get("resolution") != PROFILES[selected]["resolution"]:
+                    raise RuntimeError("生成结果与所选 LatentSync 配置不匹配。")
+                report.update({"requestedVersion": requested, "initialVersion": initial_version,
+                               "selectedVersion": selected, "fallbackReason": fallback_reason,
+                               "selectionReason": status["selectionReason"], "hardware": status["hardware"]})
                 result = {"status": "视频生成完成。", "outputPath": str(output), "previewUrl": f"/media?path={quote(str(output))}",
                           "duration": float(metadata["format"]["duration"]), "logPath": str(log_path), "report": report,
                           "mode": payload.mode, "sourcePath": str(source), "audioPath": str(audio)}

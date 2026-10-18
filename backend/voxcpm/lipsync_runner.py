@@ -9,6 +9,8 @@ from pathlib import Path
 import sys
 import time
 
+from lipsync_profiles import PROFILES, load_manifest
+
 EVENT_PREFIX = "__VOXCPM_LIPSYNC__"
 
 
@@ -20,9 +22,11 @@ def run(args):
     root = Path(args.root).resolve()
     work = Path(args.work).resolve()
     source = root / "source"
-    manifest = json.loads((root / "runtime.json").read_text(encoding="utf-8"))
-    if manifest.get("version") != "1.5" or manifest.get("resolution") != 256:
-        raise RuntimeError("请选择已安装的 LatentSync 1.5 低显存环境。")
+    version = args.model_version
+    profile = PROFILES[version]
+    resolution = profile["resolution"]
+    if not load_manifest(root, version):
+        raise RuntimeError(f"请选择已安装的 LatentSync {version} 低显存环境。")
     sys.path.insert(0, str(source))
     os.chdir(work)
     # 不继承主程序的模型搜索路径，所有权重明确指向本地文件。
@@ -48,10 +52,11 @@ def run(args):
 
     if not torch.cuda.is_available():
         raise RuntimeError("视频对口型需要可用的 NVIDIA CUDA 显卡。")
+    torch.cuda.set_device(0)
     torch.set_num_threads(min(8, os.cpu_count() or 4))
     torch.cuda.reset_peak_memory_stats()
     started = time.monotonic()
-    emit(stage="loading", progress=3, text="加载 LatentSync 1.5 · 256px 低显存")
+    emit(stage="loading", progress=3, text=f"加载 LatentSync {version} · {resolution}px 低显存")
 
     def init_detector(self, device="cuda"):
         # 检测和106点定位放在CPU，给扩散模型保留显存；不改变官方人脸对齐算法。
@@ -91,7 +96,7 @@ def run(args):
                 frames.append(self.image_processor.restorer.restore_img(video_frames[index], face, affine_matrices[index]))
             return np.stack(frames)
 
-    config = OmegaConf.load(source / "configs/unet/stage2.yaml")
+    config = OmegaConf.load(source / profile["config"])
     scheduler = DDIMScheduler.from_pretrained(str(source / "configs"), local_files_only=True)
     audio_encoder = Audio2Feature(model_path=str(source / "checkpoints/whisper/tiny.pt"), device="cuda",
                                   num_frames=16, audio_feat_length=config.data.audio_feat_length)
@@ -103,7 +108,7 @@ def run(args):
                                        local_files_only=True)
     vae.config.scaling_factor, vae.config.shift_factor = 0.18215, 0
     unet = UNet3DConditionModel.from_config(OmegaConf.to_container(config.model))
-    checkpoint = torch.load(source / "checkpoints/latentsync-1.5/latentsync_unet.pt", map_location="cpu", weights_only=True)
+    checkpoint = torch.load(source / profile["checkpoint"], map_location="cpu", weights_only=True)
     unet.load_state_dict(checkpoint["state_dict"], strict=True)
     del checkpoint
     pipeline = LowMemoryPipeline(vae=vae, audio_encoder=audio_encoder,
@@ -123,12 +128,12 @@ def run(args):
     emit(stage="aligning", progress=8, text="分析人脸与声音时序")
     pipeline(video_path="input.mp4", audio_path="audio.wav", video_out_path="synced.mp4",
              num_frames=16, num_inference_steps=args.steps, guidance_scale=args.guidance,
-             weight_dtype=torch.float16, width=256, height=256,
+             weight_dtype=torch.float16, width=resolution, height=resolution,
              mask_image_path=str(source / "latentsync/utils/mask.png"), temp_dir="render", callback=callback)
     output = work / "synced.mp4"
     if not output.is_file() or output.stat().st_size < 1024:
         raise RuntimeError("模型没有产生有效视频，请检查 FFmpeg 日志。")
-    report = {"engine": "LatentSync 1.5", "resolution": 256, "numFrames": 16,
+    report = {"engine": f"LatentSync {version}", "resolution": resolution, "numFrames": 16,
               "steps": args.steps, "guidance": args.guidance, "seed": args.seed,
               "duration": duration, "elapsedSeconds": round(time.monotonic() - started, 2),
               "peakAllocatedMB": round(torch.cuda.max_memory_allocated() / 1024 ** 2),
@@ -142,6 +147,7 @@ if __name__ == "__main__":
     parser = argparse.ArgumentParser()
     parser.add_argument("--root", required=True)
     parser.add_argument("--work", required=True)
+    parser.add_argument("--model-version", choices=list(PROFILES), default="1.5")
     parser.add_argument("--steps", type=int, default=20)
     parser.add_argument("--guidance", type=float, default=1.5)
     parser.add_argument("--seed", type=int, default=1247)

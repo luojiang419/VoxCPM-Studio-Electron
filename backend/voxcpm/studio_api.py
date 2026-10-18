@@ -91,6 +91,7 @@ class SaveAsRequest(BaseModel):
 
 class LipSyncRequest(BaseModel):
     mode: Literal["video", "photo"] = "video"
+    model_version: Literal["auto", "1.5", "1.6"] = Field(default="auto", alias="modelVersion")
     source_path: str = Field(alias="sourcePath", min_length=1)
     audio_path: str = Field(alias="audioPath", min_length=1)
     steps: int = Field(default=20, ge=20, le=50)
@@ -267,8 +268,8 @@ def create_api_app(studio: Optional[Any] = None, model_dir: Optional[str] = None
             raise HTTPException(status_code=400, detail=str(exc)) from exc
 
     @app.get("/api/lipsync/status")
-    def lipsync_status():
-        return lipsync.status()
+    def lipsync_status(modelVersion: Literal["auto", "1.5", "1.6"] = "auto"):
+        return lipsync.status(model_version=modelVersion)
 
     @app.put("/api/lipsync/settings")
     def lipsync_settings(payload: dict):
@@ -280,8 +281,9 @@ def create_api_app(studio: Optional[Any] = None, model_dir: Optional[str] = None
 
     @app.post("/api/lipsync/generate")
     def generate_lipsync(payload: LipSyncRequest):
-        if not lipsync.status()["ready"]:
-            raise HTTPException(status_code=400, detail="视频模型尚未就绪，请先选择已安装的 LatentSync 目录。")
+        status = lipsync.status(model_version=payload.model_version)
+        if not status["ready"]:
+            raise HTTPException(status_code=400, detail="视频模型尚未就绪：" + "、".join(status["missing"]))
         if getattr(studio_service, "_training_is_running", lambda: False)():
             raise HTTPException(status_code=409, detail="请先停止 LoRA 训练，再生成视频。")
         workspace_call(lipsync.validate, payload)

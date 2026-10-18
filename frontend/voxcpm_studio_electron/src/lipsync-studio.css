@@ -40,6 +40,9 @@
 .ls-settings audio { display: block; width: 100%; height: 34px; margin-top: 12px; color-scheme: dark; }
 body[data-theme="light"] .ls-settings audio { color-scheme: light; }
 .ls-hint { font-size: 10px; color: var(--muted); line-height: 1.8; margin: 9px 0 0; }
+.ls-hardware { margin-top: 10px; padding: 10px 12px; border: 1px solid var(--line); border-radius: 7px; color: var(--muted); font-size: 10px; line-height: 1.7; overflow-wrap: anywhere; }
+.ls-hardware span { display: block; }
+.ls-hardware p { margin: 6px 0; }
 .ls-advanced { margin-top: 22px; padding-top: 17px; border-top: 1px solid var(--line); }
 .ls-advanced summary { cursor: pointer; color: var(--muted); font-size: 11px; }
 .ls-model-path { overflow-wrap: anywhere; font-size: 10px; color: var(--muted); line-height: 1.6; margin-top: 18px; user-select: text; }

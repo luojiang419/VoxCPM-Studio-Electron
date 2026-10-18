@@ -18,8 +18,14 @@ import urllib.request
 import venv
 import zipfile
 
+script_root = Path(__file__).resolve().parents[1]
+profile_source = script_root / "backend/voxcpm"
+if not profile_source.is_dir():
+    profile_source = script_root / "src/voxcpm"
+sys.path.insert(0, str(profile_source))
+from lipsync_profiles import PROFILES, detect_hardware, load_manifest, select_profile
+
 SOURCE_REVISION = "a229c3948406bc2cf6eaf4873e662e70c6a04746"
-MODEL_REVISION = "32a20d29aead0498e3e885e90dbbe8027da1b61b"
 VAE_REVISION = "31f26fdeee1355a5c34592e401dd41e45d25a493"
 
 
@@ -34,8 +40,14 @@ def check_tools(root):
             raise RuntimeError(f"缺少 {name}。请将 FFmpeg 工具加入 PATH，或把 {name}.exe 放入 {root / 'tools'} 后重试。")
 
 
-def download(root):
+def download(root, model_version="auto"):
     from huggingface_hub import hf_hub_download
+    hardware = detect_hardware()
+    selected, reason = select_profile(hardware, list(PROFILES), "auto" if model_version == "both" else model_version)
+    if not selected:
+        raise RuntimeError(reason)
+    versions = list(PROFILES) if model_version == "both" else [selected]
+    print(f"检测到 {hardware['name']}，显存 {hardware['totalMB'] / 1024:.1f} GB。{reason}", flush=True)
     source = root / "source"
     if not source.is_dir():
         print("下载固定版本 LatentSync 官方源码…", flush=True)
@@ -46,8 +58,9 @@ def download(root):
                 bundle.extractall(temporary)
             shutil.copytree(Path(temporary) / f"LatentSync-{SOURCE_REVISION}", source)
     checkpoint = source / "checkpoints"
-    jobs = [("ByteDance/LatentSync-1.5", MODEL_REVISION, "latentsync_unet.pt", checkpoint / "latentsync-1.5"),
-            ("ByteDance/LatentSync-1.5", MODEL_REVISION, "whisper/tiny.pt", checkpoint),
+    jobs = [(f"ByteDance/LatentSync-{v}", PROFILES[v]["revision"], "latentsync_unet.pt",
+             (source / PROFILES[v]["checkpoint"]).parent) for v in versions]
+    jobs += [("ByteDance/LatentSync-1.5", PROFILES["1.5"]["revision"], "whisper/tiny.pt", checkpoint),
             ("stabilityai/sd-vae-ft-mse", VAE_REVISION, "config.json", checkpoint / "vae"),
             ("stabilityai/sd-vae-ft-mse", VAE_REVISION, "diffusion_pytorch_model.safetensors", checkpoint / "vae")]
     def fetch(job):
@@ -65,31 +78,29 @@ def download(root):
         raise RuntimeError("当前专用环境无法使用 CUDA。请检查驱动及 PyTorch。")
     sys.path.insert(0, str(source))
     from latentsync.pipelines.lipsync_pipeline import LipsyncPipeline  # noqa: F401
-    manifest = {"engine": "LatentSync", "version": "1.5", "resolution": 256,
-                "config": "configs/unet/stage2.yaml", "checkpoint": "checkpoints/latentsync-1.5/latentsync_unet.pt",
-                "sourceRevision": SOURCE_REVISION, "modelRevision": MODEL_REVISION, "vaeRevision": VAE_REVISION,
-                "python": sys.version, "torch": torch.__version__, "gpu": torch.cuda.get_device_name(),
-                "validation": None}
-    manifest_path = root / "runtime.json"
-    # 重复安装保留已有实测记录。
-    if manifest_path.is_file():
-        try:
-            previous = json.loads(manifest_path.read_text(encoding="utf-8"))
-        except (OSError, ValueError):
-            previous = {}
-        if previous.get("version") == "1.5":
-            manifest["validation"] = previous.get("validation")
-        elif not (root / "runtime-1.6.json").exists():
-            shutil.copy2(manifest_path, root / "runtime-1.6.json")
-    temporary = root / "runtime.pending.json"
-    temporary.write_text(json.dumps(manifest, ensure_ascii=False, indent=2), encoding="utf-8")
-    temporary.replace(manifest_path)
+    # 新增另一版本时保留现有默认清单，避免破坏已安装版本及其实测记录。
+    for version in versions:
+        profile = PROFILES[version]
+        previous = load_manifest(root, version)
+        manifest = {"engine": "LatentSync", "version": version, "resolution": profile["resolution"],
+                    "config": profile["config"], "checkpoint": profile["checkpoint"],
+                    "sourceRevision": SOURCE_REVISION, "modelRevision": profile["revision"], "vaeRevision": VAE_REVISION,
+                    "python": sys.version, "torch": torch.__version__, "gpu": torch.cuda.get_device_name(0),
+                    "validation": previous.get("validation")}
+        manifest_path = root / f"runtime-{version}.json"
+        temporary = manifest_path.with_suffix(".pending.json")
+        temporary.write_text(json.dumps(manifest, ensure_ascii=False, indent=2), encoding="utf-8")
+        temporary.replace(manifest_path)
+        if not (root / "runtime.json").exists():
+            shutil.copy2(manifest_path, root / "runtime.json")
     print("安装检查通过。可在视频对口型页面选择此目录：", root, flush=True)
 
 
 if __name__ == "__main__":
     parser = argparse.ArgumentParser(description=__doc__)
     parser.add_argument("--root", type=Path, required=True)
+    parser.add_argument("--model-version", choices=["auto", "1.5", "1.6", "both"], default="auto",
+                        help="默认按硬件安装；both 同时安装两套权重以支持显存不足回退")
     parser.add_argument("--reuse-installed-torch", action="store_true")
     parser.add_argument("--download-only", action="store_true", help=argparse.SUPPRESS)
     args = parser.parse_args()
@@ -97,7 +108,7 @@ if __name__ == "__main__":
     root.mkdir(parents=True, exist_ok=True)
     check_tools(root)
     if args.download_only:
-        download(root)
+        download(root, args.model_version)
     else:
         if sys.platform != "win32" or not (3, 10) <= sys.version_info[:2] <= (3, 12):
             raise SystemExit("请使用 Windows Python 3.10～3.12 运行此安装入口。")
@@ -107,4 +118,4 @@ if __name__ == "__main__":
         if not args.reuse_installed_torch:
             command([python, "-m", "pip", "install", "torch==2.6.0", "torchvision==0.21.0", "--index-url", "https://download.pytorch.org/whl/cu126"])
         command([python, "-m", "pip", "install", "-r", Path(__file__).with_name("requirements-lipsync.txt")])
-        command([python, __file__, "--root", root, "--download-only"])
+        command([python, __file__, "--root", root, "--download-only", "--model-version", args.model_version])
