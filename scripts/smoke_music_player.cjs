@@ -23,6 +23,9 @@ async function shot(name) {
   const image = await client.send('Page.captureScreenshot', { format: 'png' });
   fs.writeFileSync(path.join(run, name), Buffer.from(image.data, 'base64'));
 }
+async function fill(selector, value) {
+  await client.evaluate(`(()=>{const e=document.querySelector(${JSON.stringify(selector)});const p=e.tagName==='TEXTAREA'?HTMLTextAreaElement.prototype:HTMLInputElement.prototype;Object.getOwnPropertyDescriptor(p,'value').set.call(e,${JSON.stringify(value)});e.dispatchEvent(new Event('input',{bubbles:true}));})()`);
+}
 const audio = expression => client.evaluate(`(()=>{const a=document.querySelector('.workspace-generation-footer audio');return ${expression};})()`);
 (async () => {
   fs.mkdirSync(path.join(data, 'outputs/music'), { recursive: true });
@@ -52,9 +55,18 @@ const audio = expression => client.evaluate(`(()=>{const a=document.querySelecto
     return state.status === 'ready';
   }, 240000);
   backend = await client.evaluate('(async()=> (await window.voxcpmDesktop.getBootstrapState()).backendBaseUrl)()');
-  await client.evaluate("localStorage.removeItem('voxcpm-music-studio-v1')");
+  const assistant = await (await fetch(backend + '/api/assistant/settings', { method: 'PUT', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ autoOptimizeMusic: true, providers: [{ id: 'sole-assistant', name: '默认创作助手', baseUrl: 'http://127.0.0.1:1/v1', model: 'fixture', enabled: true }] }) })).json();
+  assert.equal(assistant.defaultProviderId, 'sole-assistant');
+  await client.evaluate("localStorage.setItem('voxcpm-music-studio-v1',JSON.stringify({brief:{providerId:'obsolete-provider'},autoOptimize:false}))");
   await click('音乐创作');
   await until(() => audio('a && a.duration > 1'));
+  await check('创作页隐藏助手与后端设置，显示当前模型特色', async () => client.evaluate("!document.querySelector('.music-backend') && !document.querySelector('.music-ai-pill') && !Array.from(document.querySelectorAll('.music-options h3')).some(e=>e.textContent==='AI 助手') && document.querySelector('.music-model-description').textContent.includes('推荐主力')"));
+  for (const id of ['minimax-music3', 'yue2', 'heartmula', 'ace-xl-turbo']) {
+    await client.evaluate(`(()=>{const e=document.querySelector('.music-options select');e.value=${JSON.stringify(id)};e.dispatchEvent(new Event('change',{bubbles:true}));})()`);
+    await wait(100);
+    assert.ok(await client.evaluate("document.querySelector('.music-model-description').textContent.length>25"));
+  }
+  checks.push('切换四模型分别展示特色');
   await check('音乐页仅有一个共用播放器，隐藏保存音色且不自动播放', async () => client.evaluate("document.querySelectorAll('.workspace-generation-footer').length===1 && document.querySelectorAll('audio[controls]').length===0 && !document.querySelector('.workspace-save-voice') && document.querySelector('.workspace-generation-footer audio').paused"));
   const firstSource = await audio('a.src');
   await client.evaluate("document.querySelector('.workspace-mute-button').click();document.querySelector('.workspace-play-button').click()");
@@ -105,19 +117,32 @@ const audio = expression => client.evaluate(`(()=>{const a=document.querySelecto
   // 仅替换任务响应，使用真实已有WAV模拟任务完成，不重复调用GPU/AI。
   const completed = { ...records[0], title: '新生成作品 · 底栏验收' };
   await client.evaluate(`(()=>{const original=window.fetch;window.fetch=async (url,options)=>{
-    if(String(url).endsWith('/api/music/generate')) return new Response(JSON.stringify({taskId:'player-fixture',status:'queued'}),{status:200});
-    if(String(url).endsWith('/api/tasks/player-fixture')) return new Response(JSON.stringify({taskId:'player-fixture',status:'succeeded',result:${JSON.stringify(completed)}}),{status:200});
+    if(String(url).endsWith('/api/music/generate')) {window.__musicGenerationRequest=JSON.parse(options.body);return new Response(JSON.stringify({taskId:'player-fixture',status:'queued'}),{status:200});}
+    if(String(url).endsWith('/api/tasks/player-fixture')) {const result=${JSON.stringify(completed)};result.title=window.__musicGenerationRequest.brief.title;return new Response(JSON.stringify({taskId:'player-fixture',status:'succeeded',result}),{status:200});}
     return original(url,options);
   };})()`);
   // 保持真实模型就绪检查，只在隔离数据目录选用本机现有模型。
   fs.writeFileSync(path.join(data, 'component-selection.json'), JSON.stringify({ selected: ['ace-xl-turbo'], removed: [], defaultModel: 'ace-xl-turbo' }));
   await click('声音设计与克隆'); await click('音乐创作');
-  await client.evaluate("(()=>{const e=document.querySelector('.music-idea');Object.getOwnPropertyDescriptor(HTMLTextAreaElement.prototype,'value').set.call(e,'中文史诗音乐');e.dispatchEvent(new Event('input',{bubbles:true}));})()");
+  await fill('.music-title-input input', '用户填写的歌名');
+  await fill('.music-idea', '中文史诗音乐');
   await until(() => client.evaluate("!document.querySelector('.workspace-action-bar .primary-button').disabled"));
   await click('生成音乐');
-  await until(() => client.evaluate("document.querySelector('.workspace-now-playing strong')?.textContent==='新生成作品 · 底栏验收'"));
+  await until(() => client.evaluate("document.querySelector('.workspace-now-playing strong')?.textContent==='用户填写的歌名'"));
   await check('任务成功自动载入底栏，等待用户播放', () => audio('a.paused && a.currentTime===0'));
+  await check('旧页面助手覆盖失效，使用全局默认助手及自动优化偏好', async () => client.evaluate("window.__musicGenerationRequest.brief.providerId==='' && window.__musicGenerationRequest.autoOptimize===true && !window.__musicGenerationRequest.draft"));
+  await fill('.music-final-text', 'Cinematic piano and strings');
+  await click('歌词'); await fill('.music-final-text', '[Verse]\n星火照亮和平');
+  await until(() => client.evaluate("document.querySelector('.music-ready-label').textContent==='已适配当前模型'"));
+  await fill('.music-title-input input', '改名后的歌曲');
+  await check('修改作品名保持已适配草稿，不重新请求AI', async () => client.evaluate("document.querySelector('.music-ready-label').textContent==='已适配当前模型'"));
+  await click('生成音乐');
+  await until(() => client.evaluate("document.querySelector('.workspace-now-playing strong')?.textContent==='改名后的歌曲'"));
+  assert.ok(await client.evaluate("window.__musicGenerationRequest.brief.title==='改名后的歌曲' && window.__musicGenerationRequest.autoOptimize===false && !!window.__musicGenerationRequest.draft"));
   await shot('music-player-completed.png');
+  await click('设置');
+  await until(() => client.evaluate("document.querySelectorAll('.assistant-provider').length===1"));
+  await check('设置页单个助手自动成为默认，无重复默认选择器', async () => client.evaluate("!Array.from(document.querySelectorAll('.assistant-settings .field > span')).some(e=>e.textContent==='默认助手') && document.querySelector('.assistant-provider input[type=password]').value===''"));
   fs.writeFileSync(path.join(run, 'report.json'), JSON.stringify({ checks, note: '播放和另存API使用真实WAV；生成完成采用任务响应夹具，不调用AI/GPU；未操作原生另存对话框和资源管理器。' }, null, 2));
   console.log('PASS ' + checks.join('；'));
 })().catch(error => { console.error(error); process.exitCode = 1; }).finally(async () => {

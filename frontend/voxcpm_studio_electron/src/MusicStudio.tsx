@@ -5,30 +5,34 @@ import "./music-studio.css";
 
 type Model = { id: string; name: string; ready: boolean; installed: boolean; selected: boolean; size: number };
 type Source = { id: string; name: string; kind: string; skill: string | null; url: string };
-type Status = { models: Model[]; defaultModel: string; active: boolean; runtimeReady: boolean; settings: { comfyUrl: string }; rules: { version: string; models: Source[] } };
+type Status = { models: Model[]; defaultModel: string; active: boolean; runtimeReady: boolean; rules: { version: string; models: Source[] } };
 type Running = { id: string; kind: "prompt" | "audio"; sourceKey: string; writerKey: string };
 type Task = { taskId: string; status: string; statusText: string; progressText: string; completed: number; total: number; error: string; result?: any; cancelRequested?: boolean };
+const modelDescriptions: Record<string, string> = {
+  "ace-xl-turbo": "推荐主力。Turbo适合快速尝试不同编曲，支持中文歌曲与纯音乐，可单独控制速度、调式和拍号。",
+  "minimax-music3": "适合细致描述人声、音色与编曲层次。采用分段风格描述，支持歌曲和纯音乐，适合流行与电影配乐方向。",
+  "yue2": "先规划乐谱，再生成演唱与伴奏，适合重视旋律及歌曲结构的创作。当前接入以人声歌曲为主，生成较慢。",
+  "heartmula": "用简洁风格标签搭配歌词，支持多语言歌曲，适合探索不同风格与声线；建议先生成短段试听。",
+};
 const STORAGE = "voxcpm-music-studio-v1";
 const defaults: MusicBrief = { modelId: "ace-xl-turbo", idea: "", requirements: "", lyrics: "", caption: "", preserveLyrics: true, instrumental: false, language: "auto", duration: 120, bpm: null, keyScale: "", timeSignature: "", seed: 1247, providerId: "" };
 function stored() { try { return JSON.parse(localStorage.getItem(STORAGE) || "{}"); } catch { return {}; } }
-const sourceKey = (brief: MusicBrief) => JSON.stringify({ ...brief, seed: 0 });
+const sourceKey = (brief: MusicBrief) => JSON.stringify({ ...brief, seed: 0, title: "", providerId: "" });
 const writerKey = (brief: MusicBrief) => JSON.stringify([brief.idea, brief.requirements, brief.lyrics, brief.preserveLyrics, brief.instrumental, brief.language]);
 const seconds = (value: number) => value >= 60 ? `${Math.floor(value / 60)}分${Math.round(value % 60)}秒` : `${value.toFixed(1)}秒`;
 
-export default function MusicStudio({ backendBaseUrl, onSettings }: { backendBaseUrl: string; onSettings: () => void }) {
-  const [brief, setBrief] = useState<MusicBrief>(() => ({ ...defaults, ...stored().brief }));
+export default function MusicStudio({ backendBaseUrl }: { backendBaseUrl: string }) {
+  const [brief, setBrief] = useState<MusicBrief>(() => ({ ...defaults, ...stored().brief, providerId: "" }));
   const [packet, setPacket] = useState<PromptPacket | null>(() => stored().packet || null);
   const [preparedKey, setPreparedKey] = useState<string>(() => stored().preparedKey || "");
   const [previousWriterKey, setPreviousWriterKey] = useState<string>(() => stored().previousWriterKey || "");
-  const [autoOptimize, setAutoOptimize] = useState<boolean>(() => stored().autoOptimize ?? true);
+  const [autoOptimize, setAutoOptimize] = useState<boolean>(true);
   const [running, setRunning] = useState<Running | null>(() => stored().running || null);
   const [task, setTask] = useState<Task | null>(null), [status, setStatus] = useState<Status | null>(null);
-  const [assistant, setAssistant] = useState<AssistantConfig | null>(null);
   const [results, setResults] = useState<MusicResult[]>([]), [result, setResult] = useState<MusicResult | null>(null);
   const [busy, setBusy] = useState(false), [message, setMessage] = useState("");
   const [tab, setTab] = useState<"caption" | "lyrics">("caption");
   const [compiled, setCompiled] = useState<PromptPacket | null>(null), [compileError, setCompileError] = useState("");
-  const [comfyUrl, setComfyUrl] = useState("");
   const initial = useRef(stored());
   const sourceRef = useRef(sourceKey(brief)); sourceRef.current = sourceKey(brief);
   const locked = busy || !!running;
@@ -36,25 +40,24 @@ export default function MusicStudio({ backendBaseUrl, onSettings }: { backendBas
   const selected = status?.models.find(model => model.id === brief.modelId);
   const official = status?.rules.models.find(model => model.id === brief.modelId);
   const draft: MusicDraft = packet?.draft || { title: "", caption: "", lyrics: "", metadata: { bpm: brief.bpm, keyScale: brief.keyScale, language: brief.language, timeSignature: brief.timeSignature }, modelId: brief.modelId, instrumental: brief.instrumental, duration: brief.duration, seed: brief.seed };
-  useEffect(() => { localStorage.setItem(STORAGE, JSON.stringify({ brief, packet, preparedKey, previousWriterKey, autoOptimize, running })); }, [brief, packet, preparedKey, previousWriterKey, autoOptimize, running]);
+  useEffect(() => { localStorage.setItem(STORAGE, JSON.stringify({ brief, packet, preparedKey, previousWriterKey, running })); }, [brief, packet, preparedKey, previousWriterKey, running]);
   async function refresh(accept: () => boolean = () => true) {
     const [state, config, history] = await Promise.all([musicRequest<Status>(backendBaseUrl, "/api/music/status"), musicRequest<AssistantConfig>(backendBaseUrl, "/api/assistant/settings"), musicRequest<{ items: MusicResult[] }>(backendBaseUrl, "/api/music/results")]);
     if (!accept()) return;
-    setStatus(state); setAssistant(config); setResults(history.items); setComfyUrl(state.settings.comfyUrl);
+    setStatus(state); setAutoOptimize(config.autoOptimizeMusic); setResults(history.items);
     setResult(value => value || history.items[0] || null);
     if (!initial.current.brief) { setBrief(value => ({ ...value, modelId: state.defaultModel || value.modelId })); initial.current.brief = true; }
-    if (initial.current.autoOptimize === undefined) { setAutoOptimize(config.autoOptimizeMusic); initial.current.autoOptimize = config.autoOptimizeMusic; }
   }
   useEffect(() => { let active = true; if (backendBaseUrl) void refresh(() => active).catch(error => { if (active) setMessage(error.message); }); return () => { active = false; }; }, [backendBaseUrl]);
   function buildBrief(): MusicBrief {
-    if (current && packet?.brief) return { ...packet.brief, seed: brief.seed };
+    if (current && packet?.brief) return { ...packet.brief, seed: brief.seed, title: brief.title?.trim() || draft.title, providerId: "" };
     const reuse = packet && writerKey(brief) === previousWriterKey;
-    return { ...brief, title: reuse ? draft.title : brief.title, caption: reuse ? draft.caption : brief.caption, lyrics: reuse ? draft.lyrics : brief.lyrics };
+    return { ...brief, title: brief.title?.trim() || (reuse ? draft.title : ""), providerId: "", caption: reuse ? draft.caption : brief.caption, lyrics: reuse ? draft.lyrics : brief.lyrics };
   }
   function manualBrief(): MusicBrief {
-    return { ...buildBrief(), title: draft.title, lyrics: draft.lyrics, preserveLyrics: true, caption: draft.caption };
+    return { ...buildBrief(), title: brief.title?.trim() || draft.title, lyrics: draft.lyrics, preserveLyrics: true, caption: draft.caption };
   }
-  const draftKey = JSON.stringify([draft, brief.bpm, brief.keyScale, brief.timeSignature, brief.seed, current]);
+  const draftKey = JSON.stringify([draft, brief.title, brief.bpm, brief.keyScale, brief.timeSignature, brief.seed, current]);
   useEffect(() => {
     if (!backendBaseUrl || !packet || !current || locked) return;
     let active = true;
@@ -128,7 +131,7 @@ export default function MusicStudio({ backendBaseUrl, onSettings }: { backendBas
     if (!output) return;
     await perform(async () => {
       const target = await window.voxcpmDesktop.saveDialog({
-        defaultPath: (output.title || "音乐").replace(/[<>:"/\\|?*]/g, "_") + ".wav",
+        defaultPath: output.fileName || (output.title || "音乐").replace(/[<>:"/\\|?*]/g, "_") + ".wav",
         filters: [{ name: "WAV音频", extensions: ["wav"] }],
       });
       if (!target.canceled && target.filePath) {
@@ -143,14 +146,14 @@ export default function MusicStudio({ backendBaseUrl, onSettings }: { backendBas
   <div className="music-layout">
     <div className="music-main">
       <section className="music-card music-brief-card">
-        <div className="music-card-heading"><div><span className="music-kicker">从灵感开始</span><h2>今天，想听到怎样的音乐？</h2></div><span className="music-ai-pill">{assistant?.providers.some(p => p.enabled) ? "AI 助手已就绪" : "待配置 AI 助手"}</span></div>
+        <div className="music-card-heading"><div><span className="music-kicker">从灵感开始</span><h2>今天，想听到怎样的音乐？</h2></div></div>
         <textarea className="music-idea" aria-label="音乐需求与提示词" value={brief.idea} disabled={locked} onChange={e => setBrief({ ...brief, idea: e.target.value })} placeholder="描述主题、情绪或故事，也可以粘贴已有提示词。例如：一首中文史诗歌曲，回望人类五十万年的战争与文明，从苍凉克制走向宏大，最终落在对和平的希望。" rows={4} />
         <details className="music-details"><summary>更多要求与已有歌词 <span>可选</span></summary><label className="field"><span>创作要求</span><textarea value={brief.requirements} disabled={locked} onChange={e => setBrief({ ...brief, requirements: e.target.value })} rows={3} placeholder="如：男中音、不要说唱、铜管和弦乐逐步进入、结尾完整收束。" /></label><label className="field"><span>已有歌词</span><textarea value={brief.lyrics} disabled={locked} onChange={e => setBrief({ ...brief, lyrics: e.target.value })} rows={6} placeholder="有歌词可以直接粘贴；没有时，AI会根据需求创作。" /></label><label className="music-switch-label"><input className="music-switch" type="checkbox" role="switch" checked={brief.preserveLyrics} disabled={locked} onChange={e => setBrief({ ...brief, preserveLyrics: e.target.checked })} />保留已有歌词原文</label></details>
         <div className="music-brief-actions"><label className="music-switch-label"><input className="music-switch" type="checkbox" role="switch" checked={brief.instrumental} disabled={locked} onChange={e => setBrief({ ...brief, instrumental: e.target.checked })} />纯音乐</label><button className="primary-button" disabled={locked || !backendBaseUrl || !(brief.idea.trim() || brief.lyrics.trim() || draft.caption.trim() || draft.lyrics.trim())} onClick={() => void compose()}>{current ? "再次优化 / 创作" : packet ? "AI 适配所选模型" : "AI 创作 / 优化"}</button></div>
       </section>
       <section className="music-card music-prompt-card">
         <div className="music-card-heading"><div><span className="music-kicker">生成前，可自由修改</span><h3>最终音乐提示词</h3></div><span className={`music-ready-label ${current ? "is-ready" : ""}`}>{current ? "已适配当前模型" : packet ? "需求或模型已改变，等待适配" : "等待创作或手动填写"}</span></div>
-        <label className="music-title-input"><span>作品名称</span><input value={draft.title} disabled={locked} placeholder="未命名音乐" onChange={e => editDraft({ title: e.target.value })} /></label>
+        <label className="music-title-input"><span>作品名称</span><input value={brief.title ?? draft.title} maxLength={150} disabled={locked} placeholder="填写名称，生成后以此命名音频" onChange={e => setBrief({ ...brief, title: e.target.value })} /></label>
         <div className="music-tabs" role="tablist" aria-label="提示词与歌词"><button role="tab" aria-selected={tab === "caption"} onClick={() => setTab("caption")}>{brief.modelId === "heartmula" ? "风格标签" : "风格与编曲"}</button><button role="tab" aria-selected={tab === "lyrics"} onClick={() => setTab("lyrics")}>歌词</button></div>
         <textarea className="music-final-text" aria-label={tab === "lyrics" ? "最终歌词" : "最终风格提示词"} value={tab === "lyrics" ? draft.lyrics : draft.caption} disabled={locked || (tab === "lyrics" && brief.instrumental)} onChange={e => editDraft(tab === "lyrics" ? { lyrics: e.target.value } : { caption: e.target.value })} rows={12} placeholder={tab === "lyrics" ? "AI创作的歌词会显示在这里。" : brief.modelId === "heartmula" ? "小写英语标签，逗号分隔，如 cinematic,orchestral,male vocal,solemn" : "AI会按所选模型的官方规则生成，也可直接填写最终提示词。"} />
         {compileError && current && <p className="music-message">{compileError}</p>}
@@ -161,8 +164,7 @@ export default function MusicStudio({ backendBaseUrl, onSettings }: { backendBas
       {results.length > 0 && <section className="music-card music-history"><div className="music-card-heading"><h3>最近作品</h3><span className="music-help">点击载入底部播放器</span></div>{results.slice(0, 8).map(item => <button className={item.outputPath === result?.outputPath ? "is-current" : ""} key={item.outputPath} aria-pressed={item.outputPath === result?.outputPath} onClick={() => setResult(item)}><span className="music-history-icon">♪</span><strong>{item.title}</strong><span>{status?.models.find(m => m.id === item.modelId)?.name || item.modelId}</span><small>{seconds(item.duration)}</small></button>)}</section>}
     </div>
     <aside className="music-options">
-      <section className="music-card"><div className="music-card-heading"><h3>音乐模型</h3><span className="music-kicker">自由选择</span></div><label className="field"><span>当前模型</span><select value={brief.modelId} disabled={locked} onChange={e => setBrief({ ...brief, modelId: e.target.value })}>{(status?.models || [{ id: "ace-xl-turbo", name: "ACE-Step 1.5 XL Turbo" }]).map(model => <option value={model.id} key={model.id}>{model.name}</option>)}</select></label>{selected && <div className="music-model-facts"><span>{(selected.size / 1024 ** 3).toFixed(2)} GiB</span><span>{selected.ready ? "已就绪" : selected.installed ? "文件已安装" : "待补齐"}</span></div>}{selected && !selected.ready && <button className="ghost-button music-full-button" disabled={locked} onClick={() => void enableModel()}>启用并补齐此模型</button>}<p className="music-help">更换模型后，AI会重新适配提示词；相同需求下保留已写好的歌词。</p></section>
-      <section className="music-card"><div className="music-card-heading"><h3>AI 助手</h3><button className="music-text-button" onClick={onSettings}>配置 ↗</button></div><label className="field"><span>用于创作与优化</span><select value={brief.providerId} disabled={locked} onChange={e => setBrief({ ...brief, providerId: e.target.value })}><option value="">使用默认助手</option>{assistant?.providers.filter(p => p.enabled).map(p => <option key={p.id} value={p.id}>{p.name} · {p.model}</option>)}</select></label><label className="music-switch-label"><input type="checkbox" role="switch" className="music-switch" checked={autoOptimize} disabled={locked} onChange={e => setAutoOptimize(e.target.checked)} />生成前自动创作与适配</label><p className="music-help">已适配或手动编辑的当前草稿会直接使用。助手不可用时会提示，不会悄悄改用原始需求生成。</p></section>
+      <section className="music-card"><div className="music-card-heading"><h3>音乐模型</h3><span className="music-kicker">自由选择</span></div><label className="field"><span>当前模型</span><select value={brief.modelId} disabled={locked} onChange={e => setBrief({ ...brief, modelId: e.target.value })}>{(status?.models || [{ id: "ace-xl-turbo", name: "ACE-Step 1.5 XL Turbo" }]).map(model => <option value={model.id} key={model.id}>{model.name}</option>)}</select></label>{selected && <div className="music-model-facts"><span>{(selected.size / 1024 ** 3).toFixed(2)} GiB</span><span>{selected.ready ? "已就绪" : selected.installed ? "文件已安装" : "待补齐"}</span></div>}{selected && !selected.ready && <button className="ghost-button music-full-button" disabled={locked} onClick={() => void enableModel()}>启用并补齐此模型</button>}<p className="music-model-description">{modelDescriptions[brief.modelId]}</p><p className="music-help">更换模型后会重新适配提示词，保留相同需求下的歌词。</p></section>
       <section className="music-card"><div className="music-card-heading"><h3>歌曲参数</h3></div><div className="music-parameter-grid">
         <label className="field"><span>期望时长 / 秒</span><input type="number" min={10} max={300} value={brief.duration} disabled={locked} onChange={e => setBrief({ ...brief, duration: Number(e.target.value) })} /></label>
         <label className="field"><span>歌词语言</span><select value={brief.language} disabled={locked} onChange={e => setBrief({ ...brief, language: e.target.value })}><option value="auto">跟随需求</option><option value="zh">中文 / 普通话</option><option value="yue">粤语</option><option value="en">英语</option><option value="ja">日语</option><option value="ko">韩语</option></select></label>
@@ -171,7 +173,6 @@ export default function MusicStudio({ backendBaseUrl, onSettings }: { backendBas
         <label className="field"><span>调式</span><input placeholder="如 D minor，可留空" value={brief.keyScale} disabled={locked} onChange={e => setBrief({ ...brief, keyScale: e.target.value })} /></label>
         <label className="field"><span>随机种子</span><input type="number" min={0} max={2147483647} value={brief.seed} disabled={locked} onChange={e => setBrief({ ...brief, seed: Number(e.target.value) })} /></label>
       </div><p className="music-help">模型可能提前结束歌曲。节奏、音色和结构是生成方向，可通过试听继续调整。</p>{brief.modelId === "yue2" && brief.instrumental && <p className="music-help">当前YuE2运行接口尚未接入官方纯音乐转谱。可先创作提示词，或使用ACE/MiniMax生成纯音乐。</p>}</section>
-      <details className="music-card music-backend"><summary>音乐后端设置</summary><p className="music-help">留空时优先复用本机兼容的ComfyUI，否则启动独立音乐后端。也可指定已部署的ComfyUI地址。</p><label className="field"><span>ComfyUI 地址</span><input value={comfyUrl} disabled={locked} placeholder="自动，或 http://127.0.0.1:8188" onChange={e => setComfyUrl(e.target.value)} /></label><button className="ghost-button" disabled={locked} onClick={() => void perform(async () => { await musicRequest(backendBaseUrl, "/api/music/settings", { method: "PUT", body: JSON.stringify({ comfyUrl }) }); setMessage("音乐后端设置已保存。"); })}>保存后端设置</button></details>
     </aside>
   </div>
   <WorkspacePlayer variant="music"

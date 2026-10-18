@@ -5,6 +5,7 @@ import hashlib
 import json
 import os
 from pathlib import Path
+import re
 import shutil
 import socket
 import subprocess
@@ -39,6 +40,25 @@ def atomic_json(file, value):
 def fingerprint(brief):
     value = brief.model_dump(by_alias=True); value.pop('seed', None)
     return hashlib.sha256(json.dumps(value, ensure_ascii=False, sort_keys=True).encode('utf8')).hexdigest()
+
+
+def music_filename(title):
+    name = re.sub(r'[<>:"/\\|?*\x00-\x1f]', '_', title).strip(' .')
+    if name.lower().endswith('.wav'):
+        name = name[:-4].rstrip(' .')
+    name = name[:100].rstrip(' .') or '未命名音乐'
+    if re.fullmatch(r'(?i)(CON|PRN|AUX|NUL|COM[1-9¹²³]|LPT[1-9¹²³])', name.split('.')[0]):
+        name = '_' + name
+    return name + '.wav'
+
+
+def release_music_memory():
+    import gc
+    import sys
+    gc.collect()
+    torch = sys.modules.get('torch')
+    if torch is not None and torch.cuda.is_available():
+        torch.cuda.empty_cache()
 
 
 class MusicService:
@@ -159,16 +179,9 @@ class MusicService:
                 raise MusicCancelled()
             request_file = run / 'request.json'; atomic_json(request_file, packet)
             self.studio.reset_runtime()
-            import gc
-            gc.collect()
-            try:
-                import torch
-                if torch.cuda.is_available():
-                    torch.cuda.empty_cache()
-            except ImportError:
-                pass
+            release_music_memory()
             generation_start = time.monotonic()
-            output, report = run / 'audio.wav', {}
+            output, report = run / music_filename(packet['draft']['title']), {}
             if brief.model_id in {'ace-xl-turbo', 'minimax-music3'}:
                 report = self._comfy(packet, output, progress, cancelled, run)
             else:
@@ -184,7 +197,7 @@ class MusicService:
             if not info.frames or info.duration < .1:
                 raise RuntimeError('音乐模型没有生成有效音频')
             result = {'title': packet['draft']['title'], 'modelId': brief.model_id, 'duration': round(info.duration, 2),
-                'outputPath': str(output), 'previewUrl': '/media?path=' + quote(str(output)), 'requestPath': str(request_file),
+                'fileName': output.name, 'outputPath': str(output), 'previewUrl': '/media?path=' + quote(str(output)), 'requestPath': str(request_file),
                 'packet': packet, 'report': {**report, 'elapsedSeconds': round(time.monotonic() - generation_start, 2),
                     'assistantSeconds': packet.get('assistantSeconds', 0), 'sampleRate': info.samplerate}, 'status': '音乐已生成'}
             atomic_json(run / 'result.json', result)
@@ -197,8 +210,11 @@ class MusicService:
                 raise MusicGenerationError(str(error), packet) from error
             raise
         finally:
-            with self.lock:
-                self.active = False
+            try:
+                release_music_memory()
+            finally:
+                with self.lock:
+                    self.active = False
 
     @staticmethod
     def _stop(child):
@@ -266,13 +282,8 @@ class MusicService:
     def _comfy(self, packet, output, progress, cancelled, run):
         configured = self.settings().get('comfyUrl', '')
         base, child = configured, None
-        if not base:
-            try:
-                node = 'TextEncodeAceStepAudio1.5' if packet['modelId'] == 'ace-xl-turbo' else 'MiniMaxMusic3TextEncode'
-                if node in self._http('http://127.0.0.1:8188', '/object_info/' + node, timeout=3):
-                    base = 'http://127.0.0.1:8188'
-            except (OSError, ValueError):
-                pass
+        # 默认后端仅为当前任务启动，退出即可释放模型及进程内存。
+        # 保留旧版显式指定共享服务的兼容入口，不接管或关闭外部进程。
         log = None; prompt_id = ''; completed = False
         try:
             if not base:

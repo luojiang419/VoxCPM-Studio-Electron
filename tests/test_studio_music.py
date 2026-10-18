@@ -3,6 +3,7 @@ import io
 import json
 import threading
 import time
+from pathlib import Path
 from types import SimpleNamespace
 
 import numpy as np
@@ -12,7 +13,7 @@ from fastapi.testclient import TestClient
 
 from voxcpm.studio_api import create_api_app
 from voxcpm.music_prompts import MusicBrief, compile_packet
-from voxcpm.studio_music import MusicCancelled, MusicService
+from voxcpm.studio_music import MusicCancelled, MusicService, music_filename
 
 
 @pytest.fixture
@@ -73,11 +74,72 @@ def test_manual_generation_retains_real_inputs_history_and_seekable_audio(setup,
     state = await_task(client, '/api/tasks/', response.json()['taskId'])
     assert state['status'] == 'succeeded', state
     result = state['result']; assert result['title'] == '火种' and result['report']['elapsedSeconds'] >= 0
+    assert Path(result['outputPath']).name == '火种.wav'
+    assert result['fileName'] == '火种.wav'
     assert result['packet']['inputs']['bpm'] == 92
     assert client.get('/api/music/results').json()['items'][0]['outputPath'] == result['outputPath']
     audio = client.get(result['previewUrl'], headers={'Range': 'bytes=0-63'})
     assert audio.status_code == 206 and len(audio.content) == 64
     assert not app.state.music.active
+
+
+@pytest.mark.parametrize('title,expected', [('星火·和平', '星火·和平.wav'), ('CON', '_CON.wav'),
+    ('夜曲.wav', '夜曲.wav'), ('第一章:火/水?', '第一章_火_水_.wav'), (' . ', '未命名音乐.wav')])
+def test_music_filename_is_identifiable_and_valid_on_windows(title, expected):
+    assert music_filename(title) == expected
+
+
+def test_same_named_songs_keep_distinct_files_and_user_title_wins(setup, monkeypatch):
+    client, app, _ = setup
+    monkeypatch.setattr(app.state.music, 'status', ready_status)
+    monkeypatch.setitem(sys.modules, 'torch', None)
+    def render(packet, output, *args):
+        sf.write(output, np.zeros(2400), 24000); return {}
+    monkeypatch.setattr(app.state.music, '_comfy', render)
+    body = {'brief': {'title': '用户歌曲名', 'lyrics': '中文歌词'}, 'autoOptimize': False,
+        'draft': {'title': 'AI建议名称', 'caption': 'piano', 'lyrics': '中文歌词'}}
+    results = []
+    for _ in range(2):
+        response = client.post('/api/music/generate', json=body)
+        state = await_task(client, '/api/tasks/', response.json()['taskId'])
+        assert state['status'] == 'succeeded', state
+        results.append(state['result'])
+    assert results[0]['outputPath'] != results[1]['outputPath']
+    for result in results:
+        assert result['title'] == '用户歌曲名'
+        assert Path(result['outputPath']).name == '用户歌曲名.wav' and Path(result['outputPath']).is_file()
+
+
+@pytest.mark.parametrize('outcome', ['success', 'failure', 'cancelled'])
+def test_automatic_comfy_process_is_stopped_on_every_exit(setup, monkeypatch, tmp_path, outcome):
+    _, app, _ = setup; service = app.state.music
+    monkeypatch.setattr(service, '_free_idle_comfy', lambda *args: None)
+    packet = compile_packet(MusicBrief(lyrics='中文歌词'), {'caption': 'piano', 'lyrics': '中文歌词'})
+    child = SimpleNamespace(poll=lambda: None)
+    stopped = []
+    monkeypatch.setattr('voxcpm.studio_music.subprocess.Popen', lambda *args, **kwargs: child)
+    monkeypatch.setattr(service, '_stop', stopped.append)
+    cancel = threading.Event()
+    def http(base, route, body=None, timeout=15):
+        assert not route.startswith('/object_info/'), '默认应启动自己的进程，不自动复用外部服务'
+        if route == '/queue': return {'queue_running': [], 'queue_pending': []}
+        if route == '/prompt':
+            if outcome == 'cancelled': cancel.set()
+            return {'prompt_id': 'ours'}
+        if route == '/history/ours':
+            if outcome == 'failure': return {'ours': {'status': {'status_str': 'error', 'messages': ['inference failed']}}}
+            return {'ours': {'outputs': {'save': {'audio': [{'filename': 'test.wav', 'subfolder': '', 'type': 'output'}]}}}}
+        return {}
+    monkeypatch.setattr(service, '_http', http)
+    data = io.BytesIO(); sf.write(data, np.zeros(2400), 24000, format='WAV'); raw = data.getvalue()
+    monkeypatch.setattr('urllib.request.urlopen', lambda *args, **kwargs: io.BytesIO(raw))
+    if outcome == 'success':
+        service._comfy(packet, tmp_path / '曲名.wav', lambda *_: None, cancel.is_set, tmp_path)
+        assert (tmp_path / '曲名.wav').is_file()
+    else:
+        with pytest.raises(MusicCancelled if outcome == 'cancelled' else RuntimeError):
+            service._comfy(packet, tmp_path / '曲名.wav', lambda *_: None, cancel.is_set, tmp_path)
+    assert stopped == [child]
 
 
 def test_cancel_queued_music_releases_reserved_state(setup, monkeypatch):

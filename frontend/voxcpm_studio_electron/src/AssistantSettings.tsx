@@ -23,7 +23,7 @@ export default function AssistantSettings({ backendBaseUrl }: { backendBaseUrl: 
       if (file.canceled || !file.filePaths?.[0]) return;
       setConfig(await musicRequest<AssistantConfig>(backendBaseUrl, "/api/assistant/import", { method: "POST", body: JSON.stringify({ path: file.filePaths[0] }) })); setMessage("已有助手配置已导入，密钥保留加密存储。");
     })}>导入已有配置</button></div>
-    <p className="music-help">音乐创作会自动调用选定助手，按所选音乐模型的官方规则创作歌词、编排风格描述。兼容现有 minimax 助手配置，也支持独立配置。</p>
+    <p className="music-help">配置保存后自动使用默认助手，音乐创作页无需重复选择。音乐创作会调用该助手，按所选音乐模型的官方规则创作歌词、编排风格描述。兼容现有 minimax 助手配置，也支持独立配置。</p>
     <div className="assistant-provider-list">{config.providers.map(provider => <section key={provider.id} className="assistant-provider">
       <div className="assistant-provider-head"><label className="music-switch-label"><input type="checkbox" role="switch" className="music-switch" checked={provider.enabled} disabled={busy} onChange={e => update(provider.id, { enabled: e.target.checked })} /><strong>{provider.name || "新助手"}</strong></label><button className="music-text-button" disabled={busy} onClick={() => setConfig({ ...config, providers: config.providers.filter(p => p.id !== provider.id) })}>移除配置</button></div>
       <div className="form-grid">
@@ -39,7 +39,7 @@ export default function AssistantSettings({ backendBaseUrl }: { backendBaseUrl: 
       if (e.target.value === "") return; const preset = presets[Number(e.target.value)], id = crypto.randomUUID();
       setConfig({ ...config, defaultProviderId: config.defaultProviderId || id, providers: [...config.providers, { id, name: preset[0], baseUrl: preset[1], model: preset[2], apiType: preset[3], enabled: true }] });
     }}><option value="">选择服务类型…</option>{presets.map((p, i) => <option key={p[0]} value={i}>{p[0]}</option>)}</select></label>
-    <label className="field"><span>默认助手</span><select value={config.defaultProviderId} disabled={busy} onChange={e => setConfig({ ...config, defaultProviderId: e.target.value })}><option value="">未选择</option>{config.providers.filter(p => p.enabled).map(p => <option value={p.id} key={p.id}>{p.name}</option>)}</select></label>
+    {config.providers.filter(p => p.enabled).length > 1 && <label className="field"><span>默认助手</span><select value={config.defaultProviderId} disabled={busy} onChange={e => setConfig({ ...config, defaultProviderId: e.target.value })}><option value="">未选择</option>{config.providers.filter(p => p.enabled).map(p => <option value={p.id} key={p.id}>{p.name}</option>)}</select></label>}
     <label className="music-switch-label"><input type="checkbox" role="switch" className="music-switch" checked={config.autoOptimizeMusic} disabled={busy} onChange={e => setConfig({ ...config, autoOptimizeMusic: e.target.checked })} />默认开启音乐AI优化</label>
     <button className="primary-button" disabled={busy || !backendBaseUrl} onClick={() => void perform(async () => { await save(); setMessage("AI助手设置已保存。"); })}>{busy ? "处理中…" : "保存助手设置"}</button></div>
     {message && <p className="music-message" role="status">{message}</p>}

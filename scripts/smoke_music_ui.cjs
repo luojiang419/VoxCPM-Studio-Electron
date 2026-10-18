@@ -67,7 +67,7 @@ async function fill(selector, value) {
   await client.evaluate("(()=>{const e=document.querySelector('.music-options select');e.value='minimax-music3';e.dispatchEvent(new Event('change',{bubbles:true}));})()");
   await until(()=>client.evaluate("document.querySelector('.music-ready-label').textContent.includes('等待适配')"));
   assert.equal(await client.evaluate("document.querySelector('textarea[aria-label=最终风格提示词]').value.length>0"),true);
-  await click('配置 ↗');
+  await click('设置');
   await until(()=>client.evaluate("document.querySelectorAll('.assistant-provider').length===1"));
   assert.equal(await client.evaluate("document.querySelector('.assistant-provider input[type=password]').value"),'');
   assert.ok(await client.evaluate("document.querySelector('.assistant-provider input[type=password]').placeholder.includes('已保存')"));

@@ -1111,7 +1111,7 @@ function App() {
 
         <section className={`panel-shell ${page === "workspace" ? "voice-workspace-shell" : page === "music" ? "music-workspace-shell" : page === "batch" ? "batch-workspace-shell" : page === "overview" ? "overview-shell" : page === "lipsync" ? "lipsync-shell" : ""}`}>
           {page === "lipsync" && <LipSyncStudio backendBaseUrl={backendBaseUrl} latestAudio={workspaceOutputPath} />}
-          {page === "music" && <MusicStudio backendBaseUrl={backendBaseUrl} onSettings={() => setPage("settings")} />}
+          {page === "music" && <MusicStudio backendBaseUrl={backendBaseUrl} />}
           {["production", "voices", "history"].includes(page) ? <ProductionStudio
             backendBaseUrl={backendBaseUrl}
             view={page === "voices" ? "voices" : page === "history" ? "history" : "editor"}
