@@ -57,6 +57,12 @@ body[data-theme="light"] .ls-settings audio { color-scheme: light; }
 .ls-footer-buttons button { white-space: nowrap; min-height: 35px; font-size: 12px; padding: 9px 16px; }
 .ls-message { padding: 10px 20px; display: flex; align-items: center; gap: 15px; background: var(--accent-soft); color: var(--text); border-bottom: 1px solid var(--line); max-height: 100px; overflow: auto; flex: none; font-size: 11px; line-height: 1.7; overflow-wrap: anywhere; }
 .ls-message button { border: 0; color: var(--muted); background: transparent; margin-left: auto; font-size: 18px; }
+.ls-preparation { display: flex; align-items: center; gap: 18px; padding: 12px 22px; flex: none; border-bottom: 1px solid var(--line); background: var(--panel-soft); }
+.ls-preparation > div { flex: 1; min-width: 0; }
+.ls-preparation strong { font-size: 12px; }
+.ls-preparation p { font-size: 10px; color: var(--muted); line-height: 1.6; margin: 5px 0; overflow-wrap: anywhere; max-height: 65px; overflow: auto; }
+.ls-preparation progress { width: 100%; height: 4px; accent-color: var(--accent); }
+.ls-preparation button { white-space: nowrap; font-size: 11px; padding: 8px 12px; }
 .ls-error { color: #d28d7f; }
 body[data-theme="light"] .ls-error { color: #a13e30; }
 .ls-studio button:disabled { opacity: .45; cursor: not-allowed; }

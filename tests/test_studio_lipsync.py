@@ -38,6 +38,7 @@ def service(tmp_path, monkeypatch):
                              settings_payload=lambda: {"output_dir": str(tmp_path / "outputs")})
     service = LipSyncService(tmp_path, studio)
     monkeypatch.setattr(LipSyncService, "hardware", lambda self: {"cuda": True, "name": "fixture 16GB", "totalMB": 16384, "freeMB": 14336})
+    monkeypatch.setattr(LipSyncService, "preparation_ready", lambda *args: True)
     return service
 
 
@@ -113,7 +114,7 @@ def cpu_runner(service, monkeypatch):
 def test_real_ffmpeg_duration_portrait_audio_and_persistence(service, tmp_path, monkeypatch, short_video):
     source, audio = media(tmp_path, portrait=True)
     cpu_runner(service, monkeypatch)
-    payload = SimpleNamespace(mode="video", source_path=str(source), audio_path=str(audio), short_video=short_video, steps=20, guidance=1.5, seed=1247)
+    payload = SimpleNamespace(mode="video", model_version="1.5", source_path=str(source), audio_path=str(audio), short_video=short_video, steps=20, guidance=1.5, seed=1247)
     result = service.generate(payload, lambda *args: None, lambda: False)
     assert not service.active and service.results() == [result]
     metadata = service.probe(Path(result["outputPath"]))
@@ -128,7 +129,7 @@ def test_real_ffmpeg_duration_portrait_audio_and_persistence(service, tmp_path, 
 def test_copy_failure_or_late_cancel_cannot_publish_partial_video(service, tmp_path, monkeypatch, cancel):
     source, audio = media(tmp_path)
     cpu_runner(service, monkeypatch)
-    payload = SimpleNamespace(mode="video", source_path=str(source), audio_path=str(audio), short_video="loop", steps=20, guidance=1.5, seed=1247)
+    payload = SimpleNamespace(mode="video", model_version="1.5", source_path=str(source), audio_path=str(audio), short_video="loop", steps=20, guidance=1.5, seed=1247)
     cancelled = False
     original = shutil.copy2
     def copy(source, target, *args, **kwargs):
@@ -231,7 +232,7 @@ def test_low_free_memory_rejected_before_starting_media_processing(service, tmp_
     source, audio = media(tmp_path)
     monkeypatch.setattr(service, "hardware", lambda: {"cuda": True, "totalMB": 16384, "freeMB": 3000})
     monkeypatch.setattr(service, "_process", lambda *args: pytest.fail("低空闲显存不应启动子进程"))
-    payload = SimpleNamespace(mode="video", source_path=str(source), audio_path=str(audio), short_video="loop", steps=20, guidance=1.5, seed=1247)
+    payload = SimpleNamespace(mode="video", model_version="1.5", source_path=str(source), audio_path=str(audio), short_video="loop", steps=20, guidance=1.5, seed=1247)
     with pytest.raises(ValueError, match="空闲显存"):
         service.generate(payload, lambda *args: None, lambda: False)
     assert not service.active

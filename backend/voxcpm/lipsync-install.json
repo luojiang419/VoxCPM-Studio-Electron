@@ -1,0 +1,115 @@
+{
+  "protocol": 1,
+  "revision": "lipsync/20261018-v1",
+  "sourceRevision": "a229c3948406bc2cf6eaf4873e662e70c6a04746",
+  "dependencies": {
+    "name": "video-dependencies-cp312-win_amd64.zip",
+    "size": 310383471,
+    "sha256": "2a4e43d57cdaf478b2c1c0e13f44a48683bf72d37ead25bbe43be1d9384a100d",
+    "urls": [
+      "https://modelscope.cn/api/v1/models/jiangjiang419/voxcpm-studio-updates/repo?Revision=master&FilePath=lipsync%2F20261018-v1%2Fvideo-dependencies-cp312-win_amd64.zip"
+    ]
+  },
+  "source": {
+    "name": "latentsync-source.zip",
+    "size": 8562500,
+    "sha256": "3a1eddcd604eebc4d3b104f3f649101dbe58bb2e1c52e80cf0845c335aebcb69",
+    "urls": [
+      "https://modelscope.cn/api/v1/models/jiangjiang419/voxcpm-studio-updates/repo?Revision=master&FilePath=lipsync%2F20261018-v1%2Flatentsync-source.zip"
+    ]
+  },
+  "torchvision": {
+    "cu126": {
+      "name": "torchvision-0.21.0+cu126-cp312-cp312-win_amd64.whl",
+      "size": 6148507,
+      "sha256": "600c18579cd6eae8f6bbfcc43a088bc512bfde1fa4de0587a4db1d44eaf411f9",
+      "urls": [
+        "https://modelscope.cn/api/v1/models/jiangjiang419/voxcpm-studio-updates/repo?Revision=master&FilePath=lipsync%2F20261018-v1%2Ftorchvision-0.21.0%2Bcu126-cp312-cp312-win_amd64.whl"
+      ]
+    },
+    "cu128": {
+      "name": "torchvision-0.22.1+cu128-cp312-cp312-win_amd64.whl",
+      "size": 7638377,
+      "sha256": "650561ba326d21021243f5e064133dc62dc64d52f79623db5cd76637a9665f96",
+      "urls": [
+        "https://modelscope.cn/api/v1/models/jiangjiang419/voxcpm-studio-updates/repo?Revision=master&FilePath=lipsync%2F20261018-v1%2Ftorchvision-0.22.1%2Bcu128-cp312-cp312-win_amd64.whl"
+      ]
+    }
+  },
+  "common": [
+    {
+      "name": "ffprobe.exe",
+      "size": 101251072,
+      "sha256": "0fde260f5abd35c9cafd96f594cc76365a780c1b73a90e35b6a3409ea1db1bf0",
+      "urls": [
+        "https://modelscope.cn/api/v1/models/jiangjiang419/voxcpm-studio-updates/repo?Revision=master&FilePath=lipsync%2F20261018-v1%2Fffprobe.exe"
+      ],
+      "path": "tools/ffprobe.exe"
+    },
+    {
+      "name": "det_10g.onnx",
+      "size": 16923827,
+      "sha256": "5838f7fe053675b1c7a08b633df49e7af5495cee0493c7dcf6697200b85b5b91",
+      "urls": [
+        "https://modelscope.cn/api/v1/models/jiangjiang419/voxcpm-studio-updates/repo?Revision=master&FilePath=lipsync%2F20261018-v1%2Fdet_10g.onnx"
+      ],
+      "path": "source/checkpoints/auxiliary/models/buffalo_l/det_10g.onnx"
+    },
+    {
+      "name": "2d106det.onnx",
+      "size": 5030888,
+      "sha256": "f001b856447c413801ef5c42091ed0cd516fcd21f2d6b79635b1e733a7109dbf",
+      "urls": [
+        "https://modelscope.cn/api/v1/models/jiangjiang419/voxcpm-studio-updates/repo?Revision=master&FilePath=lipsync%2F20261018-v1%2F2d106det.onnx"
+      ],
+      "path": "source/checkpoints/auxiliary/models/buffalo_l/2d106det.onnx"
+    },
+    {
+      "name": "vae-config.json",
+      "path": "source/checkpoints/vae/config.json",
+      "size": 547,
+      "sha256": "92d3dfb746fca211a2c9e019e285f8597412211728dce3c5bcf4eda0f2d62e7e",
+      "urls": [
+        "https://modelscope.cn/api/v1/models/stabilityai/sd-vae-ft-mse/repo?Revision=master&FilePath=config.json"
+      ]
+    },
+    {
+      "name": "vae-diffusion_pytorch_model.safetensors",
+      "path": "source/checkpoints/vae/diffusion_pytorch_model.safetensors",
+      "size": 334643276,
+      "sha256": "a1d993488569e928462932c8c38a0760b874d166399b14414135bd9c42df5815",
+      "urls": [
+        "https://modelscope.cn/api/v1/models/stabilityai/sd-vae-ft-mse/repo?Revision=master&FilePath=diffusion_pytorch_model.safetensors"
+      ]
+    },
+    {
+      "name": "tiny.pt",
+      "path": "source/checkpoints/whisper/tiny.pt",
+      "size": 75572083,
+      "sha256": "65147644a518d12f04e32d6f3b26facc3f8dd46e5390956a9424a650c0ce22b9",
+      "urls": [
+        "https://modelscope.cn/api/v1/models/bytedance-community/LatentSync-1.5/repo?Revision=master&FilePath=whisper%2Ftiny.pt"
+      ]
+    }
+  ],
+  "models": {
+    "1.5": {
+      "name": "latentsync-1.5.pt",
+      "path": "source/checkpoints/latentsync-1.5/latentsync_unet.pt",
+      "size": 5072348184,
+      "sha256": "6440b49a7ccceff56cdc001f5f17605216337f5bbd66fa360139768926e23f51",
+      "urls": [
+        "https://modelscope.cn/api/v1/models/bytedance-community/LatentSync-1.5/repo?Revision=master&FilePath=latentsync_unet.pt"
+      ]
+    },
+    "1.6": {
+      "name": "latentsync-1.6.pt",
+      "path": "source/checkpoints/latentsync_unet.pt",
+      "size": 5072222488,
+      "sha256": "0a478e89eb660f82da4c35dbdde8a5adfb27f99d1b4e50edd03729e1e98316d3",
+      "urls": [
+        "https://modelscope.cn/api/v1/models/bytedance-community/LatentSync-1.6/repo?Revision=master&FilePath=latentsync_unet.pt"
+      ]
+    }
+  }
+}

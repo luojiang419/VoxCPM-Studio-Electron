@@ -9,6 +9,7 @@ from pathlib import Path
 import sys
 import time
 
+sys.path.insert(0, str(Path(__file__).resolve().parent))
 from lipsync_profiles import PROFILES, load_manifest
 
 EVENT_PREFIX = "__VOXCPM_LIPSYNC__"

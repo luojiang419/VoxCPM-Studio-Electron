@@ -1,11 +1,12 @@
-import { useEffect, useState } from "react";
+import { useEffect, useRef, useState } from "react";
 import type { StudioHistory } from "./production-types";
 import "./lipsync-studio.css";
 
 type Result = { outputPath: string; previewUrl: string; mode: string; duration: number; logPath: string; report: { engine: string; elapsedSeconds: number; peakReservedMB: number; fallbackReason?: string } };
 type Task = { taskId: string; status: string; statusText: string; error: string; completed: number; cancelRequested?: boolean; result?: Result };
+type PrepareTask = Omit<Task, "result"> & { result?: { status?: string; version?: string; cancelled?: boolean } };
 type ModelVersion = "auto" | "1.5" | "1.6";
-type Status = { ready: boolean; root: string; missing: string[]; active: boolean; engine: string; selectedVersion: string; selectionReason: string; hardware: { name: string; totalMB: number; freeMB: number } };
+type Status = { ready: boolean; root: string; missing: string[]; active: boolean; engine: string; selectedVersion: string; preferredVersion: string; needsPreparation: boolean; preparationReason: string; preparing: boolean; preparationTaskId: string; selectionReason: string; hardware: { name: string; totalMB: number; freeMB: number } };
 type Draft = { mode: "video" | "photo"; modelVersion: ModelVersion; video: string; photo: string; audio: string; steps: number; guidance: number; seed: number; shortVideo: "loop" | "hold" };
 const DRAFT_KEY = "voxcpm-lipsync-draft", TASK_KEY = "voxcpm-lipsync-task";
 const defaults: Draft = { mode: "video", modelVersion: "auto", video: "", photo: "", audio: "", steps: 20, guidance: 1.5, seed: 1247, shortVideo: "loop" };
@@ -31,8 +32,13 @@ export default function LipSyncStudio({ backendBaseUrl, latestAudio }: { backend
   const [busy, setBusy] = useState("");
   const [error, setError] = useState("");
   const [notice, setNotice] = useState("");
+  const [prepareId, setPrepareId] = useState("");
+  const [prepareTask, setPrepareTask] = useState<PrepareTask | null>(null);
+  const attempted = useRef(new Set<string>());
+  const preparing = !!prepareId || !!status?.preparing;
+  const modelReady = !!status?.ready && !status.needsPreparation;
   const running = !!taskId;
-  const locked = !!busy || running;
+  const locked = !!busy || running || preparing;
   const source = draft[draft.mode];
   const media = (path: string) => path ? `${backendBaseUrl}/media?path=${encodeURIComponent(path)}` : "";
   const update = (patch: Partial<Draft>) => setDraft(current => ({ ...current, ...patch }));
@@ -55,6 +61,52 @@ export default function LipSyncStudio({ backendBaseUrl, latestAudio }: { backend
     if (backendBaseUrl) void refresh(() => active).catch(exc => { if (active) setError(String(exc.message || exc)); });
     return () => { active = false; };
   }, [backendBaseUrl, draft.modelVersion]);
+  async function startPreparation() {
+    const next = await request<PrepareTask>(backendBaseUrl, "/api/lipsync/prepare", { method: "POST", body: JSON.stringify({ modelVersion: draft.modelVersion }) });
+    setPrepareTask(next); setPrepareId(next.taskId);
+  }
+  useEffect(() => {
+    if (!backendBaseUrl || !status?.needsPreparation || !status.preferredVersion || running) return;
+    const key = `${backendBaseUrl}|${status.root}|${draft.modelVersion}`;
+    if (attempted.current.has(key)) return;
+    attempted.current.add(key);
+    let active = true;
+    void (async () => {
+      if (status.preparationTaskId) {
+        const previous = await request<PrepareTask>(backendBaseUrl, `/api/tasks/${status.preparationTaskId}`);
+        if (!active) return;
+        if (["queued", "running"].includes(previous.status)) { setPrepareTask(previous); setPrepareId(previous.taskId); return; }
+        if (["failed", "cancelled"].includes(previous.status)) { setPrepareTask(previous); return; }
+      }
+      if (active) await startPreparation();
+    })().catch(exc => { if (active) setError(String(exc.message || exc)); });
+    return () => { active = false; };
+  }, [backendBaseUrl, draft.modelVersion, status?.root, status?.needsPreparation, running]);
+  useEffect(() => {
+    if (!prepareId || !backendBaseUrl) return;
+    let active = true, timer: ReturnType<typeof setTimeout>;
+    async function poll() {
+      try {
+        const next = await request<PrepareTask>(backendBaseUrl, `/api/tasks/${prepareId}`);
+        if (!active) return;
+        setPrepareTask(next);
+        if (["succeeded", "failed", "cancelled"].includes(next.status)) {
+          if (next.status === "succeeded") setNotice(next.result?.status || "视频组件已就绪。");
+          await refresh(() => active);
+          if (active) setPrepareId("");
+          return;
+        }
+      } catch (exc) {
+        if (!active) return;
+        const failure = exc as Error & { status?: number };
+        if (failure.status === 404) { setPrepareId(""); setError("服务已重启，重新进入页面可继续补齐。"); return; }
+        setError("正在重连补齐进度：" + failure.message);
+      }
+      if (active) timer = setTimeout(() => void poll(), 1000);
+    }
+    void poll();
+    return () => { active = false; clearTimeout(timer); };
+  }, [backendBaseUrl, prepareId]);
   useEffect(() => {
     if (!taskId || !backendBaseUrl) return;
     let active = true, timer: ReturnType<typeof setTimeout>;
@@ -113,7 +165,8 @@ export default function LipSyncStudio({ backendBaseUrl, latestAudio }: { backend
   }
 
   return <div className="ls-studio">
-    <div className="ls-toolbar"><div className="ls-tabs" role="group" aria-label="素材模式">{(["video", "photo"] as const).map(mode => <button key={mode} className={draft.mode === mode ? "active" : ""} onClick={() => update({ mode })} disabled={locked}>{mode === "video" ? "视频对口型" : "照片说话"}</button>)}</div><span className={`ls-engine ${status?.ready ? "ready" : ""}`}><i />{status?.ready ? `${status.engine} · 低显存` : "视频模型待就绪"}</span></div>
+    <div className="ls-toolbar"><div className="ls-tabs" role="group" aria-label="素材模式">{(["video", "photo"] as const).map(mode => <button key={mode} className={draft.mode === mode ? "active" : ""} onClick={() => update({ mode })} disabled={locked}>{mode === "video" ? "视频对口型" : "照片说话"}</button>)}</div><span className={`ls-engine ${modelReady ? "ready" : ""}`}><i />{modelReady ? `${status?.engine} · 低显存` : "视频模型待就绪"}</span></div>
+    {(preparing || status?.needsPreparation) && <div className="ls-preparation" role="status"><div><strong>{preparing ? `正在准备 LatentSync ${status?.preferredVersion || ""}` : prepareTask?.status === "failed" ? "视频组件补齐未完成" : prepareTask?.status === "cancelled" ? "视频组件补齐已暂停" : "正在检查视频组件"}</strong><p>{prepareTask?.error || prepareTask?.statusText || "已按显卡配置选择模型，首次使用将下载对应权重和运行组件。"}</p><progress max={100} value={prepareTask?.completed || 0} /></div>{preparing ? <button className="ghost-button" disabled={!!prepareTask?.cancelRequested || !!busy} onClick={() => void action("暂停补齐", async () => { const id = prepareId || status?.preparationTaskId; if (id) setPrepareTask(await request<PrepareTask>(backendBaseUrl, `/api/tasks/${id}/cancel`, { method: "POST" })); })}>{prepareTask?.cancelRequested ? "正在暂停…" : "暂停补齐"}</button> : <button className="primary-button" disabled={!!busy || running} onClick={() => void action("继续补齐", startPreparation)}>{prepareTask?.status === "failed" ? "重试补齐" : "继续补齐"}</button>}</div>}
     {error && <div className="ls-message ls-error" role="alert">{error}<button aria-label="关闭提示" onClick={() => setError("")}>×</button></div>}
     {notice && <div className="ls-message" role="status">{notice}<button aria-label="关闭提示" onClick={() => setNotice("")}>×</button></div>}
     <div className="ls-body"><section className="ls-preview-column"><div className="ls-section-title"><h2>人物素材</h2><span>{draft.mode === "video" ? "保留原画面与人物动作" : "固定姿态 · 音频驱动嘴部"}</span></div>
@@ -134,6 +187,6 @@ export default function LipSyncStudio({ backendBaseUrl, latestAudio }: { backend
       <details className="ls-advanced"><summary>高级参数与模型</summary><label className="ls-label" htmlFor="ls-guidance">口型引导强度</label><input id="ls-guidance" type="number" min={1} max={3} step={0.1} disabled={locked} value={draft.guidance} onChange={event => update({ guidance: Number(event.target.value) })} /><p className="ls-hint">默认 1.5；提高可能增强口型，也可能增加抖动。</p><label className="ls-label" htmlFor="ls-seed">随机种子</label><input id="ls-seed" type="number" min={0} max={2147483647} disabled={locked} value={draft.seed} onChange={event => update({ seed: Number(event.target.value) })} /><p className="ls-model-path" title={status?.root}>{status?.root || "等待服务连接"}</p><button className="ghost-button" disabled={locked} onClick={() => void configure()}>选择已安装模型目录</button></details>
       <p className="ls-hint ls-bottom-hint">支持 0.32～120 秒配音，输出 MP4。优先使用单人连续镜头；照片模式保留原有姿态。生成时将自动释放语音模型占用的显存。</p>
     </aside></div>
-    <footer className="ls-footer"><div className="ls-progress"><span>{running ? task?.statusText || "读取任务状态…" : status?.ready ? "本地模型已就绪" : "请先配置视频模型"}</span><progress max={100} value={running ? task?.completed || 0 : task?.status === "succeeded" ? 100 : 0} /></div><div className="ls-footer-buttons">{running ? <button className="ghost-button" disabled={!!busy || task?.cancelRequested} onClick={() => void action("取消任务", async () => { const next = await request<Task>(backendBaseUrl, `/api/tasks/${taskId}/cancel`, { method: "POST" }); setTask(next); })}>{task?.cancelRequested ? "正在停止…" : "取消任务"}</button> : <button className="primary-button" disabled={locked || !backendBaseUrl || !status?.ready || !source || !draft.audio} onClick={() => void generate()}>{busy || "生成说话视频"}</button>}<button className="ghost-button" disabled={!!busy || !result} onClick={() => void action("保存视频", async () => { if (!result) return; const selected = await window.voxcpmDesktop.saveDialog({ defaultPath: result.outputPath, filters: [{ name: "MP4 视频", extensions: ["mp4"] }] }); if (!selected.canceled && selected.filePath) { await request(backendBaseUrl, "/api/files/save-as", { method: "POST", body: JSON.stringify({ sourcePath: result.outputPath, targetPath: selected.filePath }) }); setNotice(`已保存到 ${selected.filePath}`); } })}>另存为 MP4</button></div></footer>
+    <footer className="ls-footer"><div className="ls-progress"><span>{running ? task?.statusText || "读取任务状态…" : preparing ? prepareTask?.statusText || "正在准备视频组件…" : modelReady ? "本地模型已就绪" : "首次使用将自动准备视频组件"}</span><progress max={100} value={running ? task?.completed || 0 : preparing ? prepareTask?.completed || 0 : task?.status === "succeeded" ? 100 : 0} /></div><div className="ls-footer-buttons">{running ? <button className="ghost-button" disabled={!!busy || task?.cancelRequested} onClick={() => void action("取消任务", async () => { const next = await request<Task>(backendBaseUrl, `/api/tasks/${taskId}/cancel`, { method: "POST" }); setTask(next); })}>{task?.cancelRequested ? "正在停止…" : "取消任务"}</button> : <button className="primary-button" disabled={locked || !backendBaseUrl || !modelReady || !source || !draft.audio} onClick={() => void generate()}>{busy || "生成说话视频"}</button>}<button className="ghost-button" disabled={!!busy || !result} onClick={() => void action("保存视频", async () => { if (!result) return; const selected = await window.voxcpmDesktop.saveDialog({ defaultPath: result.outputPath, filters: [{ name: "MP4 视频", extensions: ["mp4"] }] }); if (!selected.canceled && selected.filePath) { await request(backendBaseUrl, "/api/files/save-as", { method: "POST", body: JSON.stringify({ sourcePath: result.outputPath, targetPath: selected.filePath }) }); setNotice(`已保存到 ${selected.filePath}`); } })}>另存为 MP4</button></div></footer>
   </div>;
 }

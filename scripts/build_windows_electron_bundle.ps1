@@ -151,6 +151,7 @@ if (Test-Path -LiteralPath $backendOverlay) {
     $backendDestination = Join-Path $bundleRoot "app\src\voxcpm"
     New-Item -ItemType Directory -Force -Path $backendDestination | Out-Null
     Copy-Item -Path (Join-Path $backendOverlay "*.py") -Destination $backendDestination -Force
+    Copy-Item -Path (Join-Path $backendOverlay "*.json") -Destination $backendDestination -Force
 }
 
 Write-Step "Install Electron renderer dependencies"

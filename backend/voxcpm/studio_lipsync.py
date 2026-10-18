@@ -9,12 +9,14 @@ from pathlib import Path
 import queue
 import shutil
 import subprocess
+import sys
 import threading
 import time
 import uuid
 from urllib.parse import quote
 
 from .lipsync_profiles import PROFILES, detect_hardware, load_manifest, select_profile
+from .lipsync_prepare import CONFIG, cached_ready
 
 
 class LipSyncCancelled(Exception):
@@ -31,10 +33,21 @@ class LipSyncService:
         self.studio = studio
         self.config_path = data_root / "lipsync-settings.json"
         self.active = False
+        self.preparing = False
+        self.preparation_task_id = ""
         self.lock = threading.Lock()
 
     def hardware(self):
         return detect_hardware()
+
+    def preparation_ready(self, root, version):
+        if not version:
+            return False
+        try:
+            config = json.loads(CONFIG.read_text(encoding="utf-8"))
+            return cached_ready(root, version, config, Path(sys.executable))
+        except (OSError, ValueError):
+            return False
 
     def root(self):
         override = os.environ.get("VOXCPM_LIPSYNC_ROOT", "").strip()
@@ -60,7 +73,7 @@ class LipSyncService:
         if not root.strip() or not target.is_dir():
             raise ValueError("请选择已安装视频模型的目录。")
         with self.lock:
-            if self.active:
+            if self.active or self.preparing:
                 raise ValueError("视频任务进行中，暂不能切换模型目录。")
             status = self.status(target.resolve())
             if not status["installedVersions"]:
@@ -111,17 +124,54 @@ class LipSyncService:
         installed = [v for v, m in models.items() if m["ready"] and not common_missing]
         hardware = self.hardware()
         selected, reason = select_profile(hardware, installed, model_version)
+        preferred, preparation_reason = select_profile(hardware, list(PROFILES), model_version)
+        prepared = bool(preferred) and self.preparation_ready(root, preferred)
         missing = list(common_missing) + ([] if selected else [reason])
         if not installed:
             missing = list(dict.fromkeys(missing + [item for m in models.values() for item in m["missing"]]))
         profile = PROFILES.get(selected, {})
         return {"ready": bool(selected) and not missing, "engine": f"LatentSync {selected}" if selected else "LatentSync",
                 "root": str(root), "selectedVersion": selected, "requestedVersion": model_version,
+                "preferredVersion": preferred, "needsPreparation": bool(preferred) and (preferred not in installed or not prepared),
+                "preparationReason": preparation_reason, "preparing": self.preparing,
+                "preparationTaskId": self.preparation_task_id,
                 "installedVersions": installed, "models": models, "hardware": hardware, "selectionReason": reason,
                 "missing": missing, "ffmpeg": ffmpeg, "ffprobe": probe, "active": self.active,
                 "profile": f"{profile.get('resolution', '—')}px · 16帧 · VAE分帧 · CPU人脸检测",
                 "validation": manifests.get(selected, {}).get("validation"),
                 "maxDuration": 120}
+
+    def prepare(self, model_version, progress, cancelled):
+        # preparing 在加入队列时预留，防止多次进入页面或重复点击启动多个下载。
+        try:
+            if cancelled():
+                raise LipSyncCancelled()
+            training = getattr(self.studio, "training_status_payload", lambda: {})()
+            if training.get("running") or getattr(self.studio, "_training_is_running", lambda: False)():
+                raise ValueError("LoRA训练正在运行，请先停止训练再补齐视频组件。")
+            version, reason = select_profile(self.hardware(), list(PROFILES), model_version)
+            if not version:
+                raise ValueError(reason)
+            root = self.root()
+            root.mkdir(parents=True, exist_ok=True)
+            if self.preparation_ready(root, version):
+                return {"status": f"LatentSync {version} 已就绪，复用本地资源。", "version": version}
+            reset = getattr(self.studio, "reset_runtime", None)
+            if reset:
+                reset()
+                gc.collect()
+            with (root / "prepare.log").open("a", encoding="utf-8") as log:
+                self._process([sys.executable, "-u", str(Path(__file__).with_name("lipsync_prepare.py")),
+                               "--root", str(root), "--version", version, "--base-python", sys.executable],
+                              root, progress, cancelled, log, 14400)
+            if not self.preparation_ready(root, version):
+                raise RuntimeError("视频组件校验未通过，请重试补齐。")
+            return {"status": f"LatentSync {version} 补齐完成，可以生成视频。", "version": version}
+        except LipSyncCancelled:
+            return {"cancelled": True, "status": "补齐已暂停，下次进入页面可继续。"}
+        finally:
+            with self.lock:
+                self.preparing = False
 
     def probe(self, path: Path):
         ffmpeg = self.ffmpeg()
@@ -225,7 +275,7 @@ class LipSyncService:
 
     def generate(self, payload, progress, cancelled):
         with self.lock:
-            if self.active:
+            if self.active or self.preparing:
                 raise ValueError("已有视频任务进行中。")
             self.active = True
         try:
@@ -236,6 +286,8 @@ class LipSyncService:
                 raise ValueError("LoRA训练正在占用显卡，请先停止训练。")
             requested = getattr(payload, "model_version", "auto")
             status = self.status(model_version=requested)
+            if status["needsPreparation"]:
+                raise ValueError("请先完成视频组件自动补齐，再生成视频。")
             if not status["ready"]:
                 raise ValueError("视频模型尚未就绪：" + "、".join(status["missing"]))
             source, audio, duration = self.validate(payload)

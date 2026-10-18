@@ -100,6 +100,10 @@ class LipSyncRequest(BaseModel):
     short_video: Literal["loop", "hold"] = Field(default="loop", alias="shortVideo")
 
 
+class LipSyncPrepareRequest(BaseModel):
+    model_version: Literal["auto", "1.5", "1.6"] = Field(default="auto", alias="modelVersion")
+
+
 class TrainingStartRequest(BaseModel):
     pretrained_path: str = Field(alias="pretrainedPath")
     train_manifest: str = Field(alias="trainManifest")
@@ -197,11 +201,11 @@ class StudioTaskQueue:
             record = self._tasks.get(task_id)
             if record is None:
                 raise KeyError(task_id)
-            if record.kind not in {"generate-project", "generate-lipsync"}:
+            if record.kind not in {"generate-project", "generate-lipsync", "prepare-lipsync"}:
                 raise ValueError("当前任务不支持安全取消。")
             if record.status in {"queued", "running"}:
                 record.cancel_requested = True
-                record.status_text = "正在停止视频推理进程。" if record.kind == "generate-lipsync" else "已请求取消，当前片段结束后停止。"
+                record.status_text = "正在暂停视频组件补齐。" if record.kind == "prepare-lipsync" else "正在停止视频推理进程。" if record.kind == "generate-lipsync" else "已请求取消，当前片段结束后停止。"
             return record.to_payload()
 
     def get(self, task_id: str) -> dict[str, Any]:
@@ -216,7 +220,7 @@ class StudioTaskQueue:
             task_id, runner = self._queue.get()
             with self._lock:
                 record = self._tasks[task_id]
-                if record.cancel_requested:
+                if record.cancel_requested and record.kind != "prepare-lipsync":
                     record.status = "cancelled"
                     record.status_text = "任务已取消。"
                     record.finished_at = _iso_now()
@@ -279,10 +283,28 @@ def create_api_app(studio: Optional[Any] = None, model_dir: Optional[str] = None
     def lipsync_results():
         return {"items": lipsync.results()}
 
+    @app.post("/api/lipsync/prepare")
+    def prepare_lipsync(payload: LipSyncPrepareRequest):
+        with lipsync.lock:
+            if lipsync.preparation_task_id:
+                previous = task_queue.get(lipsync.preparation_task_id)
+                if previous["status"] in {"queued", "running"}:
+                    return previous
+            if lipsync.active:
+                raise HTTPException(status_code=409, detail="视频生成中，请等待完成后补齐。")
+            status = lipsync.status(model_version=payload.model_version)
+            if not status["preferredVersion"]:
+                raise HTTPException(status_code=400, detail=status["preparationReason"])
+            lipsync.preparing = True
+            task = task_queue.submit("prepare-lipsync", "视频组件自动补齐", lambda task_id: lipsync.prepare(payload.model_version,
+                lambda percent, text: task_queue.progress(task_id, percent, 100, text), lambda: task_queue.cancelled(task_id)), contextual=True)
+            lipsync.preparation_task_id = task["taskId"]
+            return task
+
     @app.post("/api/lipsync/generate")
     def generate_lipsync(payload: LipSyncRequest):
         status = lipsync.status(model_version=payload.model_version)
-        if not status["ready"]:
+        if not status["ready"] or status.get("needsPreparation", False):
             raise HTTPException(status_code=400, detail="视频模型尚未就绪：" + "、".join(status["missing"]))
         if getattr(studio_service, "_training_is_running", lambda: False)():
             raise HTTPException(status_code=409, detail="请先停止 LoRA 训练，再生成视频。")
@@ -403,7 +425,7 @@ def create_api_app(studio: Optional[Any] = None, model_dir: Optional[str] = None
     @app.post("/api/asr/recognize")
     def recognize_audio(payload: AudioRecognizeRequest) -> dict[str, Any]:
         with lipsync.lock:
-            if lipsync.active:
+            if lipsync.active or lipsync.preparing:
                 raise HTTPException(status_code=409, detail="视频正在使用显卡，请等待完成后再识别参考音频。")
             text = studio_service.recognize_audio(payload.audio_path)
             return {"text": text}
@@ -490,7 +512,7 @@ def create_api_app(studio: Optional[Any] = None, model_dir: Optional[str] = None
     @app.post("/api/training/start")
     def start_training(payload: TrainingStartRequest) -> dict[str, Any]:
         with lipsync.lock:
-            if lipsync.active:
+            if lipsync.active or lipsync.preparing:
                 raise HTTPException(status_code=409, detail="视频正在使用显卡，请等待完成或取消视频任务后再训练。")
             return start_training_impl(payload)
 
