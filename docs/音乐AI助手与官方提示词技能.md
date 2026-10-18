@@ -37,4 +37,4 @@ ACE与MiniMax使用ComfyUI原生音频节点；优先复用兼容的本机ComfyU
 
 核心代码位于`backend/voxcpm/music_prompts.py`、`studio_assistant.py`、`studio_music.py`及前端`MusicStudio.tsx`。官方文本在`backend/voxcpm/music_skills/`，通过`scripts/sync_music_prompt_skills.py`按固定提交获取；更新资料时维护版本与清单。
 
-轻量构建和跨版本更新必须持续携带完整的音乐技能文本与新增后端模块。文本库约2.2MB，不含音乐权重、Python或CUDA；既有音乐运行包仍按原固定清单复用。本地验证完成不表示已推送线上更新。
+轻量构建和跨版本更新必须持续携带完整的音乐技能文本与新增后端模块。文本库约2.2MB，不含音乐权重、Python或CUDA；既有音乐运行包仍按原固定清单复用。2026-10-18已随2.0.2 / 20261018123054发布并激活魔搭更新，详情见[自动更新说明](自动更新说明.md)。

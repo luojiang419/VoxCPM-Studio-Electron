@@ -70,9 +70,13 @@ async function cdp(port) {
   fs.writeFileSync(packagePath, JSON.stringify(pkg, null, 2));
   const configPath = path.join(appDir, "update-config.json");
   const config = JSON.parse(fs.readFileSync(configPath)); config.releaseId = "00000000000000";
+  const manifestArgument = process.argv.indexOf("--manifest-url");
+  if (manifestArgument >= 0) config.manifestUrl = process.argv[manifestArgument + 1];
   fs.writeFileSync(configPath, JSON.stringify(config, null, 2));
   const sentinel = path.join(testRoot, "data", "config", "update-test-user-data.txt");
   fs.mkdirSync(path.dirname(sentinel), { recursive: true }); fs.writeFileSync(sentinel, "用户配置、音频和模型不得被升级覆盖");
+  const componentProfile = process.argv.includes("--empty-components") ? { selected: [], removed: ["heartmula"], defaultModel: "ace-xl-turbo" } : null;
+  if (componentProfile) fs.writeFileSync(path.join(testRoot, "data/component-selection.json"), JSON.stringify(componentProfile));
   const dataHash = await digest(sentinel);
   const modelConfig = path.join(testRoot, fs.existsSync(path.join(testRoot, "models/config.json")) ? "models/config.json" : "models/openbmb__VoxCPM2/config.json");
   const modelHash = await digest(modelConfig);
@@ -131,8 +135,16 @@ async function cdp(port) {
   if (lightweight) assert.ok(fs.readFileSync(path.join(testRoot, "data/cache/runtime-bootstrap.log"), "utf8").includes("已复用验证通过的本地环境"), "更新重启未复用已验证运行时");
   const backendState = JSON.parse(fs.readFileSync(path.join(testRoot, "data/cache/electron_backend_state.json")));
   const health = await (await fetch(backendState.serviceUrl + "/api/health")).json();
+  let music;
+  if (componentProfile) {
+    assert.deepEqual(JSON.parse(fs.readFileSync(path.join(testRoot, "data/component-selection.json"))), componentProfile);
+    music = await (await fetch(backendState.serviceUrl + "/api/music/status")).json();
+    assert.equal(music.models.length, 4);
+    assert.equal(music.rules.models.length, 4);
+  }
   const report = { result: "passed", fromVersion, toVersion: "2.0.2", testRoot, session: service.session,
-    userDataPreserved: true, modelPreserved: true, restartedBackend: backendState.serviceUrl, health };
+    userDataPreserved: true, modelPreserved: true, restartedBackend: backendState.serviceUrl, health,
+    ...(componentProfile ? { componentSelectionPreserved: true, musicModels: music.models.length, officialRules: music.rules.models.length } : {}) };
   fs.writeFileSync(path.join(testRoot, "smoke-result.json"), JSON.stringify(report, null, 2));
   console.log(JSON.stringify(report, null, 2));
   // 测试进程通过退出关闭；正式便携包与原有服务不受影响。
