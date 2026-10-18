@@ -226,6 +226,20 @@ def install(root: Path, session: Path, manifest, fail_after=None):
         raise
 
 
+def preparation_deadline(session, manifest, pid, deadline, limit):
+    """只有本次新版进程的近期准备心跳能延长健康检查，有24小时上限。"""
+    preparing = session / 'healthy.json.preparing'
+    try:
+        if preparing.exists() and time.time() - preparing.stat().st_mtime < 45:
+            state = read_json(preparing)
+            if (state.get('version') == manifest['version'] and state.get('releaseId') == manifest.get('releaseId', '00000000000000')
+                    and state.get('pid') == pid and state.get('status') not in ('error', 'cancelled')):
+                return min(limit, time.monotonic() + 210)
+    except (OSError, ValueError):
+        pass
+    return deadline
+
+
 def restart(root, session, health=True):
     env = {k: v for k, v in os.environ.items() if k not in (
         "ELECTRON_RUN_AS_NODE", "VOXCPM_UPDATE_HEALTH_FILE", "VOXCPM_UPDATE_SESSION")}
@@ -259,8 +273,10 @@ def run(session: Path, recover=False):
         emit("正在重启并检查本地服务…", 90)
         child = restart(root, session)
         deadline = time.monotonic() + 210
+        preparation_limit = time.monotonic() + 24 * 3600
         try:
             while time.monotonic() < deadline:
+                deadline = preparation_deadline(session, manifest, child.pid, deadline, preparation_limit)
                 if (session / "healthy.json").exists():
                     health = read_json(session / "healthy.json")
                     if health.get("version") == manifest["version"] and health.get("releaseId", "00000000000000") == manifest.get("releaseId", "00000000000000"):

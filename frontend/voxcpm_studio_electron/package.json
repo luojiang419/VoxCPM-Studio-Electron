@@ -45,6 +45,8 @@
       "runtime-config.json",
       "runtime-requirements.txt",
       "install-protocol.js",
+      "component-service.js",
+      "music-config.json",
       "app.ico",
       "app-icon.png",
       "package.json"

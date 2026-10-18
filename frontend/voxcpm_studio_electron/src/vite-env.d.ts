@@ -13,6 +13,9 @@ declare global {
       startBackend: () => Promise<any>;
       getPreparationState: () => Promise<any>;
       cancelPreparation: () => Promise<boolean>;
+      getComponents: () => Promise<any>;
+      selectComponents: (value: any) => Promise<any>;
+      removeComponent: (id: string) => Promise<any>;
       stopBackend: () => Promise<any>;
       getResourceStats: () => Promise<any>;
       setThemeSource: (themeSource: string) => Promise<any>;

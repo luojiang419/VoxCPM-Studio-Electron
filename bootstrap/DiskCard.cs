@@ -63,12 +63,12 @@ namespace VoxBootstrap {
         protected override void OnLostFocus(EventArgs e) { spacePressed=false; Invalidate(); base.OnLostFocus(e); }
         protected override void OnGotFocus(EventArgs e) { Invalidate(); base.OnGotFocus(e); }
         protected override void OnEnabledChanged(EventArgs e) { spacePressed=false; Invalidate(); base.OnEnabledChanged(e); }
-        protected override void OnPaintBackground(PaintEventArgs e) { e.Graphics.Clear(Parent==null?BackColor:Parent.BackColor); }
+        protected override void OnPaintBackground(PaintEventArgs e) { e.Graphics.Clear(BackColor); }
         static Color Mix(Color a,Color b,double t) { return Color.FromArgb((int)(a.R+(b.R-a.R)*t),(int)(a.G+(b.G-a.G)*t),(int)(a.B+(b.B-a.B)*t)); }
         protected override void OnPaint(PaintEventArgs e) {
             base.OnPaint(e); if(Width<2 || Height<2) return;
             float scale=Height/46f; int visualWidth=(int)Math.Ceiling(64*scale);
-            Color paper=Parent==null?BackColor:Parent.BackColor;
+            Color paper=BackColor;
             using(var image=new Bitmap(visualWidth*4,Height*4,PixelFormat.Format32bppPArgb)) {
                 using(var g=Graphics.FromImage(image)) {
                     g.Clear(paper); g.ScaleTransform(4*scale,4*scale); g.SmoothingMode=SmoothingMode.AntiAlias;

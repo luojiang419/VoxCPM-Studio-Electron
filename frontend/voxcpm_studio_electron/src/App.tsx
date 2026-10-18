@@ -5,6 +5,7 @@ import WorkspacePlayer from "./WorkspacePlayer";
 import SaveVoiceDialog from "./SaveVoiceDialog";
 import LipSyncStudio from "./LipSyncStudio";
 import RuntimePreparation from "./RuntimePreparation";
+import ComponentManager from "./ComponentManager";
 import brandIcon from "../app-icon.png";
 import type { GenerationConfig, StudioVoice } from "./production-types";
 
@@ -1038,6 +1039,15 @@ function App() {
     </div>
   );
 
+  if (bootstrap?.status !== "ready") return <main className="startup-gate">
+    <div className="runtime-dialog-kicker">VOXCPM STUDIO</div>
+    <h1>准备好，再开始创作</h1>
+    <p>{bootstrap?.statusText || "正在检查运行环境"}</p>
+    <p className="runtime-intro">{bootstrap?.detail || "所选功能的依赖和模型全部就绪后，自动进入工作区。"}</p>
+    <ComponentManager onRun={handleStartService} backendRunning={Boolean(bootstrap?.backendRunning)} />
+    <RuntimePreparation onRun={handleStartService} backendStatus={bootstrap?.status || "booting"} backendDetail={bootstrap?.detail || ""} />
+  </main>;
+
   return (
     <div className={`app-shell studio-shell ${["production", "voices", "history"].includes(page) ? "studio-creative-page" : ""}`}>
       <RuntimePreparation onRun={handleStartService} backendStatus={bootstrap?.status || ""} backendDetail={bootstrap?.detail || ""} />
@@ -1084,6 +1094,7 @@ function App() {
           </div>
         </div>
         <div className="studio-sidebar-foot">
+          <ComponentManager onRun={handleStartService} backendRunning={Boolean(bootstrap?.backendRunning)} />
           <div><span className={`studio-service-dot ${bootstrap?.backendRunning ? "is-ready" : ""}`} /><strong>{bootstrap?.backendRunning ? "本地引擎已连接" : "本地引擎准备中"}</strong></div>
           <p>{runtime?.cuda_available ? (runtime.gpu_names[0] || "CUDA GPU") : "VoxCPM 2 · 本地运行"}</p>
           <span>声音，让创作发生。</span>

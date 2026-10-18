@@ -21,3 +21,17 @@
 .runtime-log-toggle { margin: 20px 0 8px; padding: 0; color: var(--muted); border: 0; background: transparent; cursor: pointer; font-size: 12px; }
 .runtime-log { max-height: 190px; overflow: auto; padding: 14px; background: var(--panel-soft); border-radius: 12px; font-size: 11px; white-space: pre-wrap; overflow-wrap: anywhere; }
 .runtime-dialog-actions { display: flex; justify-content: flex-end; gap: 10px; margin-top: 24px; }
+.startup-gate { min-height: 100vh; padding: 18vh max(36px, calc((100vw - 720px) / 2)); box-sizing: border-box; background: var(--bg); color: var(--text); }
+.startup-gate h1 { font-size: 34px; margin: 20px 0; }
+.component-option { display: flex; justify-content: space-between; align-items: center; gap: 12px; padding: 12px 0; border-bottom: 1px solid var(--line); }
+.component-option label { display: flex; gap: 12px; align-items: center; cursor: pointer; }
+.component-option input[role="switch"] { appearance: none; flex: 0 0 42px; width: 42px; height: 24px; margin: 0; position: relative; border: 1px solid #aeb99c; border-radius: 16px; background: #bbc4ae; cursor: pointer; transition: background .25s, box-shadow .3s; }
+.component-option input[role="switch"]::after { content: ""; position: absolute; left: 3px; top: 3px; width: 16px; height: 16px; border-radius: 50%; background: linear-gradient(#fcf9e8, #dae0cf); box-shadow: 0 2px 4px #18201440; transition: transform .3s cubic-bezier(.2,.7,.2,1); }
+.component-option input[role="switch"]:checked { background: linear-gradient(100deg, #68865b, #8ba573); box-shadow: 0 0 12px #b49a6233; }
+.component-option input[role="switch"]:checked::after { transform: translateX(18px); background: linear-gradient(#fcf9e8, #ebe1bb); }
+.component-option input[role="switch"]:focus-visible { outline: 2px solid var(--accent); outline-offset: 4px; }
+.component-option input[role="switch"]:disabled { cursor: default; opacity: .45; }
+.component-option small { display: block; margin-top: 6px; font-size: 12px; color: var(--muted); }
+.component-default { display: flex; flex-wrap: wrap; gap: 12px; align-items: center; margin-top: 20px; }
+.component-default select { max-width: 100%; background: var(--panel); color: var(--text); padding: 8px; border: 1px solid var(--line); border-radius: 6px; }
+.runtime-dialog-actions { flex-wrap: wrap; }

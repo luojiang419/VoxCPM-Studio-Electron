@@ -299,6 +299,46 @@ public static class InstallationTests {
                     using (var entry = Registry.CurrentUser.OpenSubKey(key)) Check(entry == null, "提前登记安装完成");
                 }
             });
+            test("组件选择复用原生动画开关，重新开启会清除移除意图", () => {
+                string root=Path.Combine(fixtures,"component-picker");
+                ComponentPicker.Save(root,new ComponentSelection { selected=new[] { "ace-xl-turbo" }, removed=new[] { "heartmula" } });
+                var manifest=Manifest(); manifest.components=new[] {
+                    new ComponentChoice { id="ace-xl-turbo",label="ACE-Step 1.5 XL Turbo",size=15000000000,minMemoryMB=15360 },
+                    new ComponentChoice { id="heartmula",label="HeartMuLa 3B",size=22000000000,minMemoryMB=15360 }
+                };
+                using(var picker=new ComponentPicker(manifest,root,16384)) {
+                    picker.Opacity=0; picker.ShowInTaskbar=false; picker.Show(); Application.DoEvents();
+                    var ace=(GlowSwitch)picker.Controls["component-ace-xl-turbo"];
+                    var heart=(GlowSwitch)picker.Controls["component-heartmula"];
+                    Check(ace.Checked && !heart.Checked,"未保留现有选择");
+                    Check(!picker.Controls.Cast<Control>().Any(c=>c is CheckedListBox),"仍有普通复选框列表");
+                    heart.PerformClick(); heart.AdvanceAnimation(1);
+                    ((SoftButton)picker.Controls["prepare-components"]).PerformClick();
+                    Check(picker.Selection.selected.Contains("heartmula") && !picker.Selection.removed.Contains("heartmula"),"重新开启仍保留移除意图");
+                }
+            });
+            test("组件初装预检拦截空间不足，已接管目录续装交给精确缺失量检查", () => {
+                string root=Path.Combine(fixtures,"component-capacity"), key=Key();
+                var manifest=Manifest(); manifest.components=new[] { new ComponentChoice { id="ace-xl-turbo", size=1024L*1024*1024*1024 } };
+                var profile=new ComponentSelection { selected=new[] { "ace-xl-turbo" } };
+                Reject(()=>ComponentPicker.ValidateCapacity(root,profile,manifest),"新安装未拦截空间不足");
+                Begin(root,key);
+                ComponentPicker.ValidateCapacity(root,profile,manifest);
+            });
+            test("新安装握手必须包含匹配所选组件的自检凭证", () => {
+                string root=Path.Combine(fixtures,"components-ready"), session=Guid.NewGuid().ToString("N");
+                var profile=new ComponentSelection { selected=new[] { "ace-xl-turbo" }, removed=new[] { "heartmula" } };
+                ComponentPicker.Save(root,profile);
+                string report=Report(root,session);
+                Reject(() => Installer.RequireReady(root,report,session,true),"接受了只有基础环境的旧报告");
+                string signature=new string('a',64);
+                var receipt=new { protocol=2, selected=profile.selected, signature=signature };
+                Put(Path.Combine(root,"data/cache/component-ready.json"),Json.Serialize(receipt));
+                Put(report,Json.Serialize(new { session=session, root=root, ok=true, status="ready", components=receipt }));
+                Installer.RequireReady(root,report,session,true);
+                profile.selected=new[] { "yue2" }; ComponentPicker.Save(root,profile);
+                Reject(() => Installer.RequireReady(root,report,session,true),"接受了过期选择的就绪报告");
+            });
             test("必须取得正确会话的就绪报告才能创建快捷方式和注册", () => {
                 string root = Path.Combine(fixtures, "not-ready"), key = Key(); Begin(root, key);
                 Put(Path.Combine(root, "VoxCPM Studio.exe"), "app"); Put(Path.Combine(root, "uninstall.exe"), "uninstaller");

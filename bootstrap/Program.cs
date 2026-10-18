@@ -16,7 +16,8 @@ using System.Windows.Forms;
 
 namespace VoxBootstrap {
     public sealed class Asset { public string name; public long size; public string sha256; public string[] urls; }
-    public sealed class Manifest { public int protocol; public string releaseId; public string appVersion; public string appReleaseId; public string entry; public Asset package; public Asset[] files; }
+    public sealed class ComponentChoice { public string id, label; public long size; public int minMemoryMB; public Asset[] files; }
+    public sealed class Manifest { public int protocol; public int componentProtocol; public ComponentChoice[] components; public long musicRuntimeSize, musicArchiveSize; public string musicRuntimeVersion; public string releaseId; public string appVersion; public string appReleaseId; public string entry; public Asset package; public Asset[] files; }
     public sealed class Status { public string text; public long done; public long total; }
 
     public static class Core {
@@ -369,7 +370,7 @@ namespace VoxBootstrap {
             run.Click += async (sender, args) => {
                 if (preview) StartDemo();
                 else if (completedRoot != null) { OpenWorkspace(completedRoot); Close(); }
-                else await Start();
+                else try { await Start(); } catch (Exception error) { MessageBox.Show(this,error.Message,"组件选择未完成",MessageBoxButtons.OK,MessageBoxIcon.Warning); }
             };
             pause.Click += (sender, args) => { if (preview) SetPreview("paused", fraction); else if (cancellation != null) cancellation.Cancel(); };
             close.Click += (sender, args) => Close(); minimize.Click += (sender, args) => WindowState = FormWindowState.Minimized;
@@ -553,6 +554,14 @@ namespace VoxBootstrap {
             start.EnvironmentVariables.Remove("ELECTRON_RUN_AS_NODE"); start.EnvironmentVariables["VOXCPM_DATA_ROOT"] = Path.Combine(root, "data"); Process.Start(start);
         }
         async Task Start() {
+            ComponentSelection selection = null;
+            if (manifest.componentProtocol >= 2) {
+                int memory = await Task.Run(() => ComponentPicker.GpuMemory());
+                using (var picker = new ComponentPicker(manifest, installPath.Text.Trim(), memory, dark)) {
+                    if (picker.ShowDialog(this) != DialogResult.OK) return;
+                    selection = picker.Selection;
+                }
+            }
             SetPreview("working", fraction); total = 0; cancellation = new CancellationTokenSource();
             string root = installPath.Text.Trim(); Process child = null; FileStream lease = null; bool complete = false, owned = false;
             installPath.Enabled = browse.Enabled = detect.Enabled = diskPanel.Enabled = desktopShortcut.Enabled = startMenuShortcut.Enabled = false;
@@ -563,8 +572,10 @@ namespace VoxBootstrap {
             try {
                 root = Installer.Canonical(root); installPath.Text = root;
                 Installer.ValidateDestinationCapacity(root);
+                if (selection != null) ComponentPicker.ValidateCapacity(root, selection, manifest);
                 lease = Installer.AcquireRoot(root);
                 Installer.Begin(root, manifest, lockHeld: true);
+                if (selection != null) ComponentPicker.Save(root, selection);
                 owned = true;
                 await Task.Run(() => Installer.InstallUninstaller(root));
                 await Task.Run(() => Core.Prepare(root, manifest, cancellation.Token, reporter));
@@ -574,7 +585,7 @@ namespace VoxBootstrap {
                 string session = Guid.NewGuid().ToString("N"), report = Path.Combine(root, "data", "cache", "install", session + ".json");
                 Directory.CreateDirectory(Path.GetDirectoryName(report));
                 child = Installer.StartPreparation(root, report, session);
-                await Installer.WaitForReady(root, report, session, child, cancellation.Token, reporter);
+                await Installer.WaitForReady(root, report, session, child, cancellation.Token, reporter, manifest.componentProtocol >= 2);
                 Installer.Complete(root, manifest, desktopShortcut.Checked, startMenuShortcut.Checked, readyReport: report, session: session);
                 complete = true; completedRoot = root; SetPreview("ready", 1); run.Enabled = false; await Task.Delay(350, cancellation.Token);
                 cancellation.Token.ThrowIfCancellationRequested();

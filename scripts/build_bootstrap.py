@@ -22,7 +22,7 @@ def build(payload: Path, output: Path, release_id: str, payload_url: str | None 
         raise ValueError(f"启动器输出目录已存在：{output}")
     output.mkdir(parents=True)
     prefix = f"bootstrap/2.0.2/{release_id}"
-    manifest = {"protocol": 1, "releaseId": release_id, "entry": "VoxCPM Studio.exe",
+    manifest = {"protocol": 1, "componentProtocol": 2, "releaseId": release_id, "entry": "VoxCPM Studio.exe",
                 "package": {"name": payload.name, "size": payload.stat().st_size, "sha256": sha256(payload),
                             "urls": [payload_url or file_url(DEFAULT_REPO, prefix + "/" + payload.name)]}, "files": []}
     with zipfile.ZipFile(payload) as archive:
@@ -38,6 +38,14 @@ def build(payload: Path, output: Path, release_id: str, payload_url: str | None 
         root = next(iter(roots))
         manifest["appVersion"] = json.loads(archive.read(root + "/resources/app/package.json"))["version"]
         manifest["appReleaseId"] = json.loads(archive.read(root + "/resources/app/update-config.json"))["releaseId"]
+        music = json.loads(archive.read(root + '/resources/app/music-config.json'))
+        manifest['musicRuntimeSize'] = music['runtime']['installed_size']
+        manifest['musicArchiveSize'] = music['runtime']['size']
+        manifest['musicRuntimeVersion'] = music['runtime']['version']
+        limits = {'ace-xl-turbo': 15360, 'yue2': 7680, 'minimax-music3': 15360, 'heartmula': 15360}
+        manifest['components'] = [{'id': 'lipsync', 'label': '视频对口型与照片说话', 'size': 6 * 1024**3, 'minMemoryMB': 7680}] + [
+            {'id': m['id'], 'label': m['label'], 'size': sum(a['size'] for a in m['files']), 'minMemoryMB': limits[m['id']],
+             'files': [{key: a[key] for key in ('name', 'size', 'sha256')} for a in m['files']]} for m in music['models']]
     source_manifest = output.parent / (output.name + "-manifest.json")
     source_manifest.write_text(json.dumps(manifest, ensure_ascii=False, separators=(",", ":")), encoding="utf-8")
     executable = output / ("VoxCPM安装器-界面演示.exe" if demo else "VoxCPM安装器.exe")
@@ -49,7 +57,7 @@ def build(payload: Path, output: Path, release_id: str, payload_url: str | None 
                     "/resource:" + str(ROOT / "assets/brand/voxcpm-app-256.png") + ",app-mark.png",
                     "/resource:" + str(source_manifest) + ",bootstrap-manifest.json", "/resource:" + str(ROOT / "assets/brand/disk-local-256.png") + ",disk-local.png", "/reference:System.Windows.Forms.dll",
                     "/reference:System.Drawing.dll", "/reference:Accessibility.dll", "/reference:System.Web.Extensions.dll", "/reference:System.IO.Compression.dll",
-                    "/reference:System.IO.Compression.FileSystem.dll", str(ROOT / "bootstrap/Program.cs"), str(ROOT / "bootstrap/Installation.cs"), str(ROOT / "bootstrap/DiskCard.cs")], check=True)
+                    "/reference:System.IO.Compression.FileSystem.dll", str(ROOT / "bootstrap/Program.cs"), str(ROOT / "bootstrap/Installation.cs"), str(ROOT / "bootstrap/Components.cs"), str(ROOT / "bootstrap/DiskCard.cs")], check=True)
     (output / "使用说明.txt").write_text("界面演示：点击运行可观看准备进度，并可暂停、继续和重新演示。\n此版本不会下载、安装或打开工作台。\n" if demo else
         "双击 VoxCPM安装器.exe，选择独立安装目录并点击安装并运行。\n"
         "安装器会从魔搭补齐应用、依赖和模型，服务就绪后创建快捷方式并登记 Windows 卸载入口。\n"

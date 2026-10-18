@@ -15,7 +15,10 @@ function installationSession({ root, dataRoot, report, session }) {
       const { status, phase, message, name, downloaded, size } = value;
       atomicJson(expected + ".progress", { session, root: path.resolve(root), status, phase, message, name, downloaded, size });
     },
-    ready() { atomicJson(expected, { session, root: path.resolve(root), ok: true, status: "ready" }); },
+    ready(components) {
+      if (!components || components.protocol !== 2 || !Array.isArray(components.selected) || !/^[a-f0-9]{64}$/.test(components.signature)) throw new Error("所选组件尚未全部就绪");
+      atomicJson(expected, { session, root: path.resolve(root), ok: true, status: "ready", components });
+    },
     fail(error) { atomicJson(expected, { session, root: path.resolve(root), ok: false, status: "error", error: String(error?.message || error) }); },
   };
 }

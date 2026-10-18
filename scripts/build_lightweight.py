@@ -12,7 +12,7 @@ import zipfile
 ROOT = Path(__file__).resolve().parents[1]
 PROJECT = ROOT.parent
 FRONTEND = ROOT / "frontend/voxcpm_studio_electron"
-RUNTIME_FILES = ("runtime-service.js", "runtime-config.json", "runtime-requirements.txt", "install-protocol.js")
+RUNTIME_FILES = ("runtime-service.js", "runtime-config.json", "runtime-requirements.txt", "install-protocol.js", "component-service.js", "music-config.json")
 SHELL_FILES = ("main.js", "preload.js", "package.json", "update-service.js", "update-window.js", "update-config.json", "updater.py", *RUNTIME_FILES)
 
 
@@ -61,13 +61,14 @@ def build(output: Path, skip_build: bool = False, skip_zip: bool = False) -> Pat
     for name in ("lightweight.json", "runtime_manifest.json"):
         (output / name).write_text(json.dumps(manifest, indent=2) + "\n", encoding="utf-8")
     (output / "使用说明.txt").write_text(
-        "双击 VoxCPM Studio.exe，点击运行，弹窗会自动补齐模型和依赖。\n"
+        "双击 VoxCPM Studio.exe，自动检查并补齐已选择的功能、模型和依赖，然后进入工作区。\n"
         "首次需要联网并预留至少 25GB 可用空间；具体下载量取决于显卡和缓存。\n"
         "桌面、模型、Python 和依赖优先从魔搭补齐。补齐后可离线使用已安装功能。\n"
         "RTX 50 系自动选择 CUDA 12.8，需要 NVIDIA Windows 驱动 570.65 或更新。\n"
         "下载中断可点击继续；关闭软件会暂停，保留已下载文件。日志：data/cache/runtime-bootstrap.log。\n"
         "请解压到可写本地目录，路径尽量简短；不要放在 Program Files 等需要管理员权限的位置。\n"
-        "首次补齐包括配音、语音识别和降噪；视频对口型需要其独立运行环境。\n", encoding="utf-8")
+        "首次补齐包括配音、语音识别和降噪，以及所选视频、音乐功能的独立运行环境。\n"
+        "可在功能与模型管理中选择、移除和恢复模型；更新后保留主动移除状态。\n", encoding="utf-8")
     if not skip_zip:
         archive = output.parent / (output.name + ".zip")
         if archive.exists():

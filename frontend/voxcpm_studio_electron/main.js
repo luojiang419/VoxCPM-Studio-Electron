@@ -5,6 +5,7 @@ const { app, BrowserWindow, dialog, ipcMain, nativeTheme, shell } = require("ele
 const { UpdateService, atomicJson } = require("./update-service");
 const { RuntimeService, resolveManagedPython } = require("./runtime-service");
 const { installationSession } = require("./install-protocol");
+const { ComponentService } = require("./component-service");
 const fs = require("fs");
 const http = require("http");
 const net = require("net");
@@ -34,6 +35,9 @@ let previousCpuSample = null;
 let currentThemeSource = "dark";
 let updateService = null;
 let runtimeService = null;
+let componentService = null;
+let componentReceipt = null;
+let updatePreparationHeartbeat = null;
 let installSession = null;
 const preparingInstallation = process.argv.includes("--voxcpm-install");
 let updateHealthWritten = false;
@@ -409,10 +413,6 @@ function killBackend(reason = "manual-stop") {
     terminateProcessTree(backendProcess.pid);
   } catch (error) {
     console.error("Failed to stop backend:", error);
-  } finally {
-    if (reason !== "manual-stop") {
-      backendProcess = null;
-    }
   }
 }
 
@@ -583,14 +583,19 @@ function findFreePort(start = SERVICE_PORT_START, end = SERVICE_PORT_END) {
 }
 
 async function startBackend() {
-  if (isBackendRunning()) {
+  if (isBackendRunning() && bootstrapState.status === "ready") {
     return summarizeBootstrapState();
   }
   if (backendStartPromise) {
     return backendStartPromise;
   }
-
   backendStartPromise = (async () => {
+  if (isBackendRunning()) {
+    const previous = backendProcess;
+    const exited = new Promise(resolve => previous.once("exit", resolve));
+    killBackend("retry-preparation");
+    await exited;
+  }
   const projectRoot = resolveProjectRoot();
   const appRoot = resolveAppRoot();
   const dataRoot = resolveDataRoot();
@@ -746,6 +751,8 @@ async function startBackend() {
     );
   }
 
+  setBootstrapState({ status: "preparing", statusText: "正在准备所选功能", detail: "全部组件自检通过后进入工作区。" });
+  componentReceipt = await componentService.prepare({ url: serviceUrl, runtime });
   setBootstrapState({
     status: "ready",
     statusText: "控制台已就绪",
@@ -810,6 +817,21 @@ ipcMain.handle("runtime:set-theme-source", (_event, themeSource) => {
 ipcMain.handle("runtime:start-backend", async () => startBackend());
 ipcMain.handle("runtime:preparation-state", () => runtimeService.state);
 ipcMain.handle("runtime:cancel-preparation", () => { runtimeService.cancel(); return true; });
+ipcMain.handle("components:state", () => componentService.state());
+ipcMain.handle("components:select", (_event, value) => {
+  if (componentService.working || backendStartPromise) throw new Error("请先暂停并等待当前准备结束");
+  const profile = componentService.select(value);
+  componentReceipt = null;
+  killBackend("component-selection");
+  setBootstrapState({ status: "stopped", statusText: "组件选择已保存", detail: "点击准备并进入，补齐所选功能。" });
+  sendRuntimeEvent("boot", summarizeBootstrapState());
+  return profile;
+});
+ipcMain.handle("components:remove", async (_event, id) => {
+  if (isBackendRunning() || backendStartPromise) throw new Error("请先停止本地引擎，再移除模型");
+  const release = componentService.acquire();
+  try { return await componentService.remove(id); } finally { release(); }
+});
 
 ipcMain.handle("runtime:stop-backend", async () => {
   killBackend("manual-stop");
@@ -883,18 +905,23 @@ app.whenReady().then(async () => {
     currentVersion: app.getVersion(), onState: (state) => sendRuntimeEvent("update-state", { update: state }) });
   runtimeService = new RuntimeService({ root: resolveProjectRoot(), appRoot: resolveAppRoot(), dataRoot: resolveDataRoot(), appDir: __dirname,
     onState: (preparation) => { installSession?.progress(preparation); sendRuntimeEvent("runtime-preparation", { preparation }); } });
+  componentService = new ComponentService({ root: resolveProjectRoot(), appRoot: resolveAppRoot(), dataRoot: resolveDataRoot(), appDir: __dirname,
+    runtimeService, reuseRoots: process.env.VOXCPM_COMPONENT_REUSE_ROOT ? [process.env.VOXCPM_COMPONENT_REUSE_ROOT] : [] });
+  // 首次升级可能新增数十 GB 模型：有进度且进程存活时，更新器继续等待。
+  if (process.env.VOXCPM_UPDATE_HEALTH_FILE) {
+    const heartbeat = () => {
+      if (updateHealthWritten) return;
+      atomicJson(process.env.VOXCPM_UPDATE_HEALTH_FILE + ".preparing", { version: app.getVersion(),
+        releaseId: updateService.config.releaseId || "00000000000000", pid: process.pid,
+        status: runtimeService.state.status, checkedAt: Date.now() });
+    };
+    heartbeat(); updatePreparationHeartbeat = setInterval(heartbeat, 15000); updatePreparationHeartbeat.unref();
+  }
   nativeTheme.themeSource = currentThemeSource;
   setBootstrapState({});
   createWindow();
   if (!preparingInstallation && updateService.getAutoCheck()) setTimeout(() => updateService.check(), 5000).unref();
   previousCpuSample = null;
-
-  // 轻量壳打开即用，首次下载由用户点击运行触发。
-  if (fs.existsSync(path.join(resolveProjectRoot(), "lightweight.json")) && !process.env.VOXCPM_UPDATE_HEALTH_FILE && !process.argv.includes("--voxcpm-run")) {
-    setBootstrapState({ status: "stopped", statusText: "点击运行开始使用", detail: "首次运行将自动补齐模型和依赖，完成后自动启动。" });
-    sendRuntimeEvent("boot", summarizeBootstrapState());
-    return;
-  }
 
   try {
     await startBackend();
@@ -903,7 +930,7 @@ app.whenReady().then(async () => {
         const deadline = setTimeout(() => reject(new Error("工作台界面初始化超时，请重新运行安装器")), 60000);
         rendererReady.then(() => { clearTimeout(deadline); resolve(); });
       });
-      installSession.ready();
+      installSession.ready(componentReceipt);
     }
     if (process.env.VOXCPM_UPDATE_HEALTH_FILE && !updateHealthWritten) {
       await rendererReady;

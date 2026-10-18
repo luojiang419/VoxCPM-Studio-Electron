@@ -1,9 +1,10 @@
 import { useEffect, useRef, useState } from "react";
 import "./runtime-preparation.css";
+import ComponentManager from "./ComponentManager";
 
 type State = { status: string; phase: string; message: string; profile?: string; label?: string;
   name?: string; downloaded?: number; size?: number; verifying?: boolean; reused?: boolean; log?: string };
-const stages = [["detect", "识别设备"], ["python", "运行环境"], ["dependencies", "安装依赖"], ["models", "补齐模型"], ["ready", "启动服务"]];
+const stages = [["detect", "设备"], ["python", "环境"], ["dependencies", "依赖"], ["models", "语音模型"], ["components", "所选功能"], ["ready", "进入工作区"]];
 const mb = (n: number) => `${(n / 1024 / 1024).toFixed(1)} MB`;
 
 export default function RuntimePreparation({ onRun, backendStatus, backendDetail }: { onRun: () => void; backendStatus: string; backendDetail: string }) {
@@ -48,6 +49,7 @@ export default function RuntimePreparation({ onRun, backendStatus, backendDetail
         ? <button type="button" className="ghost-button" disabled={state?.status === "ready"} onClick={() => window.voxcpmDesktop.cancelPreparation()}>暂停补齐</button>
         : <><button type="button" className="ghost-button" onClick={() => setOpen(false)}>稍后再试</button><button type="button" className="primary-button" onClick={onRun}>{backendFailed ? "重新启动服务" : "继续准备并运行"}</button></>}
       </div>
+      <ComponentManager onRun={onRun} backendRunning={false} />
     </dialog>
   </>;
 }

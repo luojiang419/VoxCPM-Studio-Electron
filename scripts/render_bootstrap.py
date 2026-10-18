@@ -12,7 +12,7 @@ subprocess.run(["C:/Windows/Microsoft.NET/Framework64/v4.0.30319/csc.exe", "/nol
                 "/reference:System.IO.Compression.dll", "/reference:System.IO.Compression.FileSystem.dll",
                 "/resource:" + str(ROOT / "assets/brand/voxcpm-app-256.png") + ",app-mark.png",
                 "/resource:" + str(ROOT / "assets/brand/voxcpm-installer.ico") + ",installer.ico",
-                str(ROOT / "bootstrap/Program.cs"), str(ROOT / "bootstrap/Installation.cs"), str(ROOT / "bootstrap/DiskCard.cs"), str(ROOT / "bootstrap/Preview.cs")], check=True)
+                str(ROOT / "bootstrap/Program.cs"), str(ROOT / "bootstrap/Installation.cs"), str(ROOT / "bootstrap/Components.cs"), str(ROOT / "bootstrap/DiskCard.cs"), str(ROOT / "bootstrap/Preview.cs")], check=True)
 manifest = Path(sys.argv[1]).resolve() if len(sys.argv) > 1 else ROOT / "builds/VoxCPM-Studio-Bootstrap-2.0.2-ModelScope-manifest.json"
 subprocess.run([str(executable), str(manifest), str(output)], check=True)
 

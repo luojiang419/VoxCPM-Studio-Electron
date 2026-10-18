@@ -236,7 +236,7 @@ namespace VoxBootstrap {
         }
         public static void Complete(string root, Manifest manifest, bool desktop, bool startMenu, IntegrationPaths paths = null, string readyReport = null, string session = null) {
             paths = paths ?? new IntegrationPaths(); ValidateRegistry(paths.registryKey);
-            RequireReady(root, readyReport, session);
+            RequireReady(root, readyReport, session, manifest.componentProtocol >= 2);
             var state = ReadState(root);
             if (!File.Exists(Path.Combine(root, manifest.entry)) || !File.Exists(Path.Combine(root, "uninstall.exe"))) throw new IOException("应用或卸载器缺失，不能登记安装完成。");
             var shortcuts = new List<string>(state.shortcuts ?? new string[0]);
@@ -263,21 +263,32 @@ namespace VoxBootstrap {
                 !SamePath(Path.GetDirectoryName(report), Path.Combine(Canonical(root), "data", "cache", "install")) || Path.GetFileNameWithoutExtension(report) != session || Path.GetExtension(report) != ".json")
                 throw new IOException("安装握手路径无效。");
         }
-        public static void RequireReady(string root, string report, string session) {
+        public static void RequireReady(string root, string report, string session, bool requireComponents = false) {
             ValidateReportPath(root, report, session);
             if (!File.Exists(report)) throw new IOException("运行环境尚未完成，不能登记安装完成。");
             var result = Json.Deserialize<Dictionary<string, object>>(File.ReadAllText(report));
             if (Convert.ToString(result["session"]) != session || !SamePath(Convert.ToString(result["root"]), root)) throw new IOException("安装就绪报告与当前会话不一致。");
             if (!Convert.ToBoolean(result["ok"])) throw new IOException(Convert.ToString(result["error"]));
             if (Convert.ToString(result["status"]) != "ready") throw new IOException("本地服务尚未就绪。");
+            if (requireComponents) {
+                object raw;
+                if (!result.TryGetValue("components", out raw)) throw new IOException("缺少所选组件就绪报告。");
+                var receipt = raw as Dictionary<string, object>;
+                if (receipt == null || Convert.ToInt32(receipt["protocol"]) != 2 || !System.Text.RegularExpressions.Regex.IsMatch(Convert.ToString(receipt["signature"]), "^[a-f0-9]{64}$")) throw new IOException("组件就绪报告无效。");
+                var selected = ((System.Collections.IEnumerable)receipt["selected"]).Cast<object>().Select(Convert.ToString).OrderBy(x => x).ToArray();
+                var profile = Json.Deserialize<ComponentSelection>(File.ReadAllText(Path.Combine(root, "data", "component-selection.json")));
+                if (!selected.SequenceEqual(profile.selected.OrderBy(x => x))) throw new IOException("组件报告与安装选择不一致。");
+                var stored = Json.Deserialize<Dictionary<string, object>>(File.ReadAllText(Path.Combine(root, "data", "cache", "component-ready.json")));
+                if (Convert.ToString(stored["signature"]) != Convert.ToString(receipt["signature"])) throw new IOException("组件自检记录不匹配。");
+            }
         }
-        public static async Task WaitForReady(string root, string report, string session, Process child, CancellationToken token, IProgress<Status> progress) {
+        public static async Task WaitForReady(string root, string report, string session, Process child, CancellationToken token, IProgress<Status> progress, bool requireComponents = false) {
             ValidateReportPath(root, report, session);
-            var deadline = DateTime.UtcNow.AddHours(2); string previous = "";
+            var deadline = DateTime.UtcNow.AddHours(24); string previous = "";
             while (DateTime.UtcNow < deadline) {
                 token.ThrowIfCancellationRequested();
                 if (File.Exists(report)) {
-                    RequireReady(root, report, session);
+                    RequireReady(root, report, session, requireComponents);
                     return;
                 }
                 string progressPath = report + ".progress";

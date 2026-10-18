@@ -23,7 +23,8 @@ test("进度报告过滤运行日志和环境变量，只有显式 ready 才产�
   await assert.rejects(fs.stat(report), { code: "ENOENT" });
   const progress = JSON.parse(await fs.readFile(report + ".progress", "utf8"));
   assert.equal(progress.session, session); assert.equal(progress.log, undefined); assert.equal(progress.token, undefined);
-  protocol.ready();
+  assert.throws(() => protocol.ready(), /所选组件/);
+  protocol.ready({ protocol: 2, selected: ['ace-xl-turbo'], signature: 'a'.repeat(64) });
   const ready = JSON.parse(await fs.readFile(report, "utf8"));
   assert.equal(ready.ok, true); assert.equal(ready.status, "ready"); assert.equal(ready.root, root);
 });

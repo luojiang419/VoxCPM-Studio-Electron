@@ -13,6 +13,14 @@ public static class BootstrapPreview {
         Application.EnableVisualStyles(); Application.SetCompatibleTextRenderingDefault(false);
         var manifest = new JavaScriptSerializer().Deserialize<Manifest>(File.ReadAllText(args[0], Encoding.UTF8));
         string output = Path.GetFullPath(args[1]); Directory.CreateDirectory(output);
+        if (manifest.components != null) foreach(bool darkMode in new[] { false,true }) using (var picker = new ComponentPicker(manifest, Path.Combine(output,"preview-selection"),16384,darkMode)) {
+            picker.ShowInTaskbar=false; picker.Opacity=0; picker.Show(); Application.DoEvents(); picker.Update();
+            using(var bitmap=new Bitmap(picker.Width,picker.Height)) {
+                picker.DrawToBitmap(bitmap,new Rectangle(0,0,picker.Width,picker.Height));
+                bitmap.Save(Path.Combine(output,darkMode?"component-selection-dark.png":"component-selection.png"),ImageFormat.Png);
+            }
+            picker.Close();
+        }
         foreach (bool dark in new[] { false, true }) foreach (string state in new[] { "idle", "downloading", "paused", "ready", "disk-blocked", "disk-scroll", "runtime-long", "filename-long", "switch-off" }) {
             Func<string> detector = state == "disk-blocked" ? (Func<string>)(() => { throw new IOException("没有可用的安装分区。\n需要至少 25 GiB 可用空间；请释放空间或选择可写目录后重新检测。"); }) : null;
             Func<InstallDrive[]> survey = state == "disk-blocked" ? (Func<InstallDrive[]>)(() => new[] {

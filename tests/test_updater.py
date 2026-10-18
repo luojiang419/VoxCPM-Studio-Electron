@@ -141,6 +141,7 @@ def test_failed_restart_restores_and_reopens_old_version(tmp_path, monkeypatch):
     monkeypatch.setattr(u, "wait_exit", lambda *args: None)
     restarts = []
     class FailedChild:
+        pid = 12345
         def poll(self): return 1
     def restart(root, session, health=True):
         restarts.append(health)
@@ -158,6 +159,7 @@ def test_success_requires_health_ack(tmp_path, monkeypatch):
     root, session, settings = prepare(tmp_path)
     monkeypatch.setattr(u, "wait_exit", lambda *args: None)
     class HealthyChild:
+        pid = 12345
         def poll(self): return None
     def restart(root, session, health=True):
         u.write_json(session / "healthy.json", {"version": "2.0.2"})
