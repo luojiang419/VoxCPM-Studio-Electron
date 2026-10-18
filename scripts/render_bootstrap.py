@@ -22,3 +22,8 @@ if frames:
     durations = [1100 if index % 11 == 10 else 38 for index in range(len(frames))]
     frames[0].save(output / "disk-selection.gif", save_all=True, append_images=frames[1:], duration=durations, loop=0)
     print("真实窗口贝塞尔缩放动图：", output / "disk-selection.gif")
+
+switch_frames = [Image.open(path).convert("RGB") for path in sorted((output / "switch-animation-frames").glob("*.png"))]
+if switch_frames:
+    switch_frames[0].save(output / "switch-light.gif", save_all=True, append_images=switch_frames[1:], duration=[1100 if index % 13 == 12 else 30 for index in range(len(switch_frames))], loop=0)
+    print("真实开关光效动图：", output / "switch-light.gif")

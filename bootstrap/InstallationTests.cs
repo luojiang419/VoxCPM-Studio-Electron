@@ -1,6 +1,8 @@
 using System;
 using System.Collections.Generic;
 using System.Diagnostics;
+using System.Drawing;
+using System.Drawing.Imaging;
 using System.IO;
 using System.Linq;
 using System.Reflection;
@@ -17,6 +19,9 @@ public static class InstallationTests {
     sealed class Quiet : IProgress<Status> { public void Report(Status status) { } }
     static void Check(bool value, string message) { if (!value) throw new Exception(message); }
     static void Reject(Action action, string message) { bool rejected = false; try { action(); } catch { rejected = true; } Check(rejected, message); }
+    static object Invoke(object control, string method, params object[] args) {
+        return control.GetType().GetMethod(method, BindingFlags.Instance | BindingFlags.NonPublic).Invoke(control,args);
+    }
     static void Put(string file, string text) { Directory.CreateDirectory(Path.GetDirectoryName(file)); File.WriteAllText(file, text); }
     static Manifest Manifest() { return new Manifest { appVersion = "2.0.2", entry = "VoxCPM Studio.exe", files = new[] { new Asset { name = "VoxCPM Studio.exe" }, new Asset { name = "resources/app/main.js" } } }; }
     static string Key() { string key = Installer.UninstallKey + ".Test." + Guid.NewGuid().ToString("N"); Keys.Add(key); return key; }
@@ -43,6 +48,129 @@ public static class InstallationTests {
         string fixtures = Path.Combine(fixtureBase, Guid.NewGuid().ToString("N")); Directory.CreateDirectory(fixtures);
         int passed = 0; Action<string, Action> test = (name, action) => { action(); passed++; Console.WriteLine("PASS " + name); };
         try {
+            test("自绘按钮深浅主题及多尺寸圆角无白底，所有交互状态均正确合成", () => {
+                string output=Path.Combine(Path.GetDirectoryName(Assembly.GetExecutingAssembly().Location),"button-rendering"); Directory.CreateDirectory(output);
+                foreach(bool dark in new[] { false,true }) foreach(double scale in new[] { 1.0,1.25,1.5,2.0 }) {
+                    Color paper=dark?Color.FromArgb(29,31,29):Color.FromArgb(251,250,247);
+                    using(var form=new Form { ClientSize=new Size(600,230),BackColor=paper,ShowInTaskbar=false,Opacity=0 })
+                    using(var button=new SoftButton { Text="重新检测",Dark=dark,BackColor=Color.White,Size=new Size((int)(120*scale),(int)(46*scale)),Location=new Point(20,20),Font=new Font("Microsoft YaHei UI",(float)(10*scale)) }) {
+                        form.Controls.Add(button); form.Show(); Application.DoEvents();
+                        foreach(string state in new[] { "normal","hover","pressed","disabled","focus" }) {
+                            if(state=="hover") Invoke(button,"OnMouseEnter",EventArgs.Empty);
+                            if(state=="pressed") Invoke(button,"OnMouseDown",new MouseEventArgs(MouseButtons.Left,1,10,10,0));
+                            if(state=="disabled") button.Enabled=false;
+                            if(state=="focus") { button.Enabled=true; button.Focus(); Invoke(button,"OnMouseLeave",EventArgs.Empty); }
+                            using(var bitmap=new Bitmap(button.Width,button.Height)) {
+                                button.DrawToBitmap(bitmap,button.ClientRectangle);
+                                foreach(var point in new[] { new Point(0,0),new Point(bitmap.Width-1,0),new Point(0,bitmap.Height-1),new Point(bitmap.Width-1,bitmap.Height-1) }) {
+                                    Color corner=bitmap.GetPixel(point.X,point.Y);
+                                    Check(Math.Abs(corner.R-paper.R)<=1 && Math.Abs(corner.G-paper.G)<=1 && Math.Abs(corner.B-paper.B)<=1,"圆角外残留非父背景色："+state);
+                                }
+                                if(dark) for(int y=0;y<4;y++) for(int x=0;x<4;x++) Check(bitmap.GetPixel(x,y).R<100,"深色圆角出现白边");
+                                else for(int y=0;y<3;y++) for(int x=0;x<3;x++) { var pixel=bitmap.GetPixel(x,y); Check(pixel.R<=paper.R+1 && pixel.G<=paper.G+1 && pixel.B<=paper.B+1,"浅色按钮采样边界出现亮边"); }
+                                bitmap.Save(Path.Combine(output,(dark?"dark":"light")+"-"+(scale*100).ToString("0")+"-"+state+".png"),ImageFormat.Png);
+                            }
+                        }
+                        form.Close();
+                    }
+                }
+                // 捕获实际屏幕合成结果，补充 DrawToBitmap 无法覆盖的原生背景差异。
+                foreach(bool dark in new[] { false,true }) using(var form=new Form { Text="VoxCPM 按钮渲染验收",ClientSize=new Size(380,140),BackColor=dark?Color.FromArgb(29,31,29):Color.FromArgb(251,250,247),StartPosition=FormStartPosition.CenterScreen,ShowInTaskbar=false,TopMost=true }) {
+                    form.Controls.Add(new SoftButton { Dark=dark,Text="更改",Location=new Point(24,22),Size=new Size(80,35) });
+                    form.Controls.Add(new SoftButton { Dark=dark,Text="重新检测",Location=new Point(126,22),Size=new Size(120,46) });
+                    form.Controls.Add(new SoftButton { Dark=dark,Primary=true,Text="安装并运行",Location=new Point(126,84),Size=new Size(180,40) });
+                    form.Controls.Add(new SoftButton { Dark=dark,Glyph=ButtonGlyph.Minimize,Text="−",Location=new Point(278,24),Size=new Size(28,28) });
+                    form.Controls.Add(new SoftButton { Dark=dark,Glyph=ButtonGlyph.Close,Text="×",Location=new Point(318,24),Size=new Size(28,28) });
+                    form.Show(); form.Refresh(); Application.DoEvents(); Thread.Sleep(160);
+                    using(var bitmap=new Bitmap(form.ClientSize.Width,form.ClientSize.Height)) {
+                        using(var graphics=Graphics.FromImage(bitmap)) graphics.CopyFromScreen(form.PointToScreen(Point.Empty),Point.Empty,form.ClientSize);
+                        bitmap.Save(Path.Combine(output,"screen-"+(dark?"dark":"light")+".png"),ImageFormat.Png);
+                    }
+                    form.Close();
+                }
+            });
+            test("自绘按钮保留 Enter/Escape/空格、禁用保护和辅助功能点击", () => {
+                int accepts=0,cancels=0;
+                using(var form=new Form { ShowInTaskbar=false,Opacity=0 }) {
+                    var accept=new SoftButton { Text="安装",Size=new Size(120,40) };
+                    var cancel=new SoftButton { Text="暂停",Location=new Point(130,0),Size=new Size(100,40) };
+                    form.Controls.AddRange(new Control[] { accept,cancel }); form.AcceptButton=accept; form.CancelButton=cancel;
+                    accept.Click+=(sender,args)=>accepts++; cancel.Click+=(sender,args)=>cancels++;
+                    form.Show(); Application.DoEvents();
+                    Invoke(form,"ProcessDialogKey",System.Windows.Forms.Keys.Enter); Invoke(form,"ProcessDialogKey",System.Windows.Forms.Keys.Escape);
+                    Check(accepts==1 && cancels==1,"Enter/Escape 按钮契约丢失");
+                    cancel.Focus(); Invoke(cancel,"OnKeyDown",new KeyEventArgs(System.Windows.Forms.Keys.Enter));
+                    Check(cancels==2 && accepts==1,"焦点按钮的 Enter 错误触发默认安装按钮");
+                    Invoke(accept,"OnKeyDown",new KeyEventArgs(System.Windows.Forms.Keys.Space)); Check(accepts==1,"按下空格时过早触发");
+                    Invoke(accept,"OnKeyUp",new KeyEventArgs(System.Windows.Forms.Keys.Space)); Check(accepts==2,"释放空格未触发点击");
+                    accept.AccessibilityObject.DoDefaultAction(); Check(accepts==3,"辅助功能不能点击");
+                    accept.Enabled=false; accept.PerformClick(); accept.AccessibilityObject.DoDefaultAction(); Check(accepts==3,"禁用按钮仍然触发");
+                    form.Close();
+                }
+            });
+            test("切换开关保留选项值，关闭光效熄灭，动画可反向且禁用后不可切换", () => {
+                using(var form=new Form { ShowInTaskbar=false,Opacity=0 }) {
+                    var toggle=new GlowSwitch { Checked=true,Text="创建桌面快捷方式",Dark=true }; form.Controls.Add(toggle);
+                    form.Show(); Application.DoEvents(); int changes=0; toggle.CheckedChanged+=(sender,args)=>changes++;
+                    toggle.PerformClick(); Check(!toggle.Checked && toggle.IsAnimating,"关闭未启动贝塞尔动画");
+                    toggle.AdvanceAnimation(.2); double intermediate=toggle.GlowStrength;
+                    Check(intermediate>0 && intermediate<1,"光效没有逐渐熄灭");
+                    toggle.PerformClick(); toggle.AdvanceAnimation(0); Check(Math.Abs(toggle.GlowStrength-intermediate)<.0001,"快速反向切换时动画跳变");
+                    toggle.AdvanceAnimation(1); Check(toggle.Checked && toggle.GlowStrength==1,"开启光效未完成");
+                    Invoke(toggle,"OnKeyDown",new KeyEventArgs(System.Windows.Forms.Keys.Space)); Invoke(toggle,"OnKeyUp",new KeyEventArgs(System.Windows.Forms.Keys.Space));
+                    toggle.AdvanceAnimation(1); Check(!toggle.Checked && toggle.GlowStrength==0,"关闭后仍有光效");
+                    toggle.AccessibilityObject.DoDefaultAction(); toggle.AdvanceAnimation(1);
+                    Check(toggle.Checked && (toggle.AccessibilityObject.State&AccessibleStates.Checked)!=0,"辅助功能开关状态错误");
+                    toggle.Enabled=false; toggle.PerformClick(); toggle.AccessibilityObject.DoDefaultAction(); Check(toggle.Checked && changes==4,"禁用开关仍触发");
+                    form.Close();
+                }
+            });
+            test("运行时长标题/文件名有独立文本区域，百分比、说明和进度不会重叠", () => {
+                using(var bitmap=new Bitmap(720,830)) using(var g=Graphics.FromImage(bitmap)) {
+                    string[] titles={ "正在补齐 Python 依赖与 CUDA 运行时，首次需要下载数 GB 文件", "正在下载 torch-2.7.1+cu128-cp312-cp312-win_amd64.whl",new String('长',150) };
+                    foreach(string title in titles) {
+                        var layout=PreparationTextLayout.Measure(g,title,false);
+                        Check(layout.Title.Bottom<layout.Detail.Top && layout.Detail.Bottom<layout.Bar.Top && layout.Bar.Bottom<layout.Footnote.Top,"文本和进度区域重叠");
+                        Check(layout.Title.Right<layout.Percent.Left && layout.Footnote.Bottom<412,"百分比重叠或状态卡越界");
+                        if(title.Length<100) using(var font=new Font("Microsoft YaHei UI",layout.TitleSize,FontStyle.Bold,GraphicsUnit.Pixel))
+                            Check(g.MeasureString(title,font,new SizeF(layout.Title.Width,10000)).Height<=layout.Title.Height,"典型长标题未适配字号");
+                    }
+                }
+            });
+            test("关闭/最小化矢量按钮在深浅主题和多尺寸下无白色圆角", () => {
+                foreach(bool dark in new[] { false,true }) foreach(double scale in new[] { 1.0,1.25,1.5,2.0 }) foreach(ButtonGlyph glyph in new[] { ButtonGlyph.Close,ButtonGlyph.Minimize,ButtonGlyph.Sun,ButtonGlyph.Moon })
+                using(var form=new Form { BackColor=dark?Color.FromArgb(29,31,29):Color.FromArgb(251,250,247),Opacity=0,ShowInTaskbar=false })
+                using(var button=new SoftButton { Dark=dark,Glyph=glyph,BackColor=Color.White,Size=new Size((int)(28*scale),(int)(28*scale)) }) {
+                    form.Controls.Add(button); form.Show(); Application.DoEvents();
+                    using(var bitmap=new Bitmap(button.Width,button.Height)) {
+                        button.DrawToBitmap(bitmap,button.ClientRectangle);
+                        foreach(var p in new[] { new Point(0,0),new Point(bitmap.Width-1,0),new Point(0,bitmap.Height-1),new Point(bitmap.Width-1,bitmap.Height-1) }) {
+                            Color pixel=bitmap.GetPixel(p.X,p.Y),paper=form.BackColor;
+                            Check(pixel.A==255 && Math.Abs(pixel.R-paper.R)<=1 && Math.Abs(pixel.G-paper.G)<=1 && Math.Abs(pixel.B-paper.B)<=1,"标题栏按钮圆角残留主题白底："+dark+" / "+scale+" / "+glyph+" / "+pixel);
+                        }
+                        for(int y=0;y<4;y++) for(int x=0;x<4;x++) { var pixel=bitmap.GetPixel(x,y); Check(Math.Abs(pixel.R-form.BackColor.R)<=1 && Math.Abs(pixel.G-form.BackColor.G)<=1 && Math.Abs(pixel.B-form.BackColor.B)<=1,"标题栏按钮采样边界出现亮边"); }
+                    }
+                    form.Close();
+                }
+            });
+            test("默认浅色，主题按钮同步全部控件并保留安装进度、目录、开关和滚动位置", () => {
+                var drives=new[] { "C","D","E","F","G","H" }.Select(letter=>new InstallDrive { root=letter+@":\",ready=true,free=Installer.RequiredSpace*2 }).ToArray();
+                using(var form=new Launcher(Manifest(),true,null,()=>@"D:\Program Files\VoxCPMStudio",()=>drives)) {
+                    form.ShowInTaskbar=false; form.Opacity=0; form.Show(); Application.DoEvents();
+                    Check(!form.IsDark && form.BackColor==Color.FromArgb(251,250,247),"默认没有使用浅色");
+                    var theme=(SoftButton)form.Controls["theme"]; var panel=(DiskStrip)form.Controls["local-disks"];
+                    var toggle=(GlowSwitch)form.Controls["desktop-shortcut"]; toggle.Checked=false; toggle.AdvanceAnimation(1); toggle.Enabled=false;
+                    panel.ScrollToOffset(100,false);
+                    form.SetPreview("working",.7); form.SetPreparationProgress(new Status { text="正在补齐 Python 依赖与 CUDA 运行时",done=70,total=100 },1);
+                    string description=form.AccessibleDescription,root=form.Controls["destination"].Text;
+                    theme.PerformClick();
+                    Check(form.IsDark && form.BackColor==Color.FromArgb(29,31,29) && theme.Glyph==ButtonGlyph.Sun,"主题按钮没有切换深色");
+                    Check(panel.BackColor==form.BackColor && panel.Controls.Cast<DiskCard>().All(card=>card.BackColor==form.BackColor),"磁盘列表没有同步主题");
+                    Check(toggle.Dark && !toggle.Checked && !toggle.Enabled && panel.ScrollOffset==100,"主题切换改变了开关或滚动位置");
+                    Check(form.AccessibleDescription==description && form.Controls["destination"].Text==root && !form.Controls["install"].Enabled,"主题切换重置安装状态");
+                    theme.PerformClick(); Check(!form.IsDark && !toggle.Dark && theme.Glyph==ButtonGlyph.Moon,"主题无法切回浅色"); form.Close();
+                }
+            });
             test("自动选址优先非 C 盘 Program Files、容量排序及不可写目录避让", () => {
                 var drives = new[] {
                     new InstallDrive { root = @"C:\", ready = true, free = Installer.RequiredSpace * 8 },

@@ -188,31 +188,108 @@ namespace VoxBootstrap {
         }
     }
 
-    public sealed class SoftButton : Button {
+    public enum ButtonGlyph { None, Close, Minimize, Sun, Moon }
+    public sealed class SoftButton : Control, IButtonControl {
         public bool Primary, Dark;
-        bool hovering;
+        public ButtonGlyph Glyph;
+        bool hovering, pressed;
+        Bitmap background;
+        Color cachedSurface, cachedPaper, cachedInk;
+        ButtonGlyph cachedGlyph;
+        public DialogResult DialogResult { get; set; }
         public SoftButton() {
-            SetStyle(ControlStyles.UserPaint | ControlStyles.AllPaintingInWmPaint | ControlStyles.OptimizedDoubleBuffer, true);
-            FlatStyle = FlatStyle.Flat; FlatAppearance.BorderSize = 0; Cursor = Cursors.Hand;
-            Font = new Font("Microsoft YaHei UI", 10); UseVisualStyleBackColor = false;
+            SetStyle(ControlStyles.UserPaint | ControlStyles.AllPaintingInWmPaint | ControlStyles.OptimizedDoubleBuffer | ControlStyles.Selectable | ControlStyles.StandardClick, true);
+            Cursor = Cursors.Hand; TabStop = true; AccessibleRole = AccessibleRole.PushButton;
+            Font = new Font("Microsoft YaHei UI", 10);
+        }
+        public void NotifyDefault(bool value) { Invalidate(); }
+        public void PerformClick() { if (CanSelect) OnClick(EventArgs.Empty); }
+        protected override AccessibleObject CreateAccessibilityInstance() { return new ButtonAccessibility(this); }
+        sealed class ButtonAccessibility : ControlAccessibleObject {
+            readonly SoftButton button;
+            public ButtonAccessibility(SoftButton value) : base(value) { button=value; }
+            public override string DefaultAction { get { return "点击"; } }
+            public override void DoDefaultAction() { button.PerformClick(); }
+        }
+        protected override void OnClick(EventArgs e) {
+            if (!Enabled) return;
+            if (DialogResult != DialogResult.None && FindForm() != null) FindForm().DialogResult = DialogResult;
+            base.OnClick(e);
         }
         protected override void OnMouseEnter(EventArgs e) { hovering = true; Invalidate(); base.OnMouseEnter(e); }
-        protected override void OnMouseLeave(EventArgs e) { hovering = false; Invalidate(); base.OnMouseLeave(e); }
+        protected override void OnMouseLeave(EventArgs e) { hovering = false; pressed = false; Invalidate(); base.OnMouseLeave(e); }
+        protected override void OnMouseDown(MouseEventArgs e) { if (Enabled && e.Button == MouseButtons.Left) { pressed = true; Focus(); Invalidate(); } base.OnMouseDown(e); }
+        protected override void OnMouseUp(MouseEventArgs e) { pressed = false; Invalidate(); base.OnMouseUp(e); }
+        protected override void OnMouseCaptureChanged(EventArgs e) { pressed = false; Invalidate(); base.OnMouseCaptureChanged(e); }
+        protected override void OnEnabledChanged(EventArgs e) { pressed = false; Invalidate(); base.OnEnabledChanged(e); }
+        protected override void OnGotFocus(EventArgs e) { Invalidate(); base.OnGotFocus(e); }
+        protected override void OnLostFocus(EventArgs e) { pressed = false; Invalidate(); base.OnLostFocus(e); }
+        protected override bool IsInputKey(Keys keyData) { return (keyData & Keys.KeyCode) == Keys.Space || (keyData & Keys.KeyCode) == Keys.Enter || base.IsInputKey(keyData); }
+        protected override void OnKeyDown(KeyEventArgs e) {
+            if (e.KeyCode == Keys.Space && Enabled) { pressed = true; Invalidate(); e.Handled = true; }
+            if (e.KeyCode == Keys.Enter && Enabled) { PerformClick(); e.Handled = true; e.SuppressKeyPress = true; }
+            base.OnKeyDown(e);
+        }
+        protected override void OnKeyUp(KeyEventArgs e) { if (e.KeyCode == Keys.Space && pressed) { pressed = false; PerformClick(); Invalidate(); e.Handled = true; } base.OnKeyUp(e); }
+        protected override void OnPaintBackground(PaintEventArgs e) { e.Graphics.Clear(Parent == null ? BackColor : Parent.BackColor); }
+        void CacheBackground(Color paper, Color surface, Color ink) {
+            if (background != null && background.Size == ClientSize && cachedPaper == paper && cachedSurface == surface && cachedInk == ink && cachedGlyph == Glyph) return;
+            if (background != null) background.Dispose();
+            background = new Bitmap(Width, Height, System.Drawing.Imaging.PixelFormat.Format32bppPArgb);
+            // 圆角先以 4 倍尺寸绘制再缩小，并用父背景预合成，避免原生主题白底和透明边缘白色杂边。
+            using (var large = new Bitmap(Width * 4, Height * 4, System.Drawing.Imaging.PixelFormat.Format32bppPArgb)) {
+                using (var g = Graphics.FromImage(large)) {
+                    g.Clear(paper); g.ScaleTransform(4,4); g.SmoothingMode = SmoothingMode.AntiAlias;
+                    float radius=Glyph==ButtonGlyph.None?Math.Min(12,Height*.27f):Math.Min(Width,Height)/2f-.5f;
+                    using (var shape = Launcher.Round(new RectangleF(.5f,.5f,Width-1,Height-1),radius))
+                    using (var fill = new SolidBrush(surface)) g.FillPath(fill,shape);
+                    if(Glyph!=ButtonGlyph.None) {
+                        float scale=Math.Min(Width,Height)/28f, cx=Width/2f, cy=Height/2f, r=3.5f*scale;
+                        using(var pen=new Pen(ink,1.35f*scale) { StartCap=LineCap.Round,EndCap=LineCap.Round }) {
+                            if(Glyph==ButtonGlyph.Close) { g.DrawLine(pen,cx-r,cy-r,cx+r,cy+r); g.DrawLine(pen,cx+r,cy-r,cx-r,cy+r); }
+                            else if(Glyph==ButtonGlyph.Minimize) g.DrawLine(pen,cx-r,cy,cx+r,cy);
+                            else if(Glyph==ButtonGlyph.Sun) {
+                                g.DrawEllipse(pen,cx-2.5f*scale,cy-2.5f*scale,5*scale,5*scale);
+                                for(int i=0;i<8;i++) { double angle=i*Math.PI/4; g.DrawLine(pen,cx+(float)Math.Cos(angle)*4.5f*scale,cy+(float)Math.Sin(angle)*4.5f*scale,cx+(float)Math.Cos(angle)*6.2f*scale,cy+(float)Math.Sin(angle)*6.2f*scale); }
+                            } else {
+                                using(var fill=new SolidBrush(ink)) g.FillEllipse(fill,cx-4.7f*scale,cy-4.7f*scale,9.4f*scale,9.4f*scale);
+                                using(var cutout=new SolidBrush(surface)) g.FillEllipse(cutout,cx-1.9f*scale,cy-6.2f*scale,8.8f*scale,8.8f*scale);
+                            }
+                        }
+                    }
+                }
+                using (var g = Graphics.FromImage(background)) {
+                    g.CompositingMode = System.Drawing.Drawing2D.CompositingMode.SourceCopy;
+                    g.InterpolationMode = InterpolationMode.HighQualityBicubic; g.PixelOffsetMode = PixelOffsetMode.HighQuality;
+                    // 镜像边界避免双三次采样读到图片外的透明黑，造成浅色背景亮边。
+                    using(var attributes=new System.Drawing.Imaging.ImageAttributes()) {
+                        attributes.SetWrapMode(WrapMode.TileFlipXY);
+                        g.DrawImage(large,new Rectangle(0,0,Width,Height),0,0,large.Width,large.Height,GraphicsUnit.Pixel,attributes);
+                    }
+                }
+            }
+            cachedPaper=paper; cachedSurface=surface; cachedInk=ink; cachedGlyph=Glyph;
+        }
         protected override void OnPaint(PaintEventArgs e) {
+            if (Width < 2 || Height < 2) return;
             e.Graphics.SmoothingMode = SmoothingMode.AntiAlias;
             Color surface = Primary ? (Dark ? Color.FromArgb(236, 232, 224) : Color.FromArgb(40, 42, 39)) : (Dark ? Color.FromArgb(43, 44, 41) : Color.FromArgb(242, 241, 236));
             if (hovering && Enabled) surface = Primary ? (Dark ? Color.White : Color.FromArgb(66, 67, 61)) : (Dark ? Color.FromArgb(55, 56, 51) : Color.FromArgb(233, 231, 224));
-            using (var shape = Launcher.Round(new RectangleF(0, 0, Width - 1, Height - 1), 12)) using (var fill = new SolidBrush(surface)) e.Graphics.FillPath(fill, shape);
+            if (pressed && Enabled) surface = Primary ? (Dark ? Color.FromArgb(218,214,205) : Color.FromArgb(27,30,26)) : (Dark ? Color.FromArgb(65,69,59) : Color.FromArgb(221,225,211));
             Color ink = Primary ? (Dark ? Color.FromArgb(35, 36, 33) : Color.White) : (Dark ? Color.FromArgb(217, 216, 207) : Color.FromArgb(83, 85, 78));
             if (!Enabled) ink = Color.FromArgb(146, 146, 136);
-            TextRenderer.DrawText(e.Graphics, Text, Font, ClientRectangle, ink, TextFormatFlags.HorizontalCenter | TextFormatFlags.VerticalCenter);
-            if (Focused && ShowFocusCues) ControlPaint.DrawFocusRectangle(e.Graphics, Rectangle.Inflate(ClientRectangle, -5, -5), ink, surface);
+            CacheBackground(Parent == null ? BackColor : Parent.BackColor,surface,ink);
+            e.Graphics.DrawImageUnscaled(background,0,0);
+            if(Glyph==ButtonGlyph.None) TextRenderer.DrawText(e.Graphics, Text, Font, ClientRectangle, ink, TextFormatFlags.HorizontalCenter | TextFormatFlags.VerticalCenter);
+            if (Focused && ShowFocusCues) using(var pen=new Pen(Dark?Color.FromArgb(190,157,114):Color.FromArgb(147,120,82)) { DashStyle=DashStyle.Dot })
+                using(var path=Launcher.Round(new RectangleF(4,4,Width-9,Height-9),8)) e.Graphics.DrawPath(pen,path);
         }
+        protected override void Dispose(bool disposing) { if(disposing && background!=null) background.Dispose(); base.Dispose(disposing); }
     }
 
     public sealed class Launcher : Form {
         readonly SoftButton run = new SoftButton { Primary = true }, pause = new SoftButton(), close = new SoftButton(), minimize = new SoftButton();
-        readonly SoftButton browse = new SoftButton(), detect = new SoftButton();
+        readonly SoftButton browse = new SoftButton(), detect = new SoftButton(), theme = new SoftButton();
         readonly Func<string> rootDetector;
         readonly Func<InstallDrive[]> driveSurvey;
         readonly DiskStrip diskPanel;
@@ -220,10 +297,12 @@ namespace VoxBootstrap {
         InstallDrive[] drives = new InstallDrive[0];
         Bitmap diskIcon;
         readonly TextBox installPath = new TextBox();
-        readonly CheckBox desktopShortcut = new CheckBox(), startMenuShortcut = new CheckBox();
+        readonly GlowSwitch desktopShortcut = new GlowSwitch(), startMenuShortcut = new GlowSwitch();
         Bitmap brandMark;
         readonly Manifest manifest;
-        readonly bool preview, dark;
+        readonly bool preview;
+        bool dark;
+        public bool IsDark { get { return dark; } }
         readonly System.Windows.Forms.Timer animation = new System.Windows.Forms.Timer { Interval = 16 };
         readonly Stopwatch animationClock = new Stopwatch();
         double demoStart;
@@ -239,16 +318,12 @@ namespace VoxBootstrap {
             p.AddArc(r.X, r.Y, d, d, 180, 90); p.AddArc(r.Right - d, r.Y, d, d, 270, 90);
             p.AddArc(r.Right - d, r.Bottom - d, d, d, 0, 90); p.AddArc(r.X, r.Bottom - d, d, d, 90, 90); p.CloseFigure(); return p;
         }
-        static bool SystemDark() {
-            try { using (var key = Microsoft.Win32.Registry.CurrentUser.OpenSubKey(@"Software\Microsoft\Windows\CurrentVersion\Themes\Personalize")) return key != null && Convert.ToInt32(key.GetValue("AppsUseLightTheme", 1)) == 0; }
-            catch { return false; }
-        }
         Color Paper { get { return dark ? Color.FromArgb(29, 31, 29) : Color.FromArgb(251, 250, 247); } }
         Color Ink { get { return dark ? Color.FromArgb(235, 233, 225) : Color.FromArgb(40, 43, 39); } }
         Color Muted { get { return dark ? Color.FromArgb(158, 161, 150) : Color.FromArgb(124, 128, 116); } }
         Color Accent { get { return dark ? Color.FromArgb(218, 166, 121) : Color.FromArgb(181, 123, 83); } }
         public Launcher(Manifest value, bool demonstration = false, bool? darkMode = null, Func<string> detectRoot = null, Func<InstallDrive[]> survey = null) {
-            manifest = value; preview = demonstration; dark = darkMode ?? SystemDark();
+            manifest = value; preview = demonstration; dark = darkMode ?? false;
             diskPanel=new DiskStrip(dark) { Name="local-disks", TabIndex=0 };
             rootDetector = detectRoot ?? (() => Installer.DefaultRoot(!preview));
             driveSurvey = survey ?? Installer.SurveyDrives;
@@ -258,9 +333,12 @@ namespace VoxBootstrap {
             AccessibleName = "VoxCPM Studio 启动器"; MaximizeBox = false;
             run.Text = "安装并运行  →"; run.AccessibleName = "安装并准备工作台"; run.TabIndex = 3;
             pause.Text = "暂停"; pause.AccessibleName = "暂停准备"; pause.Visible = false; pause.TabIndex = 1;
-            close.Text = "×"; close.AccessibleName = "关闭启动器"; close.TabIndex = 3;
-            minimize.Text = "−"; minimize.AccessibleName = "最小化"; minimize.TabIndex = 2;
-            foreach (var button in new[] { run, pause, close, minimize, browse, detect }) { button.Dark = dark; button.BackColor = Paper; Controls.Add(button); }
+            close.Text = "×"; close.Name="close"; close.Glyph=ButtonGlyph.Close; close.AccessibleName = "关闭启动器"; close.TabIndex = 3;
+            minimize.Text = "−"; minimize.Name="minimize"; minimize.Glyph=ButtonGlyph.Minimize; minimize.AccessibleName = "最小化"; minimize.TabIndex = 2;
+            theme.Name="theme"; theme.Glyph=dark?ButtonGlyph.Sun:ButtonGlyph.Moon; theme.AccessibleName=dark?"切换浅色主题":"切换深色主题"; theme.TabIndex=5;
+            driveTips.SetToolTip(theme,theme.AccessibleName);
+            theme.Click+=(sender,args)=>ApplyTheme(!dark);
+            foreach (var button in new[] { run, pause, close, minimize, browse, detect, theme }) { button.Dark = dark; button.BackColor = Paper; Controls.Add(button); }
             run.Name = "install"; detect.Name = "detect"; installPath.Name = "destination";
             installPath.BorderStyle = BorderStyle.None; installPath.BackColor = Paper; installPath.ForeColor = Ink;
             installPath.AccessibleName = "安装目录"; installPath.TabIndex = 0;
@@ -273,8 +351,8 @@ namespace VoxBootstrap {
                 run.Enabled = !String.IsNullOrWhiteSpace(installPath.Text);
                 SyncDriveSelection();
             };
-            desktopShortcut.Text = "创建桌面快捷方式"; desktopShortcut.Checked = true; desktopShortcut.AutoSize = true; desktopShortcut.ForeColor = Muted; desktopShortcut.BackColor = Paper; desktopShortcut.TabIndex = 2;
-            startMenuShortcut.Text = "添加到开始菜单"; startMenuShortcut.Checked = true; startMenuShortcut.AutoSize = true; startMenuShortcut.ForeColor = Muted; startMenuShortcut.BackColor = Paper; startMenuShortcut.TabIndex = 2;
+            desktopShortcut.Name="desktop-shortcut"; desktopShortcut.Text = "创建桌面快捷方式"; desktopShortcut.Dark=dark; desktopShortcut.Checked = true; desktopShortcut.BackColor = Paper; desktopShortcut.TabIndex = 2;
+            startMenuShortcut.Name="start-menu-shortcut"; startMenuShortcut.Text = "添加到开始菜单"; startMenuShortcut.Dark=dark; startMenuShortcut.Checked = true; startMenuShortcut.BackColor = Paper; startMenuShortcut.TabIndex = 2;
             Controls.AddRange(new Control[] { installPath, desktopShortcut, startMenuShortcut });
             diskPanel.BackColor = Paper; Controls.Add(diskPanel);
             browse.Click += (sender, args) => {
@@ -308,6 +386,17 @@ namespace VoxBootstrap {
             };
             FormClosing += (sender, args) => { animation.Stop(); if (cancellation != null) cancellation.Cancel(); };
             Resize += (sender, args) => LayoutButtons(); LayoutButtons(); DetectDestination();
+        }
+        void ApplyTheme(bool value) {
+            dark=value; BackColor=Paper;
+            foreach(var button in new[] { run,pause,close,minimize,browse,detect,theme }) { button.Dark=dark; button.BackColor=Paper; button.Invalidate(); }
+            theme.Glyph=dark?ButtonGlyph.Sun:ButtonGlyph.Moon; theme.AccessibleName=dark?"切换浅色主题":"切换深色主题";
+            driveTips.SetToolTip(theme,theme.AccessibleName);
+            installPath.BackColor=Paper; installPath.ForeColor=Ink;
+            desktopShortcut.Dark=dark; desktopShortcut.BackColor=Paper; desktopShortcut.Invalidate();
+            startMenuShortcut.Dark=dark; startMenuShortcut.BackColor=Paper; startMenuShortcut.Invalidate();
+            diskPanel.SetTheme(dark);
+            Invalidate();
         }
         void DetectDestination() {
             drives = driveSurvey();
@@ -371,10 +460,11 @@ namespace VoxBootstrap {
             diskPanel.SetBounds((int)(42*sx),(int)(262*sy),(int)(636*sx),(int)(150*sy));
             installPath.SetBounds((int)(59 * sx), (int)(444 * sy), (int)(507 * sx), (int)(23 * sy));
             browse.SetBounds((int)(588 * sx), (int)(436 * sy), (int)(80 * sx), (int)(35 * sy));
-            desktopShortcut.SetBounds((int)(44 * sx), (int)(490 * sy), (int)(220 * sx), (int)(25 * sy));
-            startMenuShortcut.SetBounds((int)(266 * sx), (int)(490 * sy), (int)(205 * sx), (int)(25 * sy));
+            desktopShortcut.SetBounds((int)(42 * sx), (int)(482 * sy), (int)(256 * sx), (int)(46 * sy));
+            startMenuShortcut.SetBounds((int)(310 * sx), (int)(482 * sy), (int)(256 * sx), (int)(46 * sy));
             close.SetBounds((int)(666 * sx), (int)(27 * sy), (int)(28 * sx), (int)(28 * sy));
             minimize.SetBounds((int)(630 * sx), (int)(27 * sy), (int)(28 * sx), (int)(28 * sy));
+            theme.SetBounds((int)(594 * sx), (int)(27 * sy), (int)(28 * sx), (int)(28 * sy));
             using (var shape = Round(new RectangleF(0, 0, ClientSize.Width, ClientSize.Height), 22)) { var old = Region; Region = new Region(shape); if (old != null) old.Dispose(); }
             Invalidate();
         }
@@ -390,7 +480,7 @@ namespace VoxBootstrap {
             if (brandMark != null) g.DrawImage(brandMark, new Rectangle(36, 28, 50, 50));
             else TextAt(g, "V", 28, Accent, 48, 36, 32, true);
             TextAt(g, "VOXCPM", 14, Ink, 92, 35, 160, true); TextAt(g, "STUDIO", 10, Muted, 93, 57, 140);
-            TextAt(g, "本地 AI 配音工作台", 11, Muted, 475, 43, 150);
+            TextAt(g, "本地 AI 配音工作台", 11, Muted, 438, 43, 140);
             TextAt(g, "好声音，从这里开始。", 31, Ink, 40, 133, 420);
             TextAt(g, "选择安装位置，剩下的交给我们。", 14, Muted, 43, 183, 400);
             // 波形用向量绘制，不携带图片或网页运行时。
@@ -406,20 +496,20 @@ namespace VoxBootstrap {
             TextAt(g, "安装到专用应用文件夹", 11, Muted, 44, 411, 400);
             using (var shape = Round(new RectangleF(42, 430, 636, 48), 12)) using (var pen = new Pen(dark ? Color.FromArgb(65, 70, 60) : Color.FromArgb(218, 222, 209))) g.DrawPath(pen, shape);
             g.TranslateTransform(0, 280);
-            using (var shape = Round(new RectangleF(42, 268, 636, 128), 18)) using (var brush = new SolidBrush(dark ? Color.FromArgb(38, 41, 36) : Color.FromArgb(242, 242, 235))) g.FillPath(brush, shape);
-            TextAt(g, statusTitle, 16, Ink, 62, 289, 455, true);
+            using (var shape = Round(new RectangleF(42, 268, 636, 144), 18)) using (var brush = new SolidBrush(dark ? Color.FromArgb(38, 41, 36) : Color.FromArgb(242, 242, 235))) g.FillPath(brush, shape);
+            var textLayout=PreparationTextLayout.Measure(g,statusTitle,destinationBlocked || view=="error");
+            DrawStatusText(g,statusTitle,textLayout.TitleSize,Ink,textLayout.Title,true);
             string amount = destinationBlocked ? "需处理" : total > 0 ? Math.Round(fraction * 100) + "%" : (view == "idle" ? "等待开始" : view == "ready" ? "已就绪" : view == "paused" ? "已暂停" : "准备中");
-            TextAt(g, amount, 12, Muted, 596, 292, 70);
+            DrawStatusText(g,amount,12,Muted,textLayout.Percent,false);
             if (destinationBlocked || view == "error") {
-                using (var font = new Font("Microsoft YaHei UI", 12, GraphicsUnit.Pixel))
-                using (var brush = new SolidBrush(Muted)) g.DrawString(statusDetail, font, brush, new RectangleF(63, 321, 590, 69));
+                DrawStatusText(g,statusDetail,12,Muted,textLayout.Detail,false);
             } else {
-            TextAt(g, statusDetail, 12, Muted, 63, 321, 590);
-            using (var shape = Round(new RectangleF(63, 361, 594, 5), 2.5f)) using (var brush = new SolidBrush(dark ? Color.FromArgb(61, 66, 55) : Color.FromArgb(223, 226, 213))) g.FillPath(brush, shape);
+            DrawStatusText(g,statusDetail,12,Muted,textLayout.Detail,false);
+            using (var shape = Round(textLayout.Bar, 2.5f)) using (var brush = new SolidBrush(dark ? Color.FromArgb(61, 66, 55) : Color.FromArgb(223, 226, 213))) g.FillPath(brush, shape);
             float filled = (float)(594 * fraction);
-            if (filled > 2) using (var shape = Round(new RectangleF(63, 361, filled, 5), 2.5f)) using (var brush = new SolidBrush(Accent)) g.FillPath(brush, shape);
-            if (total == 0 && view == "working") using (var brush = new SolidBrush(Accent)) g.FillRectangle(brush, 63 + (float)(pulse * 464), 361, 130, 5);
-            TextAt(g, total > 0 ? String.Format("{0:F1} MB / {1:F1} MB", downloaded / 1048576.0, total / 1048576.0) : "首次联网准备 · 已有资源自动复用", 10, Muted, 63, 376, 570);
+            if (filled > 2) using (var shape = Round(new RectangleF(textLayout.Bar.X,textLayout.Bar.Y,filled,5), 2.5f)) using (var brush = new SolidBrush(Accent)) g.FillPath(brush, shape);
+            if (total == 0 && view == "working") using (var brush = new SolidBrush(Accent)) g.FillRectangle(brush,textLayout.Bar.X+(float)(pulse*464),textLayout.Bar.Y,130,5);
+            DrawStatusText(g,total > 0 ? String.Format("{0:F1} MB / {1:F1} MB", downloaded / 1048576.0, total / 1048576.0) : "首次联网准备 · 已有资源自动复用",10,Muted,textLayout.Footnote,false);
             }
             string[] steps = { "安装应用", "准备环境", "完成安装" };
             for (int i = 0; i < 3; i++) {
@@ -431,6 +521,21 @@ namespace VoxBootstrap {
             }
             using (var brush = new SolidBrush(Accent)) g.FillEllipse(brush, 44, 455, 5, 5);
             TextAt(g, preview ? "安装演示 · 不会下载或修改系统" : "当前用户安装 · 无需管理员权限", 11, Muted, 56, 449, 325);
+        }
+        static void DrawStatusText(Graphics graphics,string text,float size,Color color,RectangleF bounds,bool bold) {
+            var state=graphics.Save(); graphics.SetClip(bounds);
+            using(var font=new Font("Microsoft YaHei UI",size,bold?FontStyle.Bold:FontStyle.Regular,GraphicsUnit.Pixel))
+            using(var brush=new SolidBrush(color))
+            using(var format=new StringFormat { Trimming=StringTrimming.EllipsisWord,FormatFlags=StringFormatFlags.LineLimit })
+                graphics.DrawString(text,font,brush,bounds,format);
+            graphics.Restore(state);
+        }
+        public void SetPreparationProgress(Status status,int phase) {
+            installPhase=phase; statusTitle=status.text;
+            statusDetail=phase==0?"正在安装应用，下载内容会自动保存。":"正在补齐依赖和模型，完成后自动登记安装。";
+            downloaded=status.done; total=status.total;
+            if(total>0) fraction=Math.Max(0,Math.Min(1,(double)downloaded/total));
+            AccessibleDescription=statusTitle+statusDetail; Invalidate();
         }
         public void SetPreview(string state, double value) {
             view = state; fraction = Math.Max(0, Math.Min(1, value)); downloaded = (long)(fraction * 111063687); total = state == "idle" ? 0 : 111063687;
@@ -453,10 +558,7 @@ namespace VoxBootstrap {
             installPath.Enabled = browse.Enabled = detect.Enabled = diskPanel.Enabled = desktopShortcut.Enabled = startMenuShortcut.Enabled = false;
             var reporter = new Progress<Status>(status => {
                 if (IsDisposed) return;
-                statusTitle = status.text; statusDetail = installPhase == 0 ? "正在安装应用，下载内容会自动保存。" : "正在补齐依赖和模型，完成后自动登记安装。";
-                downloaded = status.done; total = status.total;
-                if (total > 0) fraction = Math.Max(0, Math.Min(1, (double)downloaded / total));
-                AccessibleDescription = statusTitle; Invalidate();
+                SetPreparationProgress(status,installPhase);
             });
             try {
                 root = Installer.Canonical(root); installPath.Text = root;

@@ -13,7 +13,7 @@ public static class BootstrapPreview {
         Application.EnableVisualStyles(); Application.SetCompatibleTextRenderingDefault(false);
         var manifest = new JavaScriptSerializer().Deserialize<Manifest>(File.ReadAllText(args[0], Encoding.UTF8));
         string output = Path.GetFullPath(args[1]); Directory.CreateDirectory(output);
-        foreach (bool dark in new[] { false, true }) foreach (string state in new[] { "idle", "downloading", "paused", "ready", "disk-blocked", "disk-scroll" }) {
+        foreach (bool dark in new[] { false, true }) foreach (string state in new[] { "idle", "downloading", "paused", "ready", "disk-blocked", "disk-scroll", "runtime-long", "filename-long", "switch-off" }) {
             Func<string> detector = state == "disk-blocked" ? (Func<string>)(() => { throw new IOException("其他分区空间均不足。\n至少需要 25 GiB；D盘 8.2 GiB，E盘 3.6 GiB。请释放空间后重新检测。不会自动安装到 C 盘。"); }) : null;
             Func<InstallDrive[]> survey = state == "disk-blocked" ? (Func<InstallDrive[]>)(() => new[] {
                 new InstallDrive { root=@"C:\", ready=true, free=100L*1073741824 },
@@ -27,6 +27,14 @@ public static class BootstrapPreview {
             using (var form = new Launcher(manifest, true, dark, detector, survey)) {
                 form.ShowInTaskbar = false; form.Opacity = 0; form.Show(); Application.DoEvents();
                 if (state != "disk-blocked") form.SetPreview(state=="disk-scroll"?"idle":state, state == "ready" ? 1 : state == "idle" || state=="disk-scroll" ? 0 : .42); form.Update();
+                if(state=="runtime-long" || state=="filename-long") {
+                    form.SetPreview("working",1);
+                    form.SetPreparationProgress(new Status { text=state=="runtime-long"?"正在补齐 Python 依赖与 CUDA 运行时，首次需要下载数 GB 文件":"正在下载 torch-2.7.1+cu128-cp312-cp312-win_amd64.whl",done=1782579,total=1782579 },1);
+                }
+                if(state=="switch-off") {
+                    form.SetPreview("idle",0);
+                    foreach(var name in new[] { "desktop-shortcut","start-menu-shortcut" }) { var toggle=(GlowSwitch)form.Controls[name]; toggle.Checked=false; toggle.AdvanceAnimation(1); }
+                }
                 var panel = (DiskStrip)form.Controls["local-disks"];
                 foreach (DiskCard card in panel.Controls) card.AdvanceAnimation(1);
                 ((TextBox)form.Controls["destination"]).DeselectAll();
@@ -59,6 +67,30 @@ public static class BootstrapPreview {
             }
             form.Close();
         }
-        Console.WriteLine("12 张实际原生界面已渲染：" + output); return 0;
+        using(var form=new Launcher(manifest,true,true)) {
+            form.ShowInTaskbar=false; form.Opacity=0; form.Show(); Application.DoEvents();
+            var toggle=(GlowSwitch)form.Controls["desktop-shortcut"];
+            string frames=Path.Combine(output,"switch-animation-frames"); Directory.CreateDirectory(frames); int index=0;
+            foreach(bool on in new[] { false,true }) {
+                toggle.Checked=on;
+                for(int frame=0;frame<=12;frame++) {
+                    toggle.AdvanceAnimation(frame/12.0);
+                    using(var bitmap=new Bitmap(form.Width,form.Height)) {
+                        form.DrawToBitmap(bitmap,form.ClientRectangle);
+                        using(var crop=bitmap.Clone(new Rectangle(42,480,540,50),PixelFormat.Format32bppArgb)) crop.Save(Path.Combine(frames,(index++).ToString("D3")+".png"),ImageFormat.Png);
+                    }
+                }
+            }
+            form.Close();
+        }
+        foreach(bool dark in new[] { false,true }) using(var form=new Launcher(manifest,true,dark)) {
+            form.ShowInTaskbar=false; form.TopMost=true; form.Show(); form.Refresh(); Application.DoEvents(); System.Threading.Thread.Sleep(180);
+            using(var bitmap=new Bitmap(form.ClientSize.Width,form.ClientSize.Height)) {
+                using(var graphics=Graphics.FromImage(bitmap)) graphics.CopyFromScreen(form.PointToScreen(Point.Empty),Point.Empty,form.ClientSize);
+                bitmap.Save(Path.Combine(output,"screen-launcher-"+(dark?"dark":"light")+".png"),ImageFormat.Png);
+            }
+            form.Close();
+        }
+        Console.WriteLine("18 张实际原生界面及两张屏幕合成截图已渲染：" + output); return 0;
     }
 }
