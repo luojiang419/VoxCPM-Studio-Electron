@@ -254,6 +254,41 @@ def restart(root, session, health=True):
                             stdout=subprocess.DEVNULL, stderr=subprocess.DEVNULL)
 
 
+def launch_standalone(session: Path):
+    """兼容上一发布的旧窗口：签名验证后交给原生EXE，窗口无需留在应用目录。"""
+    settings = read_json(session / "session.json")
+    manifest = validate(session, settings)
+    native = next((r for r in manifest["files"] if r["path"] == "resources/app/standalone-updater.exe"), None)
+    if not native:
+        return False
+    executable = session / "VoxCPM Updater.exe"
+    shutil.copy2(session / "stage" / native["path"], executable)
+    settings["pythonExecutable"] = sys.executable
+    settings.setdefault("resultPath", str(Path(settings["root"]) / "data/cache/updates/last-result.json"))
+    write_json(session / "session.json", settings)
+    child = subprocess.Popen([str(executable), "--session", str(session)], cwd=session,
+        stdin=subprocess.DEVNULL, stdout=subprocess.DEVNULL, stderr=subprocess.DEVNULL,
+        creationflags=subprocess.CREATE_NEW_PROCESS_GROUP | subprocess.DETACHED_PROCESS)
+    emit("原生独立更新器已打开，正在等待接管…", 5)
+    deadline = time.monotonic() + 45
+    while time.monotonic() < deadline:
+        host_file, ready_file = session / "host-ready.json", session / "ready.json"
+        if host_file.exists() and ready_file.exists():
+            host, ready = read_json(host_file), read_json(ready_file)
+            if (host.get("hostPid") == child.pid and host.get("workerPid") == ready.get("pid")
+                    and ready.get("parentPid") == settings["parentPid"] and ready.get("releaseId") == manifest.get("releaseId")):
+                # 旧窗口等原主进程退出后再关闭，保证旧客户端来得及接收ready握手。
+                wait_exit(settings["parentPid"], cancel=session / "cancel.json")
+                return True
+        if child.poll() is not None:
+            raise RuntimeError("原生独立更新器提前退出")
+        if (session / "cancel.json").exists():
+            raise RuntimeError("主程序已取消本次安装")
+        time.sleep(0.1)
+    write_json(session / "cancel.json", {"cancelledAt": time.time()})
+    raise TimeoutError("独立更新器接管超时，未允许主程序退出")
+
+
 def run(session: Path, recover=False):
     settings = read_json(session / "session.json")
     root = Path(settings["root"]).resolve(strict=True)
@@ -338,9 +373,12 @@ if __name__ == "__main__":
     parser = argparse.ArgumentParser(description=__doc__)
     parser.add_argument("session", type=Path)
     parser.add_argument("--recover", action="store_true")
+    parser.add_argument("--worker", action="store_true", help="由独立更新器启动的事务工作进程")
     args = parser.parse_args()
     try:
-        run(args.session.resolve(strict=True), args.recover)
+        session = args.session.resolve(strict=True)
+        if args.recover or args.worker or not launch_standalone(session):
+            run(session, args.recover)
     except BaseException as error:
         status_file = args.session / "status.json"
         if not status_file.exists() or read_json(status_file).get("status") not in ("complete", "rolled-back"):

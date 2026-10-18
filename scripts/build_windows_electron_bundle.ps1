@@ -173,6 +173,9 @@ if (-not (Test-Path (Join-Path $electronRuntime "electron.exe"))) {
 }
 
 Write-Step "Assemble direct desktop executable"
+$nativeBuildPython = Join-Path $bundleRoot "runtime\python\python.exe"
+& $nativeBuildPython (Join-Path $scriptDir "build_standalone_updater.py")
+if ($LASTEXITCODE -ne 0) { throw "Standalone updater compilation failed" }
 Invoke-Robocopy -Source $electronRuntime -Destination $bundleRoot
 if (Test-Path $desktopExePath) {
     Remove-Item -LiteralPath $desktopExePath -Force
@@ -185,7 +188,7 @@ New-Item -ItemType Directory -Force -Path $resourcesAppRoot | Out-Null
 Copy-Item -LiteralPath (Join-Path $electronProject "main.js") -Destination (Join-Path $resourcesAppRoot "main.js") -Force
 Copy-Item -LiteralPath (Join-Path $electronProject "preload.js") -Destination (Join-Path $resourcesAppRoot "preload.js") -Force
 Copy-Item -LiteralPath (Join-Path $electronProject "package.json") -Destination (Join-Path $resourcesAppRoot "package.json") -Force
-foreach ($updateFile in @("update-service.js", "update-window.js", "update-config.json", "updater.py", "runtime-service.js", "runtime-config.json", "runtime-requirements.txt", "install-protocol.js", "app.ico", "app-icon.png")) {
+foreach ($updateFile in @("update-service.js", "update-window.js", "update-config.json", "updater.py", "standalone-updater.exe", "runtime-service.js", "runtime-config.json", "runtime-requirements.txt", "install-protocol.js", "component-service.js", "music-config.json", "app.ico", "app-icon.png")) {
     Copy-Item -LiteralPath (Join-Path $electronProject $updateFile) -Destination (Join-Path $resourcesAppRoot $updateFile) -Force
 }
 Invoke-Robocopy -Source (Join-Path $electronProject "dist") -Destination (Join-Path $resourcesAppRoot "dist")

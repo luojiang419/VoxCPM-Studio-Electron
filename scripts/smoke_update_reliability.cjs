@@ -34,7 +34,7 @@ async function command(executable, args, log) {
   envelope = execFileSync('python', ['-c', "import sys,json; from pathlib import Path; from cryptography.hazmat.primitives.asymmetric.ed25519 import Ed25519PrivateKey; p=sys.stdin.buffer.read().decode('utf-8'); k=Ed25519PrivateKey.from_private_bytes(Path(sys.argv[1]).read_bytes()); print(json.dumps({'payload':p,'signature':k.sign(p.encode()).hex()}))", path.join(root, '.update-private/signing-key')], { input: JSON.stringify(local) });
   console.log('正在运行真实下载、签名新版更新器和重启握手…');
   const onlineLog = path.join(run, 'online.log');
-  await command(process.execPath, ['scripts/smoke_update.cjs', original, '--same-version', '--empty-components', '--fixed-client', '--manifest-url', base + '/latest'], onlineLog);
+  await command(process.execPath, ['scripts/smoke_update.cjs', original, '--same-version', '--empty-components', '--fixed-client', '--assert-native', '--main-install', '--native-failure-first', '--manifest-url', base + '/latest'], onlineLog);
   const onlinePath = fs.readFileSync(onlineLog, 'utf8').match(/测试副本：([^\r\n]+)/)[1];
   const online = JSON.parse(fs.readFileSync(path.join(onlinePath, 'smoke-result.json')));
   assert.equal(online.recheckStatus, 'current');

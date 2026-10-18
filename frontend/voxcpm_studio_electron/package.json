@@ -11,8 +11,9 @@
     "build": "vite build",
     "start": "npm run build && electron .",
     "dev": "npm run build && electron .",
-    "package:dir": "npm run build && electron-builder --dir",
-    "package:win": "npm run build && electron-builder --win portable"
+    "build:updater": "python ../../scripts/build_standalone_updater.py",
+    "package:dir": "npm run build:updater && npm run build && electron-builder --dir",
+    "package:win": "npm run build:updater && npm run build && electron-builder --win portable"
   },
   "dependencies": {
     "react": "^18.3.1",
@@ -41,6 +42,7 @@
       "update-window.js",
       "update-config.json",
       "updater.py",
+      "standalone-updater.exe",
       "runtime-service.js",
       "runtime-config.json",
       "runtime-requirements.txt",

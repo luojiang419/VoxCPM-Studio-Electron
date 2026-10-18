@@ -93,18 +93,20 @@ function atomicJson(file, value) {
 }
 
 async function prepareUpdater(session, manifest, python) {
-  const record = manifest.files?.find((file) => file.path === "resources/app/updater.py");
-  if (!record || !Number.isSafeInteger(record.size) || record.size <= 0 || record.size > 2 * 1024 * 1024 ||
-      !/^[0-9a-f]{64}$/.test(record.sha256)) throw new Error("签名清单缺少有效更新器，请联系发布者");
-  // 仅用本机 Python 标准库读取 ZIP 字节；通过签名清单哈希后才允许执行新版脚本。
-  const { stdout } = await promisify(execFile)(python, ["-c",
-    "import sys,zipfile; z=zipfile.ZipFile(sys.argv[1]); e=z.getinfo('resources/app/updater.py'); assert e.file_size==int(sys.argv[2]); sys.stdout.buffer.write(z.read(e))",
-    path.join(session, "package.zip"), String(record.size)],
-    { encoding: "buffer", maxBuffer: 2 * 1024 * 1024, timeout: 30000, windowsHide: true });
-  if (stdout.length !== record.size || crypto.createHash("sha256").update(stdout).digest("hex") !== record.sha256) {
-    throw new Error("新版更新器哈希校验失败");
+  for (const [relative, name] of [["resources/app/updater.py", "updater.py"], ["resources/app/standalone-updater.exe", "VoxCPM Updater.exe"]]) {
+    const record = manifest.files?.find((file) => file.path === relative);
+    if (!record || !Number.isSafeInteger(record.size) || record.size <= 0 || record.size > 2 * 1024 * 1024 ||
+        !/^[0-9a-f]{64}$/.test(record.sha256)) throw new Error("签名清单缺少有效更新器，请联系发布者");
+    // 仅用本机 Python 标准库读取 ZIP 字节；通过签名清单哈希后才允许执行。
+    const { stdout } = await promisify(execFile)(python, ["-c",
+      "import sys,zipfile; z=zipfile.ZipFile(sys.argv[1]); e=z.getinfo(sys.argv[3]); assert e.file_size==int(sys.argv[2]); sys.stdout.buffer.write(z.read(e))",
+      path.join(session, "package.zip"), String(record.size), relative],
+      { encoding: "buffer", maxBuffer: 2 * 1024 * 1024, timeout: 30000, windowsHide: true });
+    if (stdout.length !== record.size || crypto.createHash("sha256").update(stdout).digest("hex") !== record.sha256) {
+      throw new Error("新版更新器哈希校验失败");
+    }
+    fs.writeFileSync(path.join(session, name), stdout);
   }
-  fs.writeFileSync(path.join(session, "updater.py"), stdout);
 }
 
 class UpdateService {
@@ -203,12 +205,12 @@ class UpdateService {
     if (!fs.existsSync(path.join(this.root, "runtime_manifest.json"))) throw new Error("开发环境不支持安装，请使用便携版测试更新");
     this.setState({ status: "installing", message: "正在校验更新器，完成后自动重启…" });
     const session = this.session;
+    try {
     const settings = JSON.parse(fs.readFileSync(path.join(session, "session.json"), "utf8"));
     const target = JSON.parse(JSON.parse(fs.readFileSync(path.join(session, "envelope.json"), "utf8")).payload);
-    for (const name of ["ready.json", "cancel.json", "status.json"]) fs.rmSync(path.join(session, name), { force: true });
-    try {
-    const child = spawn(path.join(this.root, "VoxCPM Studio.exe"), ["--voxcpm-updater", this.session], {
-      detached: true, stdio: "ignore", windowsHide: true,
+    for (const name of ["ready.json", "host-ready.json", "cancel.json", "status.json"]) fs.rmSync(path.join(session, name), { force: true });
+    const child = spawn(path.join(session, "VoxCPM Updater.exe"), ["--session", session], {
+      detached: true, stdio: "ignore", windowsHide: false, cwd: session,
       env: Object.fromEntries(Object.entries(process.env).filter(([key]) => key !== "ELECTRON_RUN_AS_NODE")),
     });
     await new Promise((resolve, reject) => { child.once("spawn", resolve); child.once("error", reject); });
@@ -224,9 +226,12 @@ class UpdateService {
       }
       if (exited) throw new Error("独立更新器提前退出，请查看更新日志");
       const readyFile = path.join(session, "ready.json");
-      if (fs.existsSync(readyFile)) {
+      const hostFile = path.join(session, "host-ready.json");
+      if (fs.existsSync(readyFile) && fs.existsSync(hostFile)) {
         const ready = JSON.parse(fs.readFileSync(readyFile, "utf8"));
-        if (ready.session === session && ready.parentPid === settings.parentPid && ready.releaseId === target.releaseId) {
+        const host = JSON.parse(fs.readFileSync(hostFile, "utf8"));
+        if (ready.session === session && ready.parentPid === settings.parentPid && ready.releaseId === target.releaseId &&
+            host.session === session && host.hostPid === child.pid && host.workerPid === ready.pid && host.independent === true) {
           this.setState({ status: "installing", message: "更新器校验通过，正在退出并安装…" });
           return;
         }

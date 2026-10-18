@@ -30,6 +30,13 @@ def build(snapshot: Path, output_dir: Path | None = None):
     shutil.copy2(ROOT / "frontend/voxcpm_studio_electron/updater.py", output / "updater.py")
     shutil.copy2(snapshot / "envelope.json", output / "envelope.json")
     shutil.copy2(package, output / package.name)
+    manifest_native = next((item for item in manifest["files"] if item["path"] == "resources/app/standalone-updater.exe"), None)
+    if manifest_native:
+        with zipfile.ZipFile(package) as payload:
+            native = payload.read(manifest_native["path"])
+        if __import__('hashlib').sha256(native).hexdigest() != manifest_native["sha256"]:
+            raise ValueError("原生独立更新器校验失败")
+        (output / "standalone-updater.exe").write_bytes(native)
     (output / "修复更新.cmd").write_bytes(b'@echo off\r\ncd /d "%~dp0"\r\npowershell.exe -NoProfile -ExecutionPolicy Bypass -File "%~dp0repair_update.ps1" %*\r\npause\r\n')
     (output / "使用说明.txt").write_text(
         "请先完整解压，再关闭原软件与更新器，双击“修复更新.cmd”。\n"

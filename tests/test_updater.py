@@ -275,3 +275,28 @@ def test_offline_repair_recovers_only_owned_stopped_transactions(tmp_path, monke
         return
     assert old.read_bytes() == b"new desktop"
     assert pending.exists()
+
+
+def test_legacy_window_hands_off_to_native_until_parent_exits(tmp_path, monkeypatch):
+    root, session, settings = prepare(tmp_path)
+    native = session / "stage/resources/app/standalone-updater.exe"
+    native.parent.mkdir(parents=True); native.write_bytes(b"verified native fixture")
+    manifest = {"version": "2.0.2", "releaseId": "20261018000001", "files": [{"path": "resources/app/standalone-updater.exe"}]}
+    monkeypatch.setattr(u, "validate", lambda *args: manifest)
+    class Host:
+        pid = 23456
+        def poll(self): return None
+    launched = []
+    def spawn(command, **kwargs):
+        launched.append(command)
+        u.write_json(session / "host-ready.json", {"hostPid": Host.pid, "workerPid": 34567})
+        u.write_json(session / "ready.json", {"pid": 34567, "parentPid": settings["parentPid"], "releaseId": manifest["releaseId"]})
+        return Host()
+    monkeypatch.setattr(u.subprocess, "Popen", spawn)
+    exited = []
+    monkeypatch.setattr(u, "wait_exit", lambda pid, **kwargs: exited.append(pid))
+    assert u.launch_standalone(session) is True
+    assert Path(launched[0][0]) == session / "VoxCPM Updater.exe"
+    assert launched[0][1:] == ["--session", str(session)]
+    assert exited == [settings["parentPid"]], "旧窗口须等旧主进程收到ready并退出，不能抢先关闭"
+    assert u.read_json(session / "session.json")["pythonExecutable"] == sys.executable

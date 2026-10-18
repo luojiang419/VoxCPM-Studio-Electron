@@ -19,15 +19,20 @@ let server;
   const local = { ...manifest, package: { ...manifest.package, url: base + '/package' } };
   envelope = execFileSync('python', ['-c', "import sys,json; from pathlib import Path; from cryptography.hazmat.primitives.asymmetric.ed25519 import Ed25519PrivateKey; p=sys.stdin.buffer.read().decode('utf-8'); k=Ed25519PrivateKey.from_private_bytes(Path(sys.argv[1]).read_bytes()); print(json.dumps({'payload':p,'signature':k.sign(p.encode()).hex()}))", path.join(root, '.update-private/signing-key')], { input: JSON.stringify(local) });
   const logfile = path.join(run, 'upgrade.log'), log = fs.openSync(logfile, 'a');
-  const child = spawn(process.execPath, ['scripts/smoke_update.cjs', baseline, '--same-version', '--empty-components', '--legacy-client', '--manifest-url', base + '/latest'], { cwd: root, windowsHide: true, stdio: ['ignore', log, log] });
+  const child = spawn(process.execPath, ['scripts/smoke_update.cjs', baseline, '--same-version', '--empty-components', '--legacy-client', ...(process.argv.includes('--assert-native') ? ['--assert-native'] : []), '--manifest-url', base + '/latest'], { cwd: root, windowsHide: true, stdio: ['ignore', log, log] });
   fs.closeSync(log);
   console.log('正在验证未修补旧版：' + baseline);
   await new Promise((resolve, reject) => { child.once('error', reject); child.once('exit', code => code === 0 ? resolve() : reject(new Error(`升级失败，退出 ${code}：${logfile}`))); });
   const testRoot = fs.readFileSync(logfile, 'utf8').match(/测试副本：([^\r\n]+)/)[1];
   const report = JSON.parse(fs.readFileSync(path.join(testRoot, 'smoke-result.json')));
   assert.equal(report.legacyClient, true); assert.equal(report.recheckStatus, 'current');
-  assert.deepEqual(fs.readFileSync(path.join(report.session, 'updater.py')), fs.readFileSync(path.join(baseline, 'resources/app/updater.py')), '必须真实执行旧版更新脚本');
+  const copiesOldScript = !fs.readFileSync(path.join(baseline, 'resources/app/update-service.js'), 'utf8').includes('prepareUpdater');
+  if (copiesOldScript) assert.deepEqual(fs.readFileSync(path.join(report.session, 'updater.py')), fs.readFileSync(path.join(baseline, 'resources/app/updater.py')), '必须真实执行旧版更新脚本');
+  else {
+    const expected = manifest.files.find(f => f.path === 'resources/app/updater.py');
+    assert.equal(require('node:crypto').createHash('sha256').update(fs.readFileSync(path.join(report.session, 'updater.py'))).digest('hex'), expected.sha256);
+  }
   const baselineReleaseId = JSON.parse(fs.readFileSync(path.join(baseline, 'resources/app/update-config.json'))).releaseId;
-  fs.writeFileSync(path.join(run, 'report.json'), JSON.stringify({ ...report, baseline, baselineReleaseId, legacyUpdaterPreserved: true, packageUnchanged: true }, null, 2));
+  fs.writeFileSync(path.join(run, 'report.json'), JSON.stringify({ ...report, baseline, baselineReleaseId, legacyUpdaterPreserved: copiesOldScript, signedHelperMigration: !copiesOldScript, packageUnchanged: true }, null, 2));
   console.log('旧版直接升级通过：' + path.join(run, 'report.json'));
 })().catch(error => { console.error(error); process.exitCode = 1; }).finally(() => server?.close());

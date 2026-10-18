@@ -34,6 +34,9 @@ def publish_repair(snapshot: Path, archive: Path, activate=False):
         record = next(item for item in manifest["files"] if item["path"] == "resources/app/updater.py")
         if hashlib.sha256(z.read(prefix + "updater.py")).hexdigest() != record["sha256"]:
             raise ValueError("修复工具的事务脚本与签名快照不一致")
+        native = next((item for item in manifest["files"] if item["path"] == "resources/app/standalone-updater.exe"), None)
+        if native and hashlib.sha256(z.read(prefix + "standalone-updater.exe")).hexdigest() != native["sha256"]:
+            raise ValueError("修复包的原生独立更新器与签名快照不一致")
         for name in ("repair_update.py", "repair_update.ps1", "修复更新.cmd", "使用说明.txt"):
             if not z.read(prefix + name):
                 raise ValueError("修复包缺少必要入口")

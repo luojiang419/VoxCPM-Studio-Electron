@@ -12,7 +12,8 @@ const keys = crypto.generateKeyPairSync("ed25519");
 const publicKey = keys.publicKey.export({ type: "spki", format: "der" }).subarray(-32).toString("hex");
 const python = process.env.VOXCPM_TEST_PYTHON || "python";
 const updater = Buffer.from("# signed new updater\n".repeat(100));
-const bytes = execFileSync(python, ["-c", "import io,sys,zipfile; b=io.BytesIO(); z=zipfile.ZipFile(b,'w'); z.writestr('resources/app/updater.py',sys.stdin.buffer.read()); z.close(); sys.stdout.buffer.write(b.getvalue())"], { input: updater });
+const native = Buffer.from("MZ signed native updater fixture");
+const bytes = execFileSync(python, ["-c", "import io,sys,zipfile; b=io.BytesIO(); z=zipfile.ZipFile(b,'w'); z.writestr('resources/app/updater.py',sys.stdin.buffer.read()); z.writestr('resources/app/standalone-updater.exe',b'MZ signed native updater fixture'); z.close(); sys.stdout.buffer.write(b.getvalue())"], { input: updater });
 const hash = crypto.createHash("sha256").update(bytes).digest("hex");
 function sign(manifest) {
   const payload = JSON.stringify(manifest);
@@ -21,7 +22,8 @@ function sign(manifest) {
 function manifest(url) {
   return { protocol: 1, product: "voxcpm-studio", platform: "win32-x64", version: "2.0.2", minVersion: "0.2.0",
     notes: "中文更新说明", package: { url, sha256: hash, size: bytes.length },
-    files: [{ path: "resources/app/updater.py", size: updater.length, sha256: crypto.createHash("sha256").update(updater).digest("hex") }] };
+    files: [{ path: "resources/app/updater.py", size: updater.length, sha256: crypto.createHash("sha256").update(updater).digest("hex") },
+      { path: "resources/app/standalone-updater.exe", size: native.length, sha256: crypto.createHash("sha256").update(native).digest("hex") }] };
 }
 test("版本按数字比较，拒绝非法版本", () => {
   assert.equal(compareVersions("2.0.10", "2.0.2"), 1);
@@ -73,6 +75,7 @@ test("真实 HTTP 检查、断点续传、哈希失败与并发保护", async (t
   assert.equal(rangeSeen, true);
   assert.deepEqual(fs.readFileSync(path.join(service.session, "package.zip")), bytes);
   assert.deepEqual(fs.readFileSync(path.join(service.session, "updater.py")), updater, "首次升级必须使用签名新版更新器，不能沿用旧脚本");
+  assert.deepEqual(fs.readFileSync(path.join(service.session, "VoxCPM Updater.exe")), native, "独立EXE必须从签名包校验后放到会话目录");
   assert.equal((await service.check()).status, "downloaded", "检查不能丢弃已准备更新");
   service.state.status = "installing";
   assert.equal((await service.check()).status, "installing");

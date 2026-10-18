@@ -811,10 +811,10 @@ ipcMain.handle("update:install", async () => {
     await dialog.showMessageBox(mainWindow, { type: "info", title: "请先准备运行环境", message: "请先点击运行，完成环境补齐后再安装更新。" });
     return false;
   }
-  const answer = await dialog.showMessageBox(mainWindow, { type: "question", title: "重启并更新",
-    message: "安装更新需要关闭软件。请确认生成与训练任务已结束。",
-    detail: "安装完成后将自动重启，模型、配置与已有作品会保留。",
-    buttons: ["取消", "重启并安装"], defaultId: 0, cancelId: 0 });
+  const answer = await dialog.showMessageBox(mainWindow, { type: "question", title: "启动独立更新器",
+    message: "即将打开独立更新器。请确认生成与训练任务已结束。",
+    detail: "更新器准备完成后工作台会关闭，独立窗口将继续安装并自动打开新版。模型、配置与已有作品会保留。",
+    buttons: ["取消", "启动独立更新器"], defaultId: 0, cancelId: 0 });
   if (answer.response !== 1) return false;
   await updateService.launch();
   app.quit();

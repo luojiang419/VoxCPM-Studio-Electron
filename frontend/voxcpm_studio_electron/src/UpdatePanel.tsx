@@ -48,7 +48,7 @@ export default function UpdatePanel({ focusRequest = 0 }: { focusRequest?: numbe
       {(state?.status === "available" || (state?.status === "error" && state.canDownload)) &&
         <button type="button" className="primary-button" disabled={busy} onClick={() => run(() => window.voxcpmDesktop.downloadUpdate())}>
           下载更新{state.size ? `（${(state.size / 1024 / 1024).toFixed(1)} MB）` : ""}</button>}
-      {state?.status === "downloaded" && <button type="button" className="primary-button" onClick={() => run(() => window.voxcpmDesktop.installUpdate())}>重启并安装</button>}
+      {state?.status === "downloaded" && <button type="button" className="primary-button" onClick={() => run(() => window.voxcpmDesktop.installUpdate())}>启动独立更新器</button>}
     </div>
   </div>;
 }

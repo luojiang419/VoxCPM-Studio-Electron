@@ -49,6 +49,7 @@ def keys():
 
 def sources():
     for name in ("main.js", "preload.js", "package.json", "update-service.js", "update-window.js", "update-config.json", "updater.py",
+                 "standalone-updater.exe",
                  "runtime-service.js", "runtime-config.json", "runtime-requirements.txt", "install-protocol.js", "component-service.js", "music-config.json", "app.ico", "app-icon.png"):
         yield FRONTEND / name, "resources/app/" + name
     for file in sorted((FRONTEND / "dist").rglob("*")):
@@ -71,6 +72,8 @@ def sources():
 
 
 def build(notes, min_version):
+    from build_standalone_updater import build as build_updater
+    build_updater()
     key, config = keys()
     release_id = datetime.now(timezone.utc).strftime("%Y%m%d%H%M%S")
     config["releaseId"] = release_id
@@ -166,7 +169,10 @@ def publish(output):
         with (activation / "README.md").open("a", encoding="utf-8") as stream:
             stream.write(
                 f"\n## 当前正式更新\n\n版本：{manifest['version']}，发布序号：{manifest['releaseId']}。\n\n"
-                "已安装用户在软件内点击“检查更新”，下载后重启安装，无需重新安装模型。\n\n"
+                "已安装用户在软件内点击“检查更新”，下载后确认安装，无需重新安装模型。\n\n"
+                + ("本次包含原生独立更新器 VoxCPM Updater.exe：新客户端点击“启动独立更新器”，窗口就绪后工作台关闭；"
+                   "独立窗口继续安装并自动打开新版。较旧客户端可能仍显示“重启并安装”的确认文字。\n\n"
+                   if any(item['path'] == 'resources/app/standalone-updater.exe' for item in manifest['files']) else "") +
                 f"## 更新失败的补救\n\n[下载一次性更新修复包]({repair['repairUrl']})（约 {repair['size'] / 1024 ** 2:.1f} MB）。\n\n"
                 "1. 完整解压修复包，关闭原软件和独立更新窗口。\n"
                 "2. 双击“修复更新.cmd”；默认目录自动识别，找不到时选择包含 VoxCPM Studio.exe 的原安装目录。\n"

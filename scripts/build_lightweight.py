@@ -13,10 +13,12 @@ ROOT = Path(__file__).resolve().parents[1]
 PROJECT = ROOT.parent
 FRONTEND = ROOT / "frontend/voxcpm_studio_electron"
 RUNTIME_FILES = ("runtime-service.js", "runtime-config.json", "runtime-requirements.txt", "install-protocol.js", "component-service.js", "music-config.json")
-SHELL_FILES = ("main.js", "preload.js", "package.json", "update-service.js", "update-window.js", "update-config.json", "updater.py", *RUNTIME_FILES)
+SHELL_FILES = ("main.js", "preload.js", "package.json", "update-service.js", "update-window.js", "update-config.json", "updater.py", "standalone-updater.exe", *RUNTIME_FILES)
 
 
 def build(output: Path, skip_build: bool = False, skip_zip: bool = False) -> Path:
+    from build_standalone_updater import build as build_updater
+    build_updater()
     output = output.resolve()
     if output.exists():
         raise ValueError(f"输出目录已存在，使用新目录以保护原文件：{output}")

@@ -4,6 +4,8 @@ frontend/voxcpm_studio_electron/node_modules/
 frontend/voxcpm_studio_electron/dist/
 frontend/voxcpm_studio_electron/release/
 frontend/voxcpm_studio_electron/electron-v*.zip
+frontend/voxcpm_studio_electron/standalone-updater.exe
+frontend/voxcpm_studio_electron/standalone-updater.build.json
 
 *.log
 Thumbs.db

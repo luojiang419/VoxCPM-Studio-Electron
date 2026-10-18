@@ -71,6 +71,15 @@ def prepare(root: Path, snapshot: Path, helper: Path):
     if updater.sha256(script) != record["sha256"]:
         raise ValueError("新版更新脚本校验失败")
     shutil.copy2(script, session / "updater.py")
+    native = next((item for item in verified["files"] if item["path"] == "resources/app/standalone-updater.exe"), None)
+    if native:
+        executable = session / "VoxCPM Updater.exe"
+        shutil.copy2(session / "stage" / native["path"], executable)
+        child = subprocess.Popen([str(executable), "--session", str(session)], cwd=session,
+            stdin=subprocess.DEVNULL, stdout=subprocess.DEVNULL, stderr=subprocess.DEVNULL,
+            creationflags=subprocess.CREATE_NEW_PROCESS_GROUP | subprocess.DETACHED_PROCESS)
+        print(json.dumps({"session": str(session), "pid": child.pid, "releaseId": verified["releaseId"], "recoveredInterruptedUpdate": recovered}, ensure_ascii=True))
+        return
     with (session / "updater.log").open("ab") as log:
         child = subprocess.Popen([sys.executable, "-u", str(session / "updater.py"), str(session)],
             cwd=session, stdin=subprocess.DEVNULL, stdout=log, stderr=log,

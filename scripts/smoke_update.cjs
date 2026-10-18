@@ -72,6 +72,18 @@ async function cdp(port) {
     // 故意破坏旧脚本，验证首次下载使用签名新版，不能沿用本机旧脚本。
     fs.writeFileSync(path.join(appDir, "updater.py"), "raise RuntimeError('旧更新器不应执行')\n");
   }
+  const allowExitFile = path.join(testRoot, "allow-main-exit.json");
+  if (process.argv.includes("--main-install")) {
+    const mainPath = path.join(appDir, "main.js");
+    // 仅在隔离夹具里确认弹窗并延迟退出，留出验证独立进程与移开旧文件的时间。
+    const harness = `var __updateTestApp=require('electron').app,__updateTestDialog=require('electron').dialog,__updateTestFs=require('fs');
+var __updateTestQuit=__updateTestApp.quit.bind(__updateTestApp),__updateTestPending=false;
+__updateTestApp.quit=()=>{if(__updateTestPending)return;__updateTestPending=true;var t=setInterval(()=>{if(__updateTestFs.existsSync(${JSON.stringify(allowExitFile)})){clearInterval(t);__updateTestQuit();}},100);};
+var __updateTestAsk=__updateTestDialog.showMessageBox.bind(__updateTestDialog);
+__updateTestDialog.showMessageBox=(...args)=>['启动独立更新器','重启并更新'].includes(args.at(-1)?.title)?Promise.resolve({response:1}):__updateTestAsk(...args);
+`;
+    fs.writeFileSync(mainPath, harness + fs.readFileSync(mainPath, "utf8"));
+  }
   const packagePath = path.join(appDir, "package.json");
   const pkg = JSON.parse(fs.readFileSync(packagePath)); pkg.version = fromVersion;
   fs.writeFileSync(packagePath, JSON.stringify(pkg, null, 2));
@@ -114,7 +126,7 @@ async function cdp(port) {
   const downloaded = await client.evaluate("window.voxcpmDesktop.downloadUpdate()");
   assert.equal(downloaded.status, "downloaded", JSON.stringify(downloaded));
   assert.equal(await client.evaluate("Array.from(document.querySelectorAll('button')).find(b=>b.textContent.trim()==='保存设置').disabled"), false);
-  await until(async () => client.evaluate("document.body.innerText.includes('重启并安装')"));
+  await until(async () => client.evaluate("/重启并安装|启动独立更新器/.test(document.body.innerText)"));
   const screenshot = await client.send("Page.captureScreenshot", { format: "png" });
   fs.writeFileSync(path.join(testRoot, "settings-before-update.png"), Buffer.from(screenshot.data, "base64"));
   console.log("设置页版本、更新说明、下载和自动检查开关已验证");
@@ -122,13 +134,62 @@ async function cdp(port) {
   activeClient = null;
   // 使用同一更新会话启动独立更新器；绕开交互确认仅用于自动化冒烟测试。
   const cache = path.join(testRoot, "data/cache/updates");
-  const session = fs.readdirSync(cache).filter((name) => name.startsWith("session-")).sort().at(-1);
+  const latestSession = () => fs.readdirSync(cache).filter((name) => name.startsWith("session-")).sort((a, b) => fs.statSync(path.join(cache, a)).mtimeMs - fs.statSync(path.join(cache, b)).mtimeMs).at(-1);
+  let nativeFailurePreservedMain = false;
+  if (process.argv.includes("--native-failure-first")) {
+    const failedSession = path.join(cache, latestSession()), settingsPath = path.join(failedSession, "session.json");
+    const settings = JSON.parse(fs.readFileSync(settingsPath));
+    fs.writeFileSync(settingsPath, JSON.stringify({ ...settings, pythonExecutable: path.join(testRoot, "missing-python.exe") }));
+    const failureClient = await cdp(19228);
+    const failure = await failureClient.evaluate("window.voxcpmDesktop.installUpdate().then(()=>({ok:true})).catch(e=>({error:String(e)}))");
+    assert.ok(failure.error);
+    assert.equal((await failureClient.evaluate("window.voxcpmDesktop.getUpdateState()")).status, "error");
+    assert.equal((await failureClient.evaluate("window.voxcpmDesktop.getBootstrapState()")).backendRunning, true);
+    assert.equal(child.exitCode, null);
+    assert.equal(fs.existsSync(path.join(failedSession, "cancel.json")), true);
+    assert.ok(fs.readFileSync(path.join(failedSession, "updater.log"), "utf8").includes("Python"));
+    nativeFailurePreservedMain = true;
+    const closeCode = "$target=" + "'" + path.join(failedSession, "VoxCPM Updater.exe").replaceAll("'", "''") + "'; Get-CimInstance Win32_Process | Where-Object { $_.ExecutablePath -eq $target } | ForEach-Object { (Get-Process -Id $_.ProcessId).CloseMainWindow() | Out-Null }";
+    spawnSync("powershell.exe", ["-NoProfile", "-Command", closeCode], { windowsHide: true });
+    assert.equal((await failureClient.evaluate("window.voxcpmDesktop.downloadUpdate()")).status, "downloaded");
+    failureClient.close();
+    console.log("原生更新器环境失败时主程序与本地服务保持可用，重新准备后继续安装");
+  }
+  const session = latestSession();
   const Launcher = process.argv.includes("--legacy-client") ? require(path.join(appDir, "update-service.js")).UpdateService : UpdateService;
   const service = new Launcher({ root: testRoot, dataRoot: path.join(testRoot, "data"), appDir, currentVersion: fromVersion });
   service.session = path.join(cache, session); service.state.status = "downloaded";
-  await service.launch();
+  if (process.argv.includes("--main-install")) {
+    const installClient = await cdp(19228);
+    await installClient.send("Runtime.evaluate", { expression: "void window.voxcpmDesktop.installUpdate()", awaitPromise: false });
+    installClient.close();
+    await until(() => fs.existsSync(path.join(service.session, "host-ready.json")) && fs.existsSync(path.join(service.session, "ready.json")));
+  } else await service.launch();
+  let standalone;
+  if (process.argv.includes("--assert-native")) {
+    standalone = JSON.parse(fs.readFileSync(path.join(service.session, "host-ready.json")));
+    const worker = JSON.parse(fs.readFileSync(path.join(service.session, "ready.json")));
+    assert.equal(standalone.workerPid, worker.pid);
+    assert.equal(standalone.independent, true);
+    assert.equal(standalone.executable, path.join(service.session, "VoxCPM Updater.exe"));
+    assert.notEqual(standalone.hostPid, child.pid);
+    if (process.argv.includes("--main-install")) {
+      const parent = spawnSync("powershell.exe", ["-NoProfile", "-Command", `Get-CimInstance Win32_Process -Filter 'ProcessId=${Number(standalone.hostPid)}' | Select-Object -ExpandProperty ParentProcessId`], { encoding: "utf8", windowsHide: true });
+      assert.equal(Number(parent.stdout.trim()), child.pid, "更新器必须由实际主进程启动，不能用测试外部进程代替");
+      standalone.launchedByActualMain = true;
+    }
+    const capture = spawnSync("powershell.exe", ["-NoProfile", "-ExecutionPolicy", "Bypass", "-File", path.join(root, "scripts/capture_update_window.ps1"),
+      "-UpdaterProcessId", String(standalone.hostPid), "-OutputPath", path.join(testRoot, "standalone-updater.png")], { encoding: "utf8", windowsHide: true });
+    assert.equal(capture.status, 0, capture.stderr);
+    // 更新器就绪后，整个旧前端目录变为不可用，验证安装不再加载其中的JS或页面。
+    fs.renameSync(appDir, appDir + "-held-for-independence-test");
+    console.log("原生独立窗口已显示，旧resources/app目录已移开，继续关闭主程序并安装");
+  }
   // 主进程在生产中调用 app.quit；测试通过 taskkill 关闭本次测试进程树。
-  spawnSync("taskkill", ["/PID", String(child.pid), "/T", "/F"], { windowsHide: true });
+  if (process.argv.includes("--main-install")) {
+    fs.writeFileSync(allowExitFile, "{}");
+    await until(() => child.exitCode !== null, 30000);
+  } else spawnSync("taskkill", ["/PID", String(child.pid), "/T", "/F"], { windowsHide: true });
   const statusPath = path.join(service.session, "status.json");
   const result = await until(() => {
     if (!fs.existsSync(statusPath)) return false;
@@ -160,6 +221,8 @@ async function cdp(port) {
   const report = { result: "passed", fromVersion, toVersion: "2.0.2", testRoot, session: service.session,
     installedReleaseId: installedConfig.releaseId, recheckStatus: recheck.state.status, signedUpdaterBootstrap: process.argv.includes("--fixed-client"),
     legacyClient: process.argv.includes("--legacy-client"),
+    nativeFailurePreservedMain,
+    ...(standalone ? { standalone, previousAppDirectoryUnavailable: true } : {}),
     userDataPreserved: true, modelPreserved: true, restartedBackend: backendState.serviceUrl, health,
     ...(componentProfile ? { componentSelectionPreserved: true, musicModels: music.models.length, officialRules: music.rules.models.length } : {}) };
   fs.writeFileSync(path.join(testRoot, "smoke-result.json"), JSON.stringify(report, null, 2));
