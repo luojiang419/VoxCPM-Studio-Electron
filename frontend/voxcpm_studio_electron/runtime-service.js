@@ -114,6 +114,14 @@ function resolveManagedPython(root) {
   return "";
 }
 
+function offlinePipArgs(config, profile, cache, requirements) {
+  const version = config.profiles[profile].torch;
+  return ["-m", "pip", "install", "--force-reinstall", "--no-index", "--only-binary=:all:",
+    "--find-links", cache, "--cache-dir", path.join(cache, "pip"),
+    "-r", requirements, "-r", safePath(cache, config.wheelhouse.requirements.name),
+    `torch==${version}+${profile}`, `torchaudio==${version}+${profile}`];
+}
+
 const PROBE = String.raw`
 import json, os, sys, locale
 if os.name == 'nt':
@@ -158,7 +166,9 @@ class RuntimeService {
     Object.assign(this, { root, appRoot, dataRoot, appDir, onState });
     this.config = config || JSON.parse(fs.readFileSync(path.join(appDir, "runtime-config.json"), "utf8"));
     if (this.config.protocol !== 1) throw new Error("不支持的运行环境清单");
-    for (const a of [this.config.python, this.config.pip, ...Object.values(this.config.profiles).flatMap((p) => p.wheels), ...this.config.models.flatMap((m) => m.files)]) validateAsset(a);
+    for (const a of [this.config.python, this.config.pip, ...Object.values(this.config.profiles).flatMap((p) => p.wheels),
+      ...(this.config.wheelhouse ? [this.config.wheelhouse.requirements, ...this.config.wheelhouse.files] : []),
+      ...this.config.models.flatMap((m) => m.files)]) validateAsset(a);
     this.state = { status: "idle", phase: "idle", message: "点击运行，自动检查并补齐模型和依赖。", log: "" };
     this.processRunner = runProcess;
   }
@@ -311,6 +321,21 @@ try {
         "install", "--no-deps", "--force-reinstall", pip]);
       const wheels = [];
       for (const asset of this.config.profiles[selected.profile].wheels) wheels.push(await get(asset));
+      if (this.config.wheelhouse) {
+        await get(this.config.wheelhouse.requirements);
+        let next = 0, complete = 0;
+        const files = this.config.wheelhouse.files;
+        const batch = await Promise.allSettled(Array.from({ length: Math.min(4, files.length) }, async () => {
+          while (next < files.length) {
+            await get(files[next++]);
+            this.emit({ message: `正在补齐魔搭固定依赖（${++complete} / ${files.length}）` });
+          }
+        }));
+        const failure = batch.find((result) => result.status === "rejected");
+        if (failure) throw failure.reason;
+        this.emit({ name: "", size: 0, message: "正在安装已校验的依赖，无需连接 PyPI" });
+        await this.run(python, offlinePipArgs(this.config, selected.profile, cache, path.join(this.appDir, "runtime-requirements.txt")));
+      } else {
       const indexes = ["https://mirrors.aliyun.com/pypi/simple/", "https://pypi.tuna.tsinghua.edu.cn/simple/"];
       let installed = false, lastError;
       for (const index of indexes) {
@@ -329,6 +354,7 @@ try {
         } catch (error) { this.controller.signal.throwIfAborted(); lastError = error; this.log(`镜像安装失败，切换国内备用源：${error.message}\n`); }
       }
       if (!installed) throw lastError;
+      }
       this.emit({ phase: "verify", message: "正在验证依赖与显卡实际运算", name: "", size: 0 });
       await this.run(python, ["-c", PROBE, selected.profile, path.join(this.appDir, "runtime-requirements.txt")], { timeout: 120000 });
       await this.run(python, ["-m", "pip", "check"], { timeout: 30000 });
@@ -366,4 +392,4 @@ try {
   }
 }
 
-module.exports = { RuntimeService, selectProfile, downloadAsset, verified, safePath, validateAsset, resolveManagedPython, PROBE };
+module.exports = { RuntimeService, selectProfile, downloadAsset, verified, safePath, validateAsset, resolveManagedPython, offlinePipArgs, PROBE };

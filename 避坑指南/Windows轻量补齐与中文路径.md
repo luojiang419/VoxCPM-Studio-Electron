@@ -33,3 +33,13 @@ if os.name == "nt":
 ## 中断后不要只依赖 ready 标记
 
 依赖可能已安装完毕，但模型校验或应用检查尚未完成；也可能 Python 可执行文件缺失而依赖目录仍然完整。重试先检查 Python 核心，再检查真实导入、固定直接依赖版本和 `pip check`。检查通过即可复用；缺失的 Python 核心从验证过的嵌入式 ZIP 恢复，并保留已安装依赖。只有模型、FFmpeg 和环境检查均完成才写 ready，避免反复解压数 GB 的 CUDA wheel。
+
+## 魔搭多个单文件并发提交返回 429
+
+表现：大文件上传完成后，HubApi.upload_file 在 create_commit 返回 `commit lock busy, please try again`；部分对象上传了，但目标路径未成功提交。
+
+根因：同一仓库/分支的多个单文件提交竞争远端提交锁；并发上传数据与并发提交仓库是不同阶段。
+
+解决：先校验已有路径的大小和 SHA-256，拒绝同名不同内容；将缺失资源整理到专用暂存目录，使用 `upload_folder(..., allow_patterns=文件列表, max_workers=4)` 由 SDK 管理批量上传与提交。不要每个工作线程各自 upload_file 提交。已经成功上传的 LFS 对象可复用。
+
+验证：168 项运行时资源批量发布完成；远端文件大小/SHA-256 与匿名范围读取全通过。新 CPU 环境从魔搭下载全部依赖，`pip --no-index --only-binary=:all:` 安装、CPU 运算和 API 健康检查通过。发布不写 public/latest.json。

@@ -25,7 +25,7 @@ def build(output: Path, skip_build: bool = False, skip_zip: bool = False) -> Pat
     electron = FRONTEND / "node_modules/electron/dist"
     if not (electron / "electron.exe").is_file():
         raise ValueError("请先在前端目录执行 npm ci（可配置 ELECTRON_MIRROR 国内镜像）")
-    shutil.copytree(electron, output)
+    shutil.copytree(electron, output, ignore=lambda directory, names: [n for n in names if Path(directory).name == "locales" and n not in ("en-US.pak", "zh-CN.pak")])
     (output / "electron.exe").rename(output / "VoxCPM Studio.exe")
     app = output / "resources/app"
     app.mkdir(parents=True, exist_ok=True)
@@ -53,7 +53,7 @@ def build(output: Path, skip_build: bool = False, skip_zip: bool = False) -> Pat
     (output / "使用说明.txt").write_text(
         "双击 VoxCPM Studio.exe，点击运行，弹窗会自动补齐模型和依赖。\n"
         "首次需要联网并预留至少 25GB 可用空间；具体下载量取决于显卡和缓存。\n"
-        "模型来自魔搭，Python/PyPI/PyTorch 来自国内镜像。补齐后可离线使用已安装功能。\n"
+        "桌面、模型、Python 和依赖优先从魔搭补齐。补齐后可离线使用已安装功能。\n"
         "RTX 50 系自动选择 CUDA 12.8，需要 NVIDIA Windows 驱动 570.65 或更新。\n"
         "下载中断可点击继续；关闭软件会暂停，保留已下载文件。日志：data/cache/runtime-bootstrap.log。\n"
         "请解压到可写本地目录，路径尽量简短；不要放在 Program Files 等需要管理员权限的位置。\n"

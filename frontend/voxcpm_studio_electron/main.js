@@ -875,7 +875,7 @@ app.whenReady().then(async () => {
   previousCpuSample = null;
 
   // 轻量壳打开即用，首次下载由用户点击运行触发。
-  if (fs.existsSync(path.join(resolveProjectRoot(), "lightweight.json")) && !process.env.VOXCPM_UPDATE_HEALTH_FILE) {
+  if (fs.existsSync(path.join(resolveProjectRoot(), "lightweight.json")) && !process.env.VOXCPM_UPDATE_HEALTH_FILE && !process.argv.includes("--voxcpm-run")) {
     setBootstrapState({ status: "stopped", statusText: "点击运行开始使用", detail: "首次运行将自动补齐模型和依赖，完成后自动启动。" });
     sendRuntimeEvent("boot", summarizeBootstrapState());
     return;

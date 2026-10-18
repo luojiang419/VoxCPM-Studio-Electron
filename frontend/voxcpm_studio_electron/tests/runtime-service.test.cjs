@@ -5,7 +5,7 @@ const os = require("node:os");
 const path = require("node:path");
 const http = require("node:http");
 const crypto = require("node:crypto");
-const { selectProfile, downloadAsset, safePath, validateAsset, resolveManagedPython, RuntimeService } = require("../runtime-service");
+const { selectProfile, downloadAsset, safePath, validateAsset, resolveManagedPython, offlinePipArgs, RuntimeService } = require("../runtime-service");
 const config = require("../runtime-config.json");
 
 test("50 系及 Blackwell 路由 CUDA 12.8，40 系路由 CUDA 12.6，集显使用 CPU", () => {
@@ -129,4 +129,27 @@ test("启动和独立更新器仅选择已完成验证的托管 Python", async (
   assert.equal(resolveManagedPython(root), "");
   await fs.writeFile(path.join(directory, "ready.json"), "{}");
   assert.equal(resolveManagedPython(root), path.join(directory, "python.exe"));
+});
+
+test("默认资源均优先使用魔搭，固定依赖清单完整", () => {
+  const assets = [config.python, config.pip, config.wheelhouse.requirements, ...config.wheelhouse.files,
+    ...Object.values(config.profiles).flatMap((p) => p.wheels), ...config.models.flatMap((m) => m.files)];
+  for (const asset of assets) {
+    validateAsset(asset);
+    assert.equal(new URL(asset.urls[0]).hostname, "modelscope.cn", asset.name);
+  }
+  assert.ok(config.wheelhouse.files.length > 100);
+  assert.equal(new Set(config.wheelhouse.files.map((a) => a.name)).size, config.wheelhouse.files.length);
+});
+
+test("三种依赖配置强制本地 wheel 安装，禁止 PyPI 与源码构建", () => {
+  for (const profile of ["cpu", "cu126", "cu128"]) {
+    const args = offlinePipArgs(config, profile, os.tmpdir(), "requirements.txt");
+    assert.ok(args.includes("--no-index"));
+    assert.ok(args.includes("--only-binary=:all:"));
+    assert.ok(!args.includes("--index-url"));
+    assert.ok(args.includes(`torch==${config.profiles[profile].torch}+${profile}`));
+    assert.ok(args.includes(`torchaudio==${config.profiles[profile].torch}+${profile}`));
+    assert.ok(args.includes(path.join(os.tmpdir(), config.wheelhouse.requirements.name)));
+  }
 });

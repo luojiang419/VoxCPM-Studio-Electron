@@ -6,6 +6,7 @@
     "size": 11133606,
     "sha256": "4acbed6dd1c744b0376e3b1cf57ce906f9dc9e95e68824584c8099a63025a3c3",
     "urls": [
+      "https://modelscope.cn/api/v1/models/jiangjiang419/voxcpm-studio-updates/repo?Revision=master&FilePath=runtime%2Fpy312-20261018-v1%2Fpython-3.12.10-embed-amd64.zip",
       "https://mirrors.huaweicloud.com/python/3.12.10/python-3.12.10-embed-amd64.zip"
     ]
   },
@@ -14,6 +15,7 @@
     "size": 1825227,
     "sha256": "2913a38a2abf4ea6b64ab507bd9e967f3b53dc1ede74b01b0931e1ce548751af",
     "urls": [
+      "https://modelscope.cn/api/v1/models/jiangjiang419/voxcpm-studio-updates/repo?Revision=master&FilePath=runtime%2Fpy312-20261018-v1%2Fpip-25.1.1-py3-none-any.whl",
       "https://mirrors.huaweicloud.com/repository/pypi/packages/29/a2/d40fb2460e883eca5199c62cfc2463fd261f760556ae6290f88488c362c0/pip-25.1.1-py3-none-any.whl"
     ]
   },
@@ -26,6 +28,7 @@
           "size": 2496082434,
           "sha256": "b10c39c83e5d1afd639b5c9f5683b351e97e41390a93f59c59187004a9949924",
           "urls": [
+            "https://modelscope.cn/api/v1/models/jiangjiang419/voxcpm-studio-updates/repo?Revision=master&FilePath=runtime%2Fpy312-20261018-v1%2Ftorch-2.6.0%2Bcu126-cp312-cp312-win_amd64.whl",
             "https://mirrors.nju.edu.cn/pytorch/whl/cu126/torch-2.6.0%2Bcu126-cp312-cp312-win_amd64.whl",
             "https://mirrors.aliyun.com/pytorch-wheels/cu126/torch-2.6.0%2Bcu126-cp312-cp312-win_amd64.whl"
           ]
@@ -35,8 +38,17 @@
           "size": 4176541,
           "sha256": "144b286d2f6195ba8d75ed1a568bddd718d032d54d1bf94940d47730c6321a0b",
           "urls": [
+            "https://modelscope.cn/api/v1/models/jiangjiang419/voxcpm-studio-updates/repo?Revision=master&FilePath=runtime%2Fpy312-20261018-v1%2Ftorchaudio-2.6.0%2Bcu126-cp312-cp312-win_amd64.whl",
             "https://mirrors.nju.edu.cn/pytorch/whl/cu126/torchaudio-2.6.0%2Bcu126-cp312-cp312-win_amd64.whl",
             "https://mirrors.aliyun.com/pytorch-wheels/cu126/torchaudio-2.6.0%2Bcu126-cp312-cp312-win_amd64.whl"
+          ]
+        },
+        {
+          "name": "sympy-1.13.1-py3-none-any.whl",
+          "size": 6189177,
+          "sha256": "db36cdc64bf61b9b24578b6f7bab1ecdd2452cf008f34faa33776680c26d66f8",
+          "urls": [
+            "https://modelscope.cn/api/v1/models/jiangjiang419/voxcpm-studio-updates/repo?Revision=master&FilePath=runtime%2Fpy312-20261018-v1%2Fsympy-1.13.1-py3-none-any.whl"
           ]
         }
       ]
@@ -49,6 +61,7 @@
           "size": 3273024349,
           "sha256": "2bb8c05d48ba815b316879a18195d53a6472a03e297d971e916753f8e1053d30",
           "urls": [
+            "https://modelscope.cn/api/v1/models/jiangjiang419/voxcpm-studio-updates/repo?Revision=master&FilePath=runtime%2Fpy312-20261018-v1%2Ftorch-2.7.1%2Bcu128-cp312-cp312-win_amd64.whl",
             "https://mirrors.nju.edu.cn/pytorch/whl/cu128/torch-2.7.1%2Bcu128-cp312-cp312-win_amd64.whl",
             "https://mirrors.aliyun.com/pytorch-wheels/cu128/torch-2.7.1%2Bcu128-cp312-cp312-win_amd64.whl"
           ]
@@ -58,8 +71,17 @@
           "size": 4655660,
           "sha256": "4586e3106701b06a4f9377f5c1da9e1d8555e16bd58fd7d810aa3f6cf50bd713",
           "urls": [
+            "https://modelscope.cn/api/v1/models/jiangjiang419/voxcpm-studio-updates/repo?Revision=master&FilePath=runtime%2Fpy312-20261018-v1%2Ftorchaudio-2.7.1%2Bcu128-cp312-cp312-win_amd64.whl",
             "https://mirrors.nju.edu.cn/pytorch/whl/cu128/torchaudio-2.7.1%2Bcu128-cp312-cp312-win_amd64.whl",
             "https://mirrors.aliyun.com/pytorch-wheels/cu128/torchaudio-2.7.1%2Bcu128-cp312-cp312-win_amd64.whl"
+          ]
+        },
+        {
+          "name": "sympy-1.14.0-py3-none-any.whl",
+          "size": 6299353,
+          "sha256": "e091cc3e99d2141a0ba2847328f5479b05d94a6635cb96148ccb3f34671bd8f5",
+          "urls": [
+            "https://modelscope.cn/api/v1/models/jiangjiang419/voxcpm-studio-updates/repo?Revision=master&FilePath=runtime%2Fpy312-20261018-v1%2Fsympy-1.14.0-py3-none-any.whl"
           ]
         }
       ]
@@ -72,6 +94,7 @@
           "size": 206493444,
           "sha256": "4027d982eb2781c93825ab9527f17fbbb12dbabf422298e4b954be60016f87d8",
           "urls": [
+            "https://modelscope.cn/api/v1/models/jiangjiang419/voxcpm-studio-updates/repo?Revision=master&FilePath=runtime%2Fpy312-20261018-v1%2Ftorch-2.6.0%2Bcpu-cp312-cp312-win_amd64.whl",
             "https://mirrors.nju.edu.cn/pytorch/whl/cpu/torch-2.6.0%2Bcpu-cp312-cp312-win_amd64.whl",
             "https://mirrors.aliyun.com/pytorch-wheels/cpu/torch-2.6.0%2Bcpu-cp312-cp312-win_amd64.whl"
           ]
@@ -81,8 +104,17 @@
           "size": 2438883,
           "sha256": "75266c25d394bb5d70f83a38b1b4d858c074a767c18f7ff87443bdf193c1b236",
           "urls": [
+            "https://modelscope.cn/api/v1/models/jiangjiang419/voxcpm-studio-updates/repo?Revision=master&FilePath=runtime%2Fpy312-20261018-v1%2Ftorchaudio-2.6.0%2Bcpu-cp312-cp312-win_amd64.whl",
             "https://mirrors.nju.edu.cn/pytorch/whl/cpu/torchaudio-2.6.0%2Bcpu-cp312-cp312-win_amd64.whl",
             "https://mirrors.aliyun.com/pytorch-wheels/cpu/torchaudio-2.6.0%2Bcpu-cp312-cp312-win_amd64.whl"
+          ]
+        },
+        {
+          "name": "sympy-1.13.1-py3-none-any.whl",
+          "size": 6189177,
+          "sha256": "db36cdc64bf61b9b24578b6f7bab1ecdd2452cf008f34faa33776680c26d66f8",
+          "urls": [
+            "https://modelscope.cn/api/v1/models/jiangjiang419/voxcpm-studio-updates/repo?Revision=master&FilePath=runtime%2Fpy312-20261018-v1%2Fsympy-1.13.1-py3-none-any.whl"
           ]
         }
       ]
@@ -227,5 +259,1278 @@
         }
       ]
     }
-  ]
+  ],
+  "wheelhouse": {
+    "requirements": {
+      "name": "voxcpm-common-20261018.txt",
+      "size": 2884,
+      "sha256": "8e666c9d9acac3d33fc278d2b549fee08e252dec3ebe48cbf974fc399a9892f8",
+      "urls": [
+        "https://modelscope.cn/api/v1/models/jiangjiang419/voxcpm-studio-updates/repo?Revision=master&FilePath=runtime%2Fpy312-20261018-v1%2Fvoxcpm-common-20261018.txt"
+      ]
+    },
+    "files": [
+      {
+        "name": "addict-2.4.0-py3-none-any.whl",
+        "size": 3832,
+        "sha256": "249bb56bbfd3cdc2a004ea0ff4c2b6ddc84d53bc2194761636eb314d5cfa5dfc",
+        "urls": [
+          "https://modelscope.cn/api/v1/models/jiangjiang419/voxcpm-studio-updates/repo?Revision=master&FilePath=runtime%2Fpy312-20261018-v1%2Faddict-2.4.0-py3-none-any.whl"
+        ]
+      },
+      {
+        "name": "aiohappyeyeballs-2.7.1-py3-none-any.whl",
+        "size": 15038,
+        "sha256": "9243213661e29250eb41368e5daa826fc017156c3b8a11440826b2e3ed376472",
+        "urls": [
+          "https://modelscope.cn/api/v1/models/jiangjiang419/voxcpm-studio-updates/repo?Revision=master&FilePath=runtime%2Fpy312-20261018-v1%2Faiohappyeyeballs-2.7.1-py3-none-any.whl"
+        ]
+      },
+      {
+        "name": "aiohttp-3.14.5-cp312-cp312-win_amd64.whl",
+        "size": 506141,
+        "sha256": "2cc38a4f2b516bef1714e690df87a0e043faf1a7693c82d860091684453d5111",
+        "urls": [
+          "https://modelscope.cn/api/v1/models/jiangjiang419/voxcpm-studio-updates/repo?Revision=master&FilePath=runtime%2Fpy312-20261018-v1%2Faiohttp-3.14.5-cp312-cp312-win_amd64.whl"
+        ]
+      },
+      {
+        "name": "aiosignal-1.4.0-py3-none-any.whl",
+        "size": 7490,
+        "sha256": "053243f8b92b990551949e63930a839ff0cf0b0ebbe0597b0f3fb19e1a0fe82e",
+        "urls": [
+          "https://modelscope.cn/api/v1/models/jiangjiang419/voxcpm-studio-updates/repo?Revision=master&FilePath=runtime%2Fpy312-20261018-v1%2Faiosignal-1.4.0-py3-none-any.whl"
+        ]
+      },
+      {
+        "name": "aliyun_python_sdk_core-2.16.1-py3-none-any.whl",
+        "size": 521331,
+        "sha256": "0f25a6e8ec1ea29c76610278cff81cbff85149a6e692bf2398a6f9b77e5e7424",
+        "urls": [
+          "https://modelscope.cn/api/v1/models/jiangjiang419/voxcpm-studio-updates/repo?Revision=master&FilePath=runtime%2Fpy312-20261018-v1%2Faliyun_python_sdk_core-2.16.1-py3-none-any.whl"
+        ]
+      },
+      {
+        "name": "aliyun_python_sdk_kms-2.16.5-py2.py3-none-any.whl",
+        "size": 99495,
+        "sha256": "24b6cdc4fd161d2942619479c8d050c63ea9cd22b044fe33b60bbb60153786f0",
+        "urls": [
+          "https://modelscope.cn/api/v1/models/jiangjiang419/voxcpm-studio-updates/repo?Revision=master&FilePath=runtime%2Fpy312-20261018-v1%2Faliyun_python_sdk_kms-2.16.5-py2.py3-none-any.whl"
+        ]
+      },
+      {
+        "name": "annotated_doc-0.0.5-py3-none-any.whl",
+        "size": 5302,
+        "sha256": "117bac03a25ede5df5440e855b32d556049ca169ead221505badf432fed4b101",
+        "urls": [
+          "https://modelscope.cn/api/v1/models/jiangjiang419/voxcpm-studio-updates/repo?Revision=master&FilePath=runtime%2Fpy312-20261018-v1%2Fannotated_doc-0.0.5-py3-none-any.whl"
+        ]
+      },
+      {
+        "name": "annotated_types-0.8.0-py3-none-any.whl",
+        "size": 13427,
+        "sha256": "f072f4d804ea359e4eaf198b1af7a8b0943881a87f31bb764f8bf219bb9419e0",
+        "urls": [
+          "https://modelscope.cn/api/v1/models/jiangjiang419/voxcpm-studio-updates/repo?Revision=master&FilePath=runtime%2Fpy312-20261018-v1%2Fannotated_types-0.8.0-py3-none-any.whl"
+        ]
+      },
+      {
+        "name": "antlr4_python3_runtime-4.9.3-py3-none-any.whl",
+        "size": 144614,
+        "sha256": "a7fdd54e514ab53050c8b6a366f95b9908ca03b65373c49da658f3cebb07d9a6",
+        "urls": [
+          "https://modelscope.cn/api/v1/models/jiangjiang419/voxcpm-studio-updates/repo?Revision=master&FilePath=runtime%2Fpy312-20261018-v1%2Fantlr4_python3_runtime-4.9.3-py3-none-any.whl"
+        ]
+      },
+      {
+        "name": "anyascii-0.3.3-py3-none-any.whl",
+        "size": 345090,
+        "sha256": "f5ab5e53c8781a36b5a40e1296a0eeda2f48c649ef10c3921c1381b1d00dee7a",
+        "urls": [
+          "https://modelscope.cn/api/v1/models/jiangjiang419/voxcpm-studio-updates/repo?Revision=master&FilePath=runtime%2Fpy312-20261018-v1%2Fanyascii-0.3.3-py3-none-any.whl"
+        ]
+      },
+      {
+        "name": "anyio-4.15.1-py3-none-any.whl",
+        "size": 132079,
+        "sha256": "6152fdbbf9a77fdec97731721bebf7c4c44f7c29b424b0065826173efc7ed101",
+        "urls": [
+          "https://modelscope.cn/api/v1/models/jiangjiang419/voxcpm-studio-updates/repo?Revision=master&FilePath=runtime%2Fpy312-20261018-v1%2Fanyio-4.15.1-py3-none-any.whl"
+        ]
+      },
+      {
+        "name": "aqtinstall-3.3.0-py3-none-any.whl",
+        "size": 71789,
+        "sha256": "e88dbd87226f276fdd5d05347a44578d390d93a7f176e9476fbda0a7c9635f69",
+        "urls": [
+          "https://modelscope.cn/api/v1/models/jiangjiang419/voxcpm-studio-updates/repo?Revision=master&FilePath=runtime%2Fpy312-20261018-v1%2Faqtinstall-3.3.0-py3-none-any.whl"
+        ]
+      },
+      {
+        "name": "argbind-0.3.9-py2.py3-none-any.whl",
+        "size": 11898,
+        "sha256": "e02d782f4401bcd412731dae1b4c53bd606074d587a0c569b2e58e515fad919e",
+        "urls": [
+          "https://modelscope.cn/api/v1/models/jiangjiang419/voxcpm-studio-updates/repo?Revision=master&FilePath=runtime%2Fpy312-20261018-v1%2Fargbind-0.3.9-py2.py3-none-any.whl"
+        ]
+      },
+      {
+        "name": "attrs-26.1.0-py3-none-any.whl",
+        "size": 67548,
+        "sha256": "c647aa4a12dfbad9333ca4e71fe62ddc36f4e63b2d260a37a8b83d2f043ac309",
+        "urls": [
+          "https://modelscope.cn/api/v1/models/jiangjiang419/voxcpm-studio-updates/repo?Revision=master&FilePath=runtime%2Fpy312-20261018-v1%2Fattrs-26.1.0-py3-none-any.whl"
+        ]
+      },
+      {
+        "name": "audioread-3.1.0-py3-none-any.whl",
+        "size": 23143,
+        "sha256": "b30d1df6c5d3de5dcef0fb0e256f6ea17bdcf5f979408df0297d8a408e2971b4",
+        "urls": [
+          "https://modelscope.cn/api/v1/models/jiangjiang419/voxcpm-studio-updates/repo?Revision=master&FilePath=runtime%2Fpy312-20261018-v1%2Faudioread-3.1.0-py3-none-any.whl"
+        ]
+      },
+      {
+        "name": "backports_zstd-1.5.0-cp312-cp312-win_amd64.whl",
+        "size": 314933,
+        "sha256": "e2802899ba4ef1a062ffe4bb1292c5df32011a54b4c3004c54f46ec975f39554",
+        "urls": [
+          "https://modelscope.cn/api/v1/models/jiangjiang419/voxcpm-studio-updates/repo?Revision=master&FilePath=runtime%2Fpy312-20261018-v1%2Fbackports_zstd-1.5.0-cp312-cp312-win_amd64.whl"
+        ]
+      },
+      {
+        "name": "beautifulsoup4-4.14.3-py3-none-any.whl",
+        "size": 107721,
+        "sha256": "0918bfe44902e6ad8d57732ba310582e98da931428d231a5ecb9e7c703a735bb",
+        "urls": [
+          "https://modelscope.cn/api/v1/models/jiangjiang419/voxcpm-studio-updates/repo?Revision=master&FilePath=runtime%2Fpy312-20261018-v1%2Fbeautifulsoup4-4.14.3-py3-none-any.whl"
+        ]
+      },
+      {
+        "name": "brotli-1.2.0-cp312-cp312-win_amd64.whl",
+        "size": 369115,
+        "sha256": "b35c13ce241abdd44cb8ca70683f20c0c079728a36a996297adb5334adfc1c44",
+        "urls": [
+          "https://modelscope.cn/api/v1/models/jiangjiang419/voxcpm-studio-updates/repo?Revision=master&FilePath=runtime%2Fpy312-20261018-v1%2Fbrotli-1.2.0-cp312-cp312-win_amd64.whl"
+        ]
+      },
+      {
+        "name": "bs4-0.0.2-py2.py3-none-any.whl",
+        "size": 1189,
+        "sha256": "abf8742c0805ef7f662dce4b51cca104cffe52b835238afc169142ab9b3fbccc",
+        "urls": [
+          "https://modelscope.cn/api/v1/models/jiangjiang419/voxcpm-studio-updates/repo?Revision=master&FilePath=runtime%2Fpy312-20261018-v1%2Fbs4-0.0.2-py2.py3-none-any.whl"
+        ]
+      },
+      {
+        "name": "certifi-2026.7.22-py3-none-any.whl",
+        "size": 136983,
+        "sha256": "62f22742b58a1a33014a2b6b706588a8d7e2a88ae7bd1a6ebe8c992928483775",
+        "urls": [
+          "https://modelscope.cn/api/v1/models/jiangjiang419/voxcpm-studio-updates/repo?Revision=master&FilePath=runtime%2Fpy312-20261018-v1%2Fcertifi-2026.7.22-py3-none-any.whl"
+        ]
+      },
+      {
+        "name": "cffi-2.1.1-cp312-cp312-win_amd64.whl",
+        "size": 185919,
+        "sha256": "f53e442b08449d42821fa4a4fba000095af9f62742a500f978a9f557ec44339a",
+        "urls": [
+          "https://modelscope.cn/api/v1/models/jiangjiang419/voxcpm-studio-updates/repo?Revision=master&FilePath=runtime%2Fpy312-20261018-v1%2Fcffi-2.1.1-cp312-cp312-win_amd64.whl"
+        ]
+      },
+      {
+        "name": "charset_normalizer-3.5.2-cp312-cp312-win_amd64.whl",
+        "size": 207486,
+        "sha256": "780fbe7cab297b81dad9fb8dc5eb003c0468ffb0d9e5f65068c53a34661a96bc",
+        "urls": [
+          "https://modelscope.cn/api/v1/models/jiangjiang419/voxcpm-studio-updates/repo?Revision=master&FilePath=runtime%2Fpy312-20261018-v1%2Fcharset_normalizer-3.5.2-cp312-cp312-win_amd64.whl"
+        ]
+      },
+      {
+        "name": "click-8.5.0-py3-none-any.whl",
+        "size": 125251,
+        "sha256": "255bc9599cf7748b4b1a446ccc735421bd08a2ae529a8b88597d3de5664ee360",
+        "urls": [
+          "https://modelscope.cn/api/v1/models/jiangjiang419/voxcpm-studio-updates/repo?Revision=master&FilePath=runtime%2Fpy312-20261018-v1%2Fclick-8.5.0-py3-none-any.whl"
+        ]
+      },
+      {
+        "name": "cloudpickle-3.1.2-py3-none-any.whl",
+        "size": 22228,
+        "sha256": "9acb47f6afd73f60dc1df93bb801b472f05ff42fa6c84167d25cb206be1fbf4a",
+        "urls": [
+          "https://modelscope.cn/api/v1/models/jiangjiang419/voxcpm-studio-updates/repo?Revision=master&FilePath=runtime%2Fpy312-20261018-v1%2Fcloudpickle-3.1.2-py3-none-any.whl"
+        ]
+      },
+      {
+        "name": "colorama-0.4.6-py2.py3-none-any.whl",
+        "size": 25335,
+        "sha256": "4f1d9991f5acc0ca119f9d443620b77f9d6b33703e51011c16baf57afb285fc6",
+        "urls": [
+          "https://modelscope.cn/api/v1/models/jiangjiang419/voxcpm-studio-updates/repo?Revision=master&FilePath=runtime%2Fpy312-20261018-v1%2Fcolorama-0.4.6-py2.py3-none-any.whl"
+        ]
+      },
+      {
+        "name": "contourpy-1.4.0-cp312-cp312-win_amd64.whl",
+        "size": 234083,
+        "sha256": "6e697d94e69f499ff6bebb899cae97a58d5d14f0e1fe9568b43a0248d2f9af8c",
+        "urls": [
+          "https://modelscope.cn/api/v1/models/jiangjiang419/voxcpm-studio-updates/repo?Revision=master&FilePath=runtime%2Fpy312-20261018-v1%2Fcontourpy-1.4.0-cp312-cp312-win_amd64.whl"
+        ]
+      },
+      {
+        "name": "contractions-0.1.73-py2.py3-none-any.whl",
+        "size": 8651,
+        "sha256": "398cee3b69c37307a50dce4930d961a0f42b48fdae9562df73bed5683008d3bc",
+        "urls": [
+          "https://modelscope.cn/api/v1/models/jiangjiang419/voxcpm-studio-updates/repo?Revision=master&FilePath=runtime%2Fpy312-20261018-v1%2Fcontractions-0.1.73-py2.py3-none-any.whl"
+        ]
+      },
+      {
+        "name": "crcmod-1.7-py3-none-any.whl",
+        "size": 18949,
+        "sha256": "56f10a14ad48f286a2be1c52c1e183734aafce016be87b88ecea378462e23a4c",
+        "urls": [
+          "https://modelscope.cn/api/v1/models/jiangjiang419/voxcpm-studio-updates/repo?Revision=master&FilePath=runtime%2Fpy312-20261018-v1%2Fcrcmod-1.7-py3-none-any.whl"
+        ]
+      },
+      {
+        "name": "cryptography-50.0.2-cp311-abi3-win_amd64.whl",
+        "size": 3824692,
+        "sha256": "7afa5a6602a9f29af1f3a2965f831bae7c9d5d597b7cbb716d41ab3b7d89879c",
+        "urls": [
+          "https://modelscope.cn/api/v1/models/jiangjiang419/voxcpm-studio-updates/repo?Revision=master&FilePath=runtime%2Fpy312-20261018-v1%2Fcryptography-50.0.2-cp311-abi3-win_amd64.whl"
+        ]
+      },
+      {
+        "name": "cycler-0.12.1-py3-none-any.whl",
+        "size": 8321,
+        "sha256": "85cef7cff222d8644161529808465972e51340599459b8ac3ccbac5a854e0d30",
+        "urls": [
+          "https://modelscope.cn/api/v1/models/jiangjiang419/voxcpm-studio-updates/repo?Revision=master&FilePath=runtime%2Fpy312-20261018-v1%2Fcycler-0.12.1-py3-none-any.whl"
+        ]
+      },
+      {
+        "name": "datasets-3.6.0-py3-none-any.whl",
+        "size": 491546,
+        "sha256": "25000c4a2c0873a710df127d08a202a06eab7bf42441a6bc278b499c2f72cd1b",
+        "urls": [
+          "https://modelscope.cn/api/v1/models/jiangjiang419/voxcpm-studio-updates/repo?Revision=master&FilePath=runtime%2Fpy312-20261018-v1%2Fdatasets-3.6.0-py3-none-any.whl"
+        ]
+      },
+      {
+        "name": "decorator-5.3.1-py3-none-any.whl",
+        "size": 10365,
+        "sha256": "f47fe6fdbd2edd623ecfe36875d37aba411624e2670dd395dddae1358689bb3c",
+        "urls": [
+          "https://modelscope.cn/api/v1/models/jiangjiang419/voxcpm-studio-updates/repo?Revision=master&FilePath=runtime%2Fpy312-20261018-v1%2Fdecorator-5.3.1-py3-none-any.whl"
+        ]
+      },
+      {
+        "name": "defusedxml-0.7.1-py2.py3-none-any.whl",
+        "size": 25604,
+        "sha256": "a352e7e428770286cc899e2542b6cdaedb2b4953ff269a210103ec58f6198a61",
+        "urls": [
+          "https://modelscope.cn/api/v1/models/jiangjiang419/voxcpm-studio-updates/repo?Revision=master&FilePath=runtime%2Fpy312-20261018-v1%2Fdefusedxml-0.7.1-py2.py3-none-any.whl"
+        ]
+      },
+      {
+        "name": "dill-0.3.8-py3-none-any.whl",
+        "size": 116252,
+        "sha256": "c36ca9ffb54365bdd2f8eb3eff7d2a21237f8452b57ace88b1ac615b7e815bd7",
+        "urls": [
+          "https://modelscope.cn/api/v1/models/jiangjiang419/voxcpm-studio-updates/repo?Revision=master&FilePath=runtime%2Fpy312-20261018-v1%2Fdill-0.3.8-py3-none-any.whl"
+        ]
+      },
+      {
+        "name": "docstring_parser-0.18.0-py3-none-any.whl",
+        "size": 22484,
+        "sha256": "b3fcbed555c47d8479be0796ef7e19c2670d428d72e96da63f3a40122860374b",
+        "urls": [
+          "https://modelscope.cn/api/v1/models/jiangjiang419/voxcpm-studio-updates/repo?Revision=master&FilePath=runtime%2Fpy312-20261018-v1%2Fdocstring_parser-0.18.0-py3-none-any.whl"
+        ]
+      },
+      {
+        "name": "editdistance-0.8.1-cp312-cp312-win_amd64.whl",
+        "size": 79853,
+        "sha256": "09f01ed51746d90178af7dd7ea4ebb41497ef19f53c7f327e864421743dffb0a",
+        "urls": [
+          "https://modelscope.cn/api/v1/models/jiangjiang419/voxcpm-studio-updates/repo?Revision=master&FilePath=runtime%2Fpy312-20261018-v1%2Feditdistance-0.8.1-cp312-cp312-win_amd64.whl"
+        ]
+      },
+      {
+        "name": "einops-0.8.2-py3-none-any.whl",
+        "size": 65638,
+        "sha256": "54058201ac7087911181bfec4af6091bb59380360f069276601256a76af08193",
+        "urls": [
+          "https://modelscope.cn/api/v1/models/jiangjiang419/voxcpm-studio-updates/repo?Revision=master&FilePath=runtime%2Fpy312-20261018-v1%2Feinops-0.8.2-py3-none-any.whl"
+        ]
+      },
+      {
+        "name": "fastapi-0.136.1-py3-none-any.whl",
+        "size": 117683,
+        "sha256": "a6e9d7eeada96c93a4d69cb03836b44fa34e2854accb7244a1ece36cd4781c3f",
+        "urls": [
+          "https://modelscope.cn/api/v1/models/jiangjiang419/voxcpm-studio-updates/repo?Revision=master&FilePath=runtime%2Fpy312-20261018-v1%2Ffastapi-0.136.1-py3-none-any.whl"
+        ]
+      },
+      {
+        "name": "filelock-4.2.1-py3-none-any.whl",
+        "size": 162455,
+        "sha256": "7be2662e9e826b9bba28afc0f843a123280d799a2ea44bb5d35ccec67905ae44",
+        "urls": [
+          "https://modelscope.cn/api/v1/models/jiangjiang419/voxcpm-studio-updates/repo?Revision=master&FilePath=runtime%2Fpy312-20261018-v1%2Ffilelock-4.2.1-py3-none-any.whl"
+        ]
+      },
+      {
+        "name": "fonttools-4.67.0-cp312-cp312-win_amd64.whl",
+        "size": 2497985,
+        "sha256": "2bfab2f5d1d255dec82f4bd082a1c10e77df808e42210890f50a9c30bf91570e",
+        "urls": [
+          "https://modelscope.cn/api/v1/models/jiangjiang419/voxcpm-studio-updates/repo?Revision=master&FilePath=runtime%2Fpy312-20261018-v1%2Ffonttools-4.67.0-cp312-cp312-win_amd64.whl"
+        ]
+      },
+      {
+        "name": "frozenlist-1.8.0-cp312-cp312-win_amd64.whl",
+        "size": 44591,
+        "sha256": "34187385b08f866104f0c0617404c8eb08165ab1272e884abc89c112e9c00746",
+        "urls": [
+          "https://modelscope.cn/api/v1/models/jiangjiang419/voxcpm-studio-updates/repo?Revision=master&FilePath=runtime%2Fpy312-20261018-v1%2Ffrozenlist-1.8.0-cp312-cp312-win_amd64.whl"
+        ]
+      },
+      {
+        "name": "fsspec-2025.3.0-py3-none-any.whl",
+        "size": 193615,
+        "sha256": "efb87af3efa9103f94ca91a7f8cb7a4df91af9f74fc106c9c7ea0efd7277c1b3",
+        "urls": [
+          "https://modelscope.cn/api/v1/models/jiangjiang419/voxcpm-studio-updates/repo?Revision=master&FilePath=runtime%2Fpy312-20261018-v1%2Ffsspec-2025.3.0-py3-none-any.whl"
+        ]
+      },
+      {
+        "name": "funasr-1.3.1-py3-none-any.whl",
+        "size": 811975,
+        "sha256": "f63050d7d625f287ec741b84a0325365699c49550a4bfd3ace4acb43e41a87a8",
+        "urls": [
+          "https://modelscope.cn/api/v1/models/jiangjiang419/voxcpm-studio-updates/repo?Revision=master&FilePath=runtime%2Fpy312-20261018-v1%2Ffunasr-1.3.1-py3-none-any.whl"
+        ]
+      },
+      {
+        "name": "gradio-6.13.0-py3-none-any.whl",
+        "size": 19684382,
+        "sha256": "46953f88aad36db9bc369ad2d1d6c4f200274da28f232b54842b2d4942a24f8f",
+        "urls": [
+          "https://modelscope.cn/api/v1/models/jiangjiang419/voxcpm-studio-updates/repo?Revision=master&FilePath=runtime%2Fpy312-20261018-v1%2Fgradio-6.13.0-py3-none-any.whl"
+        ]
+      },
+      {
+        "name": "gradio_client-2.5.0-py3-none-any.whl",
+        "size": 59952,
+        "sha256": "d43e2179c29076292a76485ad7ed2e6eaa19d14ac58283bd7f5beabfe4ca958c",
+        "urls": [
+          "https://modelscope.cn/api/v1/models/jiangjiang419/voxcpm-studio-updates/repo?Revision=master&FilePath=runtime%2Fpy312-20261018-v1%2Fgradio_client-2.5.0-py3-none-any.whl"
+        ]
+      },
+      {
+        "name": "groovy-0.1.2-py3-none-any.whl",
+        "size": 14090,
+        "sha256": "7f7975bab18c729a257a8b1ae9dcd70b7cafb1720481beae47719af57c35fa64",
+        "urls": [
+          "https://modelscope.cn/api/v1/models/jiangjiang419/voxcpm-studio-updates/repo?Revision=master&FilePath=runtime%2Fpy312-20261018-v1%2Fgroovy-0.1.2-py3-none-any.whl"
+        ]
+      },
+      {
+        "name": "h11-0.16.0-py3-none-any.whl",
+        "size": 37515,
+        "sha256": "63cf8bbe7522de3bf65932fda1d9c2772064ffb3dae62d55932da54b31cb6c86",
+        "urls": [
+          "https://modelscope.cn/api/v1/models/jiangjiang419/voxcpm-studio-updates/repo?Revision=master&FilePath=runtime%2Fpy312-20261018-v1%2Fh11-0.16.0-py3-none-any.whl"
+        ]
+      },
+      {
+        "name": "hf_gradio-0.4.1-py3-none-any.whl",
+        "size": 4482,
+        "sha256": "76b8cb8be6abe62d74c1ad2d35b42f0629db89aa9e1a8d033cecfe7c856eeab3",
+        "urls": [
+          "https://modelscope.cn/api/v1/models/jiangjiang419/voxcpm-studio-updates/repo?Revision=master&FilePath=runtime%2Fpy312-20261018-v1%2Fhf_gradio-0.4.1-py3-none-any.whl"
+        ]
+      },
+      {
+        "name": "hf_xet-1.7.0-cp38-abi3-win_amd64.whl",
+        "size": 3822644,
+        "sha256": "2b7bb5727889b0f2436dbaaad8fc4c3e66b8240d992716989e0c086b4278b1bc",
+        "urls": [
+          "https://modelscope.cn/api/v1/models/jiangjiang419/voxcpm-studio-updates/repo?Revision=master&FilePath=runtime%2Fpy312-20261018-v1%2Fhf_xet-1.7.0-cp38-abi3-win_amd64.whl"
+        ]
+      },
+      {
+        "name": "httpcore-1.0.9-py3-none-any.whl",
+        "size": 78784,
+        "sha256": "2d400746a40668fc9dec9810239072b40b4484b640a8c38fd654a024c7a1bf55",
+        "urls": [
+          "https://modelscope.cn/api/v1/models/jiangjiang419/voxcpm-studio-updates/repo?Revision=master&FilePath=runtime%2Fpy312-20261018-v1%2Fhttpcore-1.0.9-py3-none-any.whl"
+        ]
+      },
+      {
+        "name": "httpx-0.28.1-py3-none-any.whl",
+        "size": 73517,
+        "sha256": "d909fcccc110f8c7faf814ca82a9a4d816bc5a6dbfea25d6591d6985b8ba59ad",
+        "urls": [
+          "https://modelscope.cn/api/v1/models/jiangjiang419/voxcpm-studio-updates/repo?Revision=master&FilePath=runtime%2Fpy312-20261018-v1%2Fhttpx-0.28.1-py3-none-any.whl"
+        ]
+      },
+      {
+        "name": "huggingface_hub-1.12.0-py3-none-any.whl",
+        "size": 646806,
+        "sha256": "d74939969585ee35748bd66de09baf84099d461bda7287cd9043bfb99b0e424d",
+        "urls": [
+          "https://modelscope.cn/api/v1/models/jiangjiang419/voxcpm-studio-updates/repo?Revision=master&FilePath=runtime%2Fpy312-20261018-v1%2Fhuggingface_hub-1.12.0-py3-none-any.whl"
+        ]
+      },
+      {
+        "name": "humanize-4.15.0-py3-none-any.whl",
+        "size": 132203,
+        "sha256": "b1186eb9f5a9749cd9cb8565aee77919dd7c8d076161cf44d70e59e3301e1769",
+        "urls": [
+          "https://modelscope.cn/api/v1/models/jiangjiang419/voxcpm-studio-updates/repo?Revision=master&FilePath=runtime%2Fpy312-20261018-v1%2Fhumanize-4.15.0-py3-none-any.whl"
+        ]
+      },
+      {
+        "name": "hydra_core-1.3.7-py3-none-any.whl",
+        "size": 168790,
+        "sha256": "83606c4a05c770f1e026e0489875f28989829d151799eabd8cfa8cbe82164515",
+        "urls": [
+          "https://modelscope.cn/api/v1/models/jiangjiang419/voxcpm-studio-updates/repo?Revision=master&FilePath=runtime%2Fpy312-20261018-v1%2Fhydra_core-1.3.7-py3-none-any.whl"
+        ]
+      },
+      {
+        "name": "idna-3.20-py3-none-any.whl",
+        "size": 69583,
+        "sha256": "ab7ae7122974553370f0bdb919e1a960b2cd1bc1ef0276416d896db81c14582c",
+        "urls": [
+          "https://modelscope.cn/api/v1/models/jiangjiang419/voxcpm-studio-updates/repo?Revision=master&FilePath=runtime%2Fpy312-20261018-v1%2Fidna-3.20-py3-none-any.whl"
+        ]
+      },
+      {
+        "name": "imageio_ffmpeg-0.6.0-py3-none-win_amd64.whl",
+        "size": 31246824,
+        "sha256": "02fa47c83703c37df6bfe4896aab339013f62bf02c5ebf2dce6da56af04ffc0a",
+        "urls": [
+          "https://modelscope.cn/api/v1/models/jiangjiang419/voxcpm-studio-updates/repo?Revision=master&FilePath=runtime%2Fpy312-20261018-v1%2Fimageio_ffmpeg-0.6.0-py3-none-win_amd64.whl"
+        ]
+      },
+      {
+        "name": "inflate64-1.0.4-cp312-cp312-win_amd64.whl",
+        "size": 35577,
+        "sha256": "2c6befdf83d088a6e0d10d0873a9d4bfde2ce00ad7a52c8189cf303306f98030",
+        "urls": [
+          "https://modelscope.cn/api/v1/models/jiangjiang419/voxcpm-studio-updates/repo?Revision=master&FilePath=runtime%2Fpy312-20261018-v1%2Finflate64-1.0.4-cp312-cp312-win_amd64.whl"
+        ]
+      },
+      {
+        "name": "inflect-7.5.0-py3-none-any.whl",
+        "size": 35197,
+        "sha256": "2aea70e5e70c35d8350b8097396ec155ffd68def678c7ff97f51aa69c1d92344",
+        "urls": [
+          "https://modelscope.cn/api/v1/models/jiangjiang419/voxcpm-studio-updates/repo?Revision=master&FilePath=runtime%2Fpy312-20261018-v1%2Finflect-7.5.0-py3-none-any.whl"
+        ]
+      },
+      {
+        "name": "jaconv-0.5.0-py3-none-any.whl",
+        "size": 16831,
+        "sha256": "2914114fe761ca49fc7089e25e6ad4a400c26f262ffce84e13b176916b71610a",
+        "urls": [
+          "https://modelscope.cn/api/v1/models/jiangjiang419/voxcpm-studio-updates/repo?Revision=master&FilePath=runtime%2Fpy312-20261018-v1%2Fjaconv-0.5.0-py3-none-any.whl"
+        ]
+      },
+      {
+        "name": "jamo-0.4.1-py3-none-any.whl",
+        "size": 9543,
+        "sha256": "d4b94fd23324c606ed2fbc4037c603e2c3a7ae9390c05d3473aea1ccb6b1c3fb",
+        "urls": [
+          "https://modelscope.cn/api/v1/models/jiangjiang419/voxcpm-studio-updates/repo?Revision=master&FilePath=runtime%2Fpy312-20261018-v1%2Fjamo-0.4.1-py3-none-any.whl"
+        ]
+      },
+      {
+        "name": "jieba-0.42.1-py3-none-any.whl",
+        "size": 19314527,
+        "sha256": "d2750e7dde6928892a30ac4ca226a1797465df3026ff6f837c89b1372f9a41b8",
+        "urls": [
+          "https://modelscope.cn/api/v1/models/jiangjiang419/voxcpm-studio-updates/repo?Revision=master&FilePath=runtime%2Fpy312-20261018-v1%2Fjieba-0.42.1-py3-none-any.whl"
+        ]
+      },
+      {
+        "name": "jinja2-3.1.6-py3-none-any.whl",
+        "size": 134899,
+        "sha256": "85ece4451f492d0c13c5dd7c13a64681a86afae63a5f347908daf103ce6d2f67",
+        "urls": [
+          "https://modelscope.cn/api/v1/models/jiangjiang419/voxcpm-studio-updates/repo?Revision=master&FilePath=runtime%2Fpy312-20261018-v1%2Fjinja2-3.1.6-py3-none-any.whl"
+        ]
+      },
+      {
+        "name": "jmespath-1.1.0-py3-none-any.whl",
+        "size": 20419,
+        "sha256": "a5663118de4908c91729bea0acadca56526eb2698e83de10cd116ae0f4e97c64",
+        "urls": [
+          "https://modelscope.cn/api/v1/models/jiangjiang419/voxcpm-studio-updates/repo?Revision=master&FilePath=runtime%2Fpy312-20261018-v1%2Fjmespath-1.1.0-py3-none-any.whl"
+        ]
+      },
+      {
+        "name": "joblib-1.6.0-py3-none-any.whl",
+        "size": 306115,
+        "sha256": "3dbbf9f6e4b592a2357b854608e980fe6390d131d7a82f011a377ef2ebef7aba",
+        "urls": [
+          "https://modelscope.cn/api/v1/models/jiangjiang419/voxcpm-studio-updates/repo?Revision=master&FilePath=runtime%2Fpy312-20261018-v1%2Fjoblib-1.6.0-py3-none-any.whl"
+        ]
+      },
+      {
+        "name": "kaldifst-1.8.1-cp312-cp312-win_amd64.whl",
+        "size": 1094581,
+        "sha256": "db119a6b1dbaf5f6b5b0ece0fad88a22a7b4c8359e858588a02b53f01b8eea06",
+        "urls": [
+          "https://modelscope.cn/api/v1/models/jiangjiang419/voxcpm-studio-updates/repo?Revision=master&FilePath=runtime%2Fpy312-20261018-v1%2Fkaldifst-1.8.1-cp312-cp312-win_amd64.whl"
+        ]
+      },
+      {
+        "name": "kaldiio-2.18.1-py3-none-any.whl",
+        "size": 29330,
+        "sha256": "397a4cd18977acaae7acabfba6807ee0a6978c620064381a266eac15b3c1a0a0",
+        "urls": [
+          "https://modelscope.cn/api/v1/models/jiangjiang419/voxcpm-studio-updates/repo?Revision=master&FilePath=runtime%2Fpy312-20261018-v1%2Fkaldiio-2.18.1-py3-none-any.whl"
+        ]
+      },
+      {
+        "name": "kiwisolver-1.5.1-cp312-cp312-win_amd64.whl",
+        "size": 70748,
+        "sha256": "06a6917674de9e0fe3f66f5430787f59a9f2ddb64af9b714eaec547e29ef5c19",
+        "urls": [
+          "https://modelscope.cn/api/v1/models/jiangjiang419/voxcpm-studio-updates/repo?Revision=master&FilePath=runtime%2Fpy312-20261018-v1%2Fkiwisolver-1.5.1-cp312-cp312-win_amd64.whl"
+        ]
+      },
+      {
+        "name": "lazy_loader-0.6-py3-none-any.whl",
+        "size": 8791,
+        "sha256": "77253be3391b06124a0e16105bd663b6c54470af1a9ca8e1cf026f38d58ed056",
+        "urls": [
+          "https://modelscope.cn/api/v1/models/jiangjiang419/voxcpm-studio-updates/repo?Revision=master&FilePath=runtime%2Fpy312-20261018-v1%2Flazy_loader-0.6-py3-none-any.whl"
+        ]
+      },
+      {
+        "name": "librosa-0.11.0-py3-none-any.whl",
+        "size": 260749,
+        "sha256": "0b6415c4fd68bff4c29288abe67c6d80b587e0e1e2cfb0aad23e4559504a7fa1",
+        "urls": [
+          "https://modelscope.cn/api/v1/models/jiangjiang419/voxcpm-studio-updates/repo?Revision=master&FilePath=runtime%2Fpy312-20261018-v1%2Flibrosa-0.11.0-py3-none-any.whl"
+        ]
+      },
+      {
+        "name": "llvmlite-0.50.0-cp312-cp312-win_amd64.whl",
+        "size": 41865553,
+        "sha256": "c20595cc3a76e3c85140fdafbf9246c732ddf8e0e646ba2f4e4881f87567300d",
+        "urls": [
+          "https://modelscope.cn/api/v1/models/jiangjiang419/voxcpm-studio-updates/repo?Revision=master&FilePath=runtime%2Fpy312-20261018-v1%2Fllvmlite-0.50.0-cp312-cp312-win_amd64.whl"
+        ]
+      },
+      {
+        "name": "markdown_it_py-4.2.0-py3-none-any.whl",
+        "size": 91687,
+        "sha256": "9f7ebbcd14fe59494226453aed97c1070d83f8d24b6fc3a3bcf9a38092641c4a",
+        "urls": [
+          "https://modelscope.cn/api/v1/models/jiangjiang419/voxcpm-studio-updates/repo?Revision=master&FilePath=runtime%2Fpy312-20261018-v1%2Fmarkdown_it_py-4.2.0-py3-none-any.whl"
+        ]
+      },
+      {
+        "name": "markupsafe-3.0.4-cp312-cp312-win_amd64.whl",
+        "size": 14303,
+        "sha256": "11935df9bf455ed0c04eb87bcd720f02b1fe5e02128a9430f23aed6f93336fc7",
+        "urls": [
+          "https://modelscope.cn/api/v1/models/jiangjiang419/voxcpm-studio-updates/repo?Revision=master&FilePath=runtime%2Fpy312-20261018-v1%2Fmarkupsafe-3.0.4-cp312-cp312-win_amd64.whl"
+        ]
+      },
+      {
+        "name": "matplotlib-3.10.9-cp312-cp312-win_amd64.whl",
+        "size": 8217462,
+        "sha256": "d091f9d758b34aaaaa6331d13574bf01891d903b3dec59bfff458ef7551de5d6",
+        "urls": [
+          "https://modelscope.cn/api/v1/models/jiangjiang419/voxcpm-studio-updates/repo?Revision=master&FilePath=runtime%2Fpy312-20261018-v1%2Fmatplotlib-3.10.9-cp312-cp312-win_amd64.whl"
+        ]
+      },
+      {
+        "name": "mdurl-0.1.2-py3-none-any.whl",
+        "size": 9979,
+        "sha256": "84008a41e51615a49fc9966191ff91509e3c40b939176e643fd50a5c2196b8f8",
+        "urls": [
+          "https://modelscope.cn/api/v1/models/jiangjiang419/voxcpm-studio-updates/repo?Revision=master&FilePath=runtime%2Fpy312-20261018-v1%2Fmdurl-0.1.2-py3-none-any.whl"
+        ]
+      },
+      {
+        "name": "modelscope-1.36.3-py3-none-any.whl",
+        "size": 6085015,
+        "sha256": "65834a077347522d4473778692fded0b23b2a91cb3305811de0deabb83f20e98",
+        "urls": [
+          "https://modelscope.cn/api/v1/models/jiangjiang419/voxcpm-studio-updates/repo?Revision=master&FilePath=runtime%2Fpy312-20261018-v1%2Fmodelscope-1.36.3-py3-none-any.whl"
+        ]
+      },
+      {
+        "name": "more_itertools-11.2.1-py3-none-any.whl",
+        "size": 74405,
+        "sha256": "35a7377edd1dd6608dcb2cdf534ded55ea32d49448875ad042cd3f879fb1ded0",
+        "urls": [
+          "https://modelscope.cn/api/v1/models/jiangjiang419/voxcpm-studio-updates/repo?Revision=master&FilePath=runtime%2Fpy312-20261018-v1%2Fmore_itertools-11.2.1-py3-none-any.whl"
+        ]
+      },
+      {
+        "name": "mpmath-1.3.0-py3-none-any.whl",
+        "size": 536198,
+        "sha256": "a0b2b9fe80bbcd81a6647ff13108738cfb482d481d826cc0e02f5b35e5c88d2c",
+        "urls": [
+          "https://modelscope.cn/api/v1/models/jiangjiang419/voxcpm-studio-updates/repo?Revision=master&FilePath=runtime%2Fpy312-20261018-v1%2Fmpmath-1.3.0-py3-none-any.whl"
+        ]
+      },
+      {
+        "name": "msgpack-1.2.3-cp312-cp312-win_amd64.whl",
+        "size": 76744,
+        "sha256": "3ec409b0d6aa8e9eec6eaf881b893caa215dbe68c5319ca96e8a271d81bb111d",
+        "urls": [
+          "https://modelscope.cn/api/v1/models/jiangjiang419/voxcpm-studio-updates/repo?Revision=master&FilePath=runtime%2Fpy312-20261018-v1%2Fmsgpack-1.2.3-cp312-cp312-win_amd64.whl"
+        ]
+      },
+      {
+        "name": "multidict-7.1.0-cp312-cp312-win_amd64.whl",
+        "size": 93817,
+        "sha256": "10202ba98cfb3f7eb60da7ca87a2c458a69b7d0d6e4d4388cd6773ebbce89085",
+        "urls": [
+          "https://modelscope.cn/api/v1/models/jiangjiang419/voxcpm-studio-updates/repo?Revision=master&FilePath=runtime%2Fpy312-20261018-v1%2Fmultidict-7.1.0-cp312-cp312-win_amd64.whl"
+        ]
+      },
+      {
+        "name": "multiprocess-0.70.16-py312-none-any.whl",
+        "size": 146741,
+        "sha256": "fc0544c531920dde3b00c29863377f87e1632601092ea2daca74e4beb40faa2e",
+        "urls": [
+          "https://modelscope.cn/api/v1/models/jiangjiang419/voxcpm-studio-updates/repo?Revision=master&FilePath=runtime%2Fpy312-20261018-v1%2Fmultiprocess-0.70.16-py312-none-any.whl"
+        ]
+      },
+      {
+        "name": "multivolumefile-0.2.3-py3-none-any.whl",
+        "size": 17037,
+        "sha256": "237f4353b60af1703087cf7725755a1f6fcaeeea48421e1896940cd1c920d678",
+        "urls": [
+          "https://modelscope.cn/api/v1/models/jiangjiang419/voxcpm-studio-updates/repo?Revision=master&FilePath=runtime%2Fpy312-20261018-v1%2Fmultivolumefile-0.2.3-py3-none-any.whl"
+        ]
+      },
+      {
+        "name": "narwhals-2.27.1-py3-none-any.whl",
+        "size": 483211,
+        "sha256": "d057df13f5852b8e157596e82eb5e955fad267425df5e420e0ee9863da483b31",
+        "urls": [
+          "https://modelscope.cn/api/v1/models/jiangjiang419/voxcpm-studio-updates/repo?Revision=master&FilePath=runtime%2Fpy312-20261018-v1%2Fnarwhals-2.27.1-py3-none-any.whl"
+        ]
+      },
+      {
+        "name": "networkx-3.7-py3-none-any.whl",
+        "size": 2142205,
+        "sha256": "e3fd2c13a7814cee3746340d8d7f8598a67f16a58bf47fb7f8793fab6efca1b0",
+        "urls": [
+          "https://modelscope.cn/api/v1/models/jiangjiang419/voxcpm-studio-updates/repo?Revision=master&FilePath=runtime%2Fpy312-20261018-v1%2Fnetworkx-3.7-py3-none-any.whl"
+        ]
+      },
+      {
+        "name": "numba-0.68.0-cp312-cp312-win_amd64.whl",
+        "size": 2830891,
+        "sha256": "530961dc7e41ee358eca2b828baf7b645ce6fa466d778bb9dc73855dd103c4f7",
+        "urls": [
+          "https://modelscope.cn/api/v1/models/jiangjiang419/voxcpm-studio-updates/repo?Revision=master&FilePath=runtime%2Fpy312-20261018-v1%2Fnumba-0.68.0-cp312-cp312-win_amd64.whl"
+        ]
+      },
+      {
+        "name": "numpy-2.5.4-cp312-cp312-win_amd64.whl",
+        "size": 12573091,
+        "sha256": "a7b1b6353e36a7e50de2973a38d705c88ee93adcf120673cee7f45a4a3fa223a",
+        "urls": [
+          "https://modelscope.cn/api/v1/models/jiangjiang419/voxcpm-studio-updates/repo?Revision=master&FilePath=runtime%2Fpy312-20261018-v1%2Fnumpy-2.5.4-cp312-cp312-win_amd64.whl"
+        ]
+      },
+      {
+        "name": "omegaconf-2.3.1-py3-none-any.whl",
+        "size": 79502,
+        "sha256": "3d701d14e9a8828f1edd28bb70b725908b34277cdd72cf7d6a83f94dadc6b6a0",
+        "urls": [
+          "https://modelscope.cn/api/v1/models/jiangjiang419/voxcpm-studio-updates/repo?Revision=master&FilePath=runtime%2Fpy312-20261018-v1%2Fomegaconf-2.3.1-py3-none-any.whl"
+        ]
+      },
+      {
+        "name": "orjson-3.13.0-cp312-cp312-win_amd64.whl",
+        "size": 121538,
+        "sha256": "b571236d8393edcd3236e07423f762bfcf571f852aad667a3bce9e7b755e0790",
+        "urls": [
+          "https://modelscope.cn/api/v1/models/jiangjiang419/voxcpm-studio-updates/repo?Revision=master&FilePath=runtime%2Fpy312-20261018-v1%2Forjson-3.13.0-cp312-cp312-win_amd64.whl"
+        ]
+      },
+      {
+        "name": "oss2-2.19.1-py3-none-any.whl",
+        "size": 124053,
+        "sha256": "52bfe9b37a3c02bab6fea38bef6b8ce41d025b55320d53dc39aa23b48236be1e",
+        "urls": [
+          "https://modelscope.cn/api/v1/models/jiangjiang419/voxcpm-studio-updates/repo?Revision=master&FilePath=runtime%2Fpy312-20261018-v1%2Foss2-2.19.1-py3-none-any.whl"
+        ]
+      },
+      {
+        "name": "packaging-26.3-py3-none-any.whl",
+        "size": 129956,
+        "sha256": "d7193f7c8e4e93f444fde0262bf90af30e16fa0ad0ad44cb553c87339b23cd1c",
+        "urls": [
+          "https://modelscope.cn/api/v1/models/jiangjiang419/voxcpm-studio-updates/repo?Revision=master&FilePath=runtime%2Fpy312-20261018-v1%2Fpackaging-26.3-py3-none-any.whl"
+        ]
+      },
+      {
+        "name": "pandas-3.0.6-cp312-cp312-win_amd64.whl",
+        "size": 9661439,
+        "sha256": "3ef908d28590b3f42d7070e7ad8f9b34b442b260b7f3c1afb57e0040c58cdb1b",
+        "urls": [
+          "https://modelscope.cn/api/v1/models/jiangjiang419/voxcpm-studio-updates/repo?Revision=master&FilePath=runtime%2Fpy312-20261018-v1%2Fpandas-3.0.6-cp312-cp312-win_amd64.whl"
+        ]
+      },
+      {
+        "name": "patch_ng-1.19.1-py3-none-any.whl",
+        "size": 17601,
+        "sha256": "d45fd47b3f74b48c3e336690341876bb26244a077a06f5f7e6e47c19c15c1ca4",
+        "urls": [
+          "https://modelscope.cn/api/v1/models/jiangjiang419/voxcpm-studio-updates/repo?Revision=master&FilePath=runtime%2Fpy312-20261018-v1%2Fpatch_ng-1.19.1-py3-none-any.whl"
+        ]
+      },
+      {
+        "name": "pillow-12.3.0-cp312-cp312-win_amd64.whl",
+        "size": 7227137,
+        "sha256": "a2b55dd6b2a4c4b7d87ffa56bdb33fdc5fdb9a462173861a7bc097f17d91cb09",
+        "urls": [
+          "https://modelscope.cn/api/v1/models/jiangjiang419/voxcpm-studio-updates/repo?Revision=master&FilePath=runtime%2Fpy312-20261018-v1%2Fpillow-12.3.0-cp312-cp312-win_amd64.whl"
+        ]
+      },
+      {
+        "name": "platformdirs-4.13.4-py3-none-any.whl",
+        "size": 32782,
+        "sha256": "502ce08e9d36cf90579ee44e1e764838842fa658e4975ef47344fd053011d2c8",
+        "urls": [
+          "https://modelscope.cn/api/v1/models/jiangjiang419/voxcpm-studio-updates/repo?Revision=master&FilePath=runtime%2Fpy312-20261018-v1%2Fplatformdirs-4.13.4-py3-none-any.whl"
+        ]
+      },
+      {
+        "name": "pooch-1.9.0-py3-none-any.whl",
+        "size": 67175,
+        "sha256": "f265597baa9f760d25ceb29d0beb8186c243d6607b0f60b83ecf14078dbc703b",
+        "urls": [
+          "https://modelscope.cn/api/v1/models/jiangjiang419/voxcpm-studio-updates/repo?Revision=master&FilePath=runtime%2Fpy312-20261018-v1%2Fpooch-1.9.0-py3-none-any.whl"
+        ]
+      },
+      {
+        "name": "propcache-0.5.4-cp312-cp312-win_amd64.whl",
+        "size": 46190,
+        "sha256": "98914de2c4d7f0f9f4a8c6ea4bf05841f4175796941e3ef7d47eb718f22311fb",
+        "urls": [
+          "https://modelscope.cn/api/v1/models/jiangjiang419/voxcpm-studio-updates/repo?Revision=master&FilePath=runtime%2Fpy312-20261018-v1%2Fpropcache-0.5.4-cp312-cp312-win_amd64.whl"
+        ]
+      },
+      {
+        "name": "protobuf-7.36.2-cp310-abi3-win_amd64.whl",
+        "size": 456514,
+        "sha256": "a300819d441e078a5608c0d3c709796bb548136058fda017ae51d425b44fd353",
+        "urls": [
+          "https://modelscope.cn/api/v1/models/jiangjiang419/voxcpm-studio-updates/repo?Revision=master&FilePath=runtime%2Fpy312-20261018-v1%2Fprotobuf-7.36.2-cp310-abi3-win_amd64.whl"
+        ]
+      },
+      {
+        "name": "psutil-5.9.8-cp37-abi3-win_amd64.whl",
+        "size": 255090,
+        "sha256": "8db4c1b57507eef143a15a6884ca10f7c73876cdf5d51e713151c1236a0e68cf",
+        "urls": [
+          "https://modelscope.cn/api/v1/models/jiangjiang419/voxcpm-studio-updates/repo?Revision=master&FilePath=runtime%2Fpy312-20261018-v1%2Fpsutil-5.9.8-cp37-abi3-win_amd64.whl"
+        ]
+      },
+      {
+        "name": "py7zr-1.1.0-py3-none-any.whl",
+        "size": 71257,
+        "sha256": "5921bc30fb72b5453aafe3b2183664c08ef508cde2655988d5e9bd6078353ef7",
+        "urls": [
+          "https://modelscope.cn/api/v1/models/jiangjiang419/voxcpm-studio-updates/repo?Revision=master&FilePath=runtime%2Fpy312-20261018-v1%2Fpy7zr-1.1.0-py3-none-any.whl"
+        ]
+      },
+      {
+        "name": "pyahocorasick-2.3.1-cp312-cp312-win_amd64.whl",
+        "size": 35258,
+        "sha256": "f5cc3c021be241fe9317c5991f8efba2b876e3956691322ad9e55c0d9ff7c599",
+        "urls": [
+          "https://modelscope.cn/api/v1/models/jiangjiang419/voxcpm-studio-updates/repo?Revision=master&FilePath=runtime%2Fpy312-20261018-v1%2Fpyahocorasick-2.3.1-cp312-cp312-win_amd64.whl"
+        ]
+      },
+      {
+        "name": "pyarrow-26.0.0-cp312-cp312-win_amd64.whl",
+        "size": 28567581,
+        "sha256": "cc903e1069e9dd5e9dcf780324c0112e27e051e422ecfaff574fb33ed65d9160",
+        "urls": [
+          "https://modelscope.cn/api/v1/models/jiangjiang419/voxcpm-studio-updates/repo?Revision=master&FilePath=runtime%2Fpy312-20261018-v1%2Fpyarrow-26.0.0-cp312-cp312-win_amd64.whl"
+        ]
+      },
+      {
+        "name": "pybcj-1.0.7-cp312-cp312-win_amd64.whl",
+        "size": 24940,
+        "sha256": "c435062d66364f85674a639541980000e37657b98367a2ce2699514e44b8ab05",
+        "urls": [
+          "https://modelscope.cn/api/v1/models/jiangjiang419/voxcpm-studio-updates/repo?Revision=master&FilePath=runtime%2Fpy312-20261018-v1%2Fpybcj-1.0.7-cp312-cp312-win_amd64.whl"
+        ]
+      },
+      {
+        "name": "pycparser-3.11-py3-none-any.whl",
+        "size": 51178,
+        "sha256": "51d5a8ba2be0bbe440b99d2112604c95bbbc3c2748a64260186c541e1729cd80",
+        "urls": [
+          "https://modelscope.cn/api/v1/models/jiangjiang419/voxcpm-studio-updates/repo?Revision=master&FilePath=runtime%2Fpy312-20261018-v1%2Fpycparser-3.11-py3-none-any.whl"
+        ]
+      },
+      {
+        "name": "pycryptodome-4.0.1-cp39-abi3-win_amd64.whl",
+        "size": 1330493,
+        "sha256": "c4c0447cf70e6fa2914657959548eb50ba594a1a1c198698f8c96abbc6ca3c89",
+        "urls": [
+          "https://modelscope.cn/api/v1/models/jiangjiang419/voxcpm-studio-updates/repo?Revision=master&FilePath=runtime%2Fpy312-20261018-v1%2Fpycryptodome-4.0.1-cp39-abi3-win_amd64.whl"
+        ]
+      },
+      {
+        "name": "pycryptodomex-3.23.0-cp37-abi3-win_amd64.whl",
+        "size": 1803124,
+        "sha256": "52e5ca58c3a0b0bd5e100a9fbc8015059b05cffc6c66ce9d98b4b45e023443b9",
+        "urls": [
+          "https://modelscope.cn/api/v1/models/jiangjiang419/voxcpm-studio-updates/repo?Revision=master&FilePath=runtime%2Fpy312-20261018-v1%2Fpycryptodomex-3.23.0-cp37-abi3-win_amd64.whl"
+        ]
+      },
+      {
+        "name": "pydantic-2.13.3-py3-none-any.whl",
+        "size": 471981,
+        "sha256": "6db14ac8dfc9a1e57f87ea2c0de670c251240f43cb0c30a5130e9720dc612927",
+        "urls": [
+          "https://modelscope.cn/api/v1/models/jiangjiang419/voxcpm-studio-updates/repo?Revision=master&FilePath=runtime%2Fpy312-20261018-v1%2Fpydantic-2.13.3-py3-none-any.whl"
+        ]
+      },
+      {
+        "name": "pydantic_core-2.46.3-cp312-cp312-win_amd64.whl",
+        "size": 2072970,
+        "sha256": "c3212fda0ee959c1dd04c60b601ec31097aaa893573a3a1abd0a47bcac2968c1",
+        "urls": [
+          "https://modelscope.cn/api/v1/models/jiangjiang419/voxcpm-studio-updates/repo?Revision=master&FilePath=runtime%2Fpy312-20261018-v1%2Fpydantic_core-2.46.3-cp312-cp312-win_amd64.whl"
+        ]
+      },
+      {
+        "name": "pydub-0.25.1-py2.py3-none-any.whl",
+        "size": 32327,
+        "sha256": "65617e33033874b59d87db603aa1ed450633288aefead953b30bded59cb599a6",
+        "urls": [
+          "https://modelscope.cn/api/v1/models/jiangjiang419/voxcpm-studio-updates/repo?Revision=master&FilePath=runtime%2Fpy312-20261018-v1%2Fpydub-0.25.1-py2.py3-none-any.whl"
+        ]
+      },
+      {
+        "name": "pygments-2.21.0-py3-none-any.whl",
+        "size": 1250147,
+        "sha256": "2363c69b61c4a97c838da3b130dcd6468f4848992b21a82f2a63ec34377137d9",
+        "urls": [
+          "https://modelscope.cn/api/v1/models/jiangjiang419/voxcpm-studio-updates/repo?Revision=master&FilePath=runtime%2Fpy312-20261018-v1%2Fpygments-2.21.0-py3-none-any.whl"
+        ]
+      },
+      {
+        "name": "pynndescent-0.6.0-py3-none-any.whl",
+        "size": 73511,
+        "sha256": "dc8c74844e4c7f5cbd1e0cd6909da86fdc789e6ff4997336e344779c3d5538ef",
+        "urls": [
+          "https://modelscope.cn/api/v1/models/jiangjiang419/voxcpm-studio-updates/repo?Revision=master&FilePath=runtime%2Fpy312-20261018-v1%2Fpynndescent-0.6.0-py3-none-any.whl"
+        ]
+      },
+      {
+        "name": "pyparsing-3.3.3-py3-none-any.whl",
+        "size": 126420,
+        "sha256": "ece8c00a69cf01b45d0b1dedabb469c90d8caf996d4fda40f147627a122849a4",
+        "urls": [
+          "https://modelscope.cn/api/v1/models/jiangjiang419/voxcpm-studio-updates/repo?Revision=master&FilePath=runtime%2Fpy312-20261018-v1%2Fpyparsing-3.3.3-py3-none-any.whl"
+        ]
+      },
+      {
+        "name": "pyppmd-1.3.1-cp312-cp312-win_amd64.whl",
+        "size": 46957,
+        "sha256": "c8c1ad39e7ebde71bf5a54cf61f489bf4790f1dd0beb70dc2e8f5ad3329d7ca7",
+        "urls": [
+          "https://modelscope.cn/api/v1/models/jiangjiang419/voxcpm-studio-updates/repo?Revision=master&FilePath=runtime%2Fpy312-20261018-v1%2Fpyppmd-1.3.1-cp312-cp312-win_amd64.whl"
+        ]
+      },
+      {
+        "name": "python_dateutil-2.9.0.post0-py2.py3-none-any.whl",
+        "size": 229892,
+        "sha256": "a8b2bc7bffae282281c8140a97d3aa9c14da0b136dfe83f850eea9a5f7470427",
+        "urls": [
+          "https://modelscope.cn/api/v1/models/jiangjiang419/voxcpm-studio-updates/repo?Revision=master&FilePath=runtime%2Fpy312-20261018-v1%2Fpython_dateutil-2.9.0.post0-py2.py3-none-any.whl"
+        ]
+      },
+      {
+        "name": "python_multipart-0.0.32-py3-none-any.whl",
+        "size": 30042,
+        "sha256": "ff6d3f776f16878c894e52e107296ffc890e913c611b1a4ec6c44e2821fe2e23",
+        "urls": [
+          "https://modelscope.cn/api/v1/models/jiangjiang419/voxcpm-studio-updates/repo?Revision=master&FilePath=runtime%2Fpy312-20261018-v1%2Fpython_multipart-0.0.32-py3-none-any.whl"
+        ]
+      },
+      {
+        "name": "pytorch_wpe-0.0.1-py3-none-any.whl",
+        "size": 8080,
+        "sha256": "fa0dc9f818fba81b36c1a51a53331cf6ed975f29b33f23e07b0deb4bee82eaad",
+        "urls": [
+          "https://modelscope.cn/api/v1/models/jiangjiang419/voxcpm-studio-updates/repo?Revision=master&FilePath=runtime%2Fpy312-20261018-v1%2Fpytorch_wpe-0.0.1-py3-none-any.whl"
+        ]
+      },
+      {
+        "name": "pytz-2026.5-py2.py3-none-any.whl",
+        "size": 506342,
+        "sha256": "e658af3757f9e26a9d25dd2aff38335acd92bc9104f890a894b2c1ba28311b03",
+        "urls": [
+          "https://modelscope.cn/api/v1/models/jiangjiang419/voxcpm-studio-updates/repo?Revision=master&FilePath=runtime%2Fpy312-20261018-v1%2Fpytz-2026.5-py2.py3-none-any.whl"
+        ]
+      },
+      {
+        "name": "pyyaml-6.0.3-cp312-cp312-win_amd64.whl",
+        "size": 154003,
+        "sha256": "5fcd34e47f6e0b794d17de1b4ff496c00986e1c83f7ab2fb8fcfe9616ff7477b",
+        "urls": [
+          "https://modelscope.cn/api/v1/models/jiangjiang419/voxcpm-studio-updates/repo?Revision=master&FilePath=runtime%2Fpy312-20261018-v1%2Fpyyaml-6.0.3-cp312-cp312-win_amd64.whl"
+        ]
+      },
+      {
+        "name": "regex-2026.9.29-cp312-cp312-win_amd64.whl",
+        "size": 280334,
+        "sha256": "fdd88ed5e20b1bcdd234421e454962c971aa44b653bdb7f1ea9ef683e90fb649",
+        "urls": [
+          "https://modelscope.cn/api/v1/models/jiangjiang419/voxcpm-studio-updates/repo?Revision=master&FilePath=runtime%2Fpy312-20261018-v1%2Fregex-2026.9.29-cp312-cp312-win_amd64.whl"
+        ]
+      },
+      {
+        "name": "requests-2.34.2-py3-none-any.whl",
+        "size": 73075,
+        "sha256": "2a0d60c172f83ac6ab31e4554906c0f3b3588d37b5cb939b1c061f4907e278e0",
+        "urls": [
+          "https://modelscope.cn/api/v1/models/jiangjiang419/voxcpm-studio-updates/repo?Revision=master&FilePath=runtime%2Fpy312-20261018-v1%2Frequests-2.34.2-py3-none-any.whl"
+        ]
+      },
+      {
+        "name": "rich-15.0.0-py3-none-any.whl",
+        "size": 310654,
+        "sha256": "33bd4ef74232fb73fe9279a257718407f169c09b78a87ad3d296f548e27de0bb",
+        "urls": [
+          "https://modelscope.cn/api/v1/models/jiangjiang419/voxcpm-studio-updates/repo?Revision=master&FilePath=runtime%2Fpy312-20261018-v1%2Frich-15.0.0-py3-none-any.whl"
+        ]
+      },
+      {
+        "name": "safehttpx-0.1.7-py3-none-any.whl",
+        "size": 8959,
+        "sha256": "c4f4a162db6993464d7ca3d7cc4af0ffc6515a606dfd220b9f82c6945d869cde",
+        "urls": [
+          "https://modelscope.cn/api/v1/models/jiangjiang419/voxcpm-studio-updates/repo?Revision=master&FilePath=runtime%2Fpy312-20261018-v1%2Fsafehttpx-0.1.7-py3-none-any.whl"
+        ]
+      },
+      {
+        "name": "safetensors-0.7.0-cp38-abi3-win_amd64.whl",
+        "size": 341380,
+        "sha256": "d1239932053f56f3456f32eb9625590cc7582e905021f94636202a864d470755",
+        "urls": [
+          "https://modelscope.cn/api/v1/models/jiangjiang419/voxcpm-studio-updates/repo?Revision=master&FilePath=runtime%2Fpy312-20261018-v1%2Fsafetensors-0.7.0-cp38-abi3-win_amd64.whl"
+        ]
+      },
+      {
+        "name": "scikit_learn-1.9.1-cp312-cp312-win_amd64.whl",
+        "size": 8262238,
+        "sha256": "4b59abb30618121cc46b45972d6bf53a7128b4df4cd346c6ca6f4d5f9031e49c",
+        "urls": [
+          "https://modelscope.cn/api/v1/models/jiangjiang419/voxcpm-studio-updates/repo?Revision=master&FilePath=runtime%2Fpy312-20261018-v1%2Fscikit_learn-1.9.1-cp312-cp312-win_amd64.whl"
+        ]
+      },
+      {
+        "name": "scipy-1.18.1-cp312-cp312-win_amd64.whl",
+        "size": 36658278,
+        "sha256": "5e4d44984abc0020154ea81b247adeddcc3ac5527b975ff798bd1ba0adc513c2",
+        "urls": [
+          "https://modelscope.cn/api/v1/models/jiangjiang419/voxcpm-studio-updates/repo?Revision=master&FilePath=runtime%2Fpy312-20261018-v1%2Fscipy-1.18.1-cp312-cp312-win_amd64.whl"
+        ]
+      },
+      {
+        "name": "semantic_version-2.10.0-py2.py3-none-any.whl",
+        "size": 15552,
+        "sha256": "de78a3b8e0feda74cabc54aab2da702113e33ac9d9eb9d2389bcf1f58b7d9177",
+        "urls": [
+          "https://modelscope.cn/api/v1/models/jiangjiang419/voxcpm-studio-updates/repo?Revision=master&FilePath=runtime%2Fpy312-20261018-v1%2Fsemantic_version-2.10.0-py2.py3-none-any.whl"
+        ]
+      },
+      {
+        "name": "sentencepiece-0.2.2-cp312-cp312-win_amd64.whl",
+        "size": 1248030,
+        "sha256": "7c6e7bf684dc12145bfa685d3060beaea55139134ba848289bee514ed42e7383",
+        "urls": [
+          "https://modelscope.cn/api/v1/models/jiangjiang419/voxcpm-studio-updates/repo?Revision=master&FilePath=runtime%2Fpy312-20261018-v1%2Fsentencepiece-0.2.2-cp312-cp312-win_amd64.whl"
+        ]
+      },
+      {
+        "name": "setuptools-82.0.1-py3-none-any.whl",
+        "size": 1006223,
+        "sha256": "a59e362652f08dcd477c78bb6e7bd9d80a7995bc73ce773050228a348ce2e5bb",
+        "urls": [
+          "https://modelscope.cn/api/v1/models/jiangjiang419/voxcpm-studio-updates/repo?Revision=master&FilePath=runtime%2Fpy312-20261018-v1%2Fsetuptools-82.0.1-py3-none-any.whl"
+        ]
+      },
+      {
+        "name": "shellingham-1.5.4-py2.py3-none-any.whl",
+        "size": 9755,
+        "sha256": "7ecfff8f2fd72616f7481040475a65b2bf8af90a56c89140852d1120324e8686",
+        "urls": [
+          "https://modelscope.cn/api/v1/models/jiangjiang419/voxcpm-studio-updates/repo?Revision=master&FilePath=runtime%2Fpy312-20261018-v1%2Fshellingham-1.5.4-py2.py3-none-any.whl"
+        ]
+      },
+      {
+        "name": "simplejson-4.1.1-cp312-cp312-win_amd64.whl",
+        "size": 90748,
+        "sha256": "63a5451f557d6be48a231bae932458655c620902b868170b2f1c8afed496f6b4",
+        "urls": [
+          "https://modelscope.cn/api/v1/models/jiangjiang419/voxcpm-studio-updates/repo?Revision=master&FilePath=runtime%2Fpy312-20261018-v1%2Fsimplejson-4.1.1-cp312-cp312-win_amd64.whl"
+        ]
+      },
+      {
+        "name": "six-1.17.0-py2.py3-none-any.whl",
+        "size": 11050,
+        "sha256": "4721f391ed90541fddacab5acf947aa0d3dc7d27b2e1e8eda2be8970586c3274",
+        "urls": [
+          "https://modelscope.cn/api/v1/models/jiangjiang419/voxcpm-studio-updates/repo?Revision=master&FilePath=runtime%2Fpy312-20261018-v1%2Fsix-1.17.0-py2.py3-none-any.whl"
+        ]
+      },
+      {
+        "name": "sortedcontainers-2.4.0-py2.py3-none-any.whl",
+        "size": 29575,
+        "sha256": "a163dcaede0f1c021485e957a39245190e74249897e2ae4b2aa38595db237ee0",
+        "urls": [
+          "https://modelscope.cn/api/v1/models/jiangjiang419/voxcpm-studio-updates/repo?Revision=master&FilePath=runtime%2Fpy312-20261018-v1%2Fsortedcontainers-2.4.0-py2.py3-none-any.whl"
+        ]
+      },
+      {
+        "name": "soundfile-0.13.1-py2.py3-none-win_amd64.whl",
+        "size": 1019162,
+        "sha256": "1e70a05a0626524a69e9f0f4dd2ec174b4e9567f4d8b6c11d38b5c289be36ee9",
+        "urls": [
+          "https://modelscope.cn/api/v1/models/jiangjiang419/voxcpm-studio-updates/repo?Revision=master&FilePath=runtime%2Fpy312-20261018-v1%2Fsoundfile-0.13.1-py2.py3-none-win_amd64.whl"
+        ]
+      },
+      {
+        "name": "soupsieve-2.8.4-py3-none-any.whl",
+        "size": 37304,
+        "sha256": "e7e6b0769c8f51ed59acab6e994b00621096cfb1c640a7509295987388fbaf65",
+        "urls": [
+          "https://modelscope.cn/api/v1/models/jiangjiang419/voxcpm-studio-updates/repo?Revision=master&FilePath=runtime%2Fpy312-20261018-v1%2Fsoupsieve-2.8.4-py3-none-any.whl"
+        ]
+      },
+      {
+        "name": "soxr-1.1.0-cp312-abi3-win_amd64.whl",
+        "size": 174357,
+        "sha256": "6ae2a174bffea94e8ead857dad85999d3f49f091774dbad5b046c0417d7092f4",
+        "urls": [
+          "https://modelscope.cn/api/v1/models/jiangjiang419/voxcpm-studio-updates/repo?Revision=master&FilePath=runtime%2Fpy312-20261018-v1%2Fsoxr-1.1.0-cp312-abi3-win_amd64.whl"
+        ]
+      },
+      {
+        "name": "spaces-0.48.3-py3-none-any.whl",
+        "size": 107531,
+        "sha256": "14c9ff4c7f687ae32c52ad24c3938bdc342d9b66394ae12af69327a6614ee2f3",
+        "urls": [
+          "https://modelscope.cn/api/v1/models/jiangjiang419/voxcpm-studio-updates/repo?Revision=master&FilePath=runtime%2Fpy312-20261018-v1%2Fspaces-0.48.3-py3-none-any.whl"
+        ]
+      },
+      {
+        "name": "starlette-1.8.0-py3-none-any.whl",
+        "size": 79612,
+        "sha256": "dfdd6b29c26483288088d990eee59631dedadd66ce20d203402a7ca8e3c4656f",
+        "urls": [
+          "https://modelscope.cn/api/v1/models/jiangjiang419/voxcpm-studio-updates/repo?Revision=master&FilePath=runtime%2Fpy312-20261018-v1%2Fstarlette-1.8.0-py3-none-any.whl"
+        ]
+      },
+      {
+        "name": "tensorboardx-2.6.5-py3-none-any.whl",
+        "size": 87510,
+        "sha256": "c10b891d00af306537cb8b58a039b2ba41571f0da06f433a41c4ca8d6abe1373",
+        "urls": [
+          "https://modelscope.cn/api/v1/models/jiangjiang419/voxcpm-studio-updates/repo?Revision=master&FilePath=runtime%2Fpy312-20261018-v1%2Ftensorboardx-2.6.5-py3-none-any.whl"
+        ]
+      },
+      {
+        "name": "textsearch-0.0.24-py2.py3-none-any.whl",
+        "size": 7606,
+        "sha256": "1bbc4cc36300fbf0bbaa865500f84e907c85f6a48faf37da6e098407b405ed09",
+        "urls": [
+          "https://modelscope.cn/api/v1/models/jiangjiang419/voxcpm-studio-updates/repo?Revision=master&FilePath=runtime%2Fpy312-20261018-v1%2Ftextsearch-0.0.24-py2.py3-none-any.whl"
+        ]
+      },
+      {
+        "name": "texttable-1.7.0-py2.py3-none-any.whl",
+        "size": 10768,
+        "sha256": "72227d592c82b3d7f672731ae73e4d1f88cd8e2ef5b075a7a7f01a23a3743917",
+        "urls": [
+          "https://modelscope.cn/api/v1/models/jiangjiang419/voxcpm-studio-updates/repo?Revision=master&FilePath=runtime%2Fpy312-20261018-v1%2Ftexttable-1.7.0-py2.py3-none-any.whl"
+        ]
+      },
+      {
+        "name": "threadpoolctl-3.7.0-py3-none-any.whl",
+        "size": 26362,
+        "sha256": "cd8b60b5641b45c67bbf73c64c843235fc2d8a480c87389f52f5dbee893b86be",
+        "urls": [
+          "https://modelscope.cn/api/v1/models/jiangjiang419/voxcpm-studio-updates/repo?Revision=master&FilePath=runtime%2Fpy312-20261018-v1%2Fthreadpoolctl-3.7.0-py3-none-any.whl"
+        ]
+      },
+      {
+        "name": "tokenizers-0.22.2-cp39-abi3-win_amd64.whl",
+        "size": 2747786,
+        "sha256": "c9ea31edff2968b44a88f97d784c2f16dc0729b8b143ed004699ebca91f05c48",
+        "urls": [
+          "https://modelscope.cn/api/v1/models/jiangjiang419/voxcpm-studio-updates/repo?Revision=master&FilePath=runtime%2Fpy312-20261018-v1%2Ftokenizers-0.22.2-cp39-abi3-win_amd64.whl"
+        ]
+      },
+      {
+        "name": "tomlkit-0.14.0-py3-none-any.whl",
+        "size": 39310,
+        "sha256": "592064ed85b40fa213469f81ac584f67a4f2992509a7c3ea2d632208623a3680",
+        "urls": [
+          "https://modelscope.cn/api/v1/models/jiangjiang419/voxcpm-studio-updates/repo?Revision=master&FilePath=runtime%2Fpy312-20261018-v1%2Ftomlkit-0.14.0-py3-none-any.whl"
+        ]
+      },
+      {
+        "name": "torch_complex-0.4.4-py3-none-any.whl",
+        "size": 9125,
+        "sha256": "6ab4ecd4f3a16e3adb70a7f7cd2e769a9dfd07d7a8e27d04ff9c621ebbe34b13",
+        "urls": [
+          "https://modelscope.cn/api/v1/models/jiangjiang419/voxcpm-studio-updates/repo?Revision=master&FilePath=runtime%2Fpy312-20261018-v1%2Ftorch_complex-0.4.4-py3-none-any.whl"
+        ]
+      },
+      {
+        "name": "tqdm-4.67.3-py3-none-any.whl",
+        "size": 78374,
+        "sha256": "ee1e4c0e59148062281c49d80b25b67771a127c85fc9676d3be5f243206826bf",
+        "urls": [
+          "https://modelscope.cn/api/v1/models/jiangjiang419/voxcpm-studio-updates/repo?Revision=master&FilePath=runtime%2Fpy312-20261018-v1%2Ftqdm-4.67.3-py3-none-any.whl"
+        ]
+      },
+      {
+        "name": "transformers-5.7.0-py3-none-any.whl",
+        "size": 10474236,
+        "sha256": "869660cd8fc92badc041f5551bf755a42f4b9558c93341bf3fa3eeed7065079c",
+        "urls": [
+          "https://modelscope.cn/api/v1/models/jiangjiang419/voxcpm-studio-updates/repo?Revision=master&FilePath=runtime%2Fpy312-20261018-v1%2Ftransformers-5.7.0-py3-none-any.whl"
+        ]
+      },
+      {
+        "name": "typeguard-4.6.0-py3-none-any.whl",
+        "size": 36884,
+        "sha256": "79878165bb86f2cf5d41d159a0ff1792a796cf496882d2fe1b1c6c7049b9cdd7",
+        "urls": [
+          "https://modelscope.cn/api/v1/models/jiangjiang419/voxcpm-studio-updates/repo?Revision=master&FilePath=runtime%2Fpy312-20261018-v1%2Ftypeguard-4.6.0-py3-none-any.whl"
+        ]
+      },
+      {
+        "name": "typer-0.27.3-py3-none-any.whl",
+        "size": 123312,
+        "sha256": "e50022f28b82a86313e54501317a1db64bf8f8d036ff8cfe5ca7e47675454aff",
+        "urls": [
+          "https://modelscope.cn/api/v1/models/jiangjiang419/voxcpm-studio-updates/repo?Revision=master&FilePath=runtime%2Fpy312-20261018-v1%2Ftyper-0.27.3-py3-none-any.whl"
+        ]
+      },
+      {
+        "name": "typing_extensions-4.16.0-py3-none-any.whl",
+        "size": 45571,
+        "sha256": "481caa481374e813c1b176ada14e97f1f67a4539ce9cfeb3f350d78d6370c2e8",
+        "urls": [
+          "https://modelscope.cn/api/v1/models/jiangjiang419/voxcpm-studio-updates/repo?Revision=master&FilePath=runtime%2Fpy312-20261018-v1%2Ftyping_extensions-4.16.0-py3-none-any.whl"
+        ]
+      },
+      {
+        "name": "typing_inspection-0.4.4-py3-none-any.whl",
+        "size": 14750,
+        "sha256": "65b8397ba37ccbce054456aaccddfc91e6e3083c92824df348d96ca832f3f147",
+        "urls": [
+          "https://modelscope.cn/api/v1/models/jiangjiang419/voxcpm-studio-updates/repo?Revision=master&FilePath=runtime%2Fpy312-20261018-v1%2Ftyping_inspection-0.4.4-py3-none-any.whl"
+        ]
+      },
+      {
+        "name": "tzdata-2026.5-py2.py3-none-any.whl",
+        "size": 347996,
+        "sha256": "b683bd1b6659ddcd810ff02ad09ba821d4bf1065072805063eb35c49617905ac",
+        "urls": [
+          "https://modelscope.cn/api/v1/models/jiangjiang419/voxcpm-studio-updates/repo?Revision=master&FilePath=runtime%2Fpy312-20261018-v1%2Ftzdata-2026.5-py2.py3-none-any.whl"
+        ]
+      },
+      {
+        "name": "umap_learn-0.5.12-py3-none-any.whl",
+        "size": 91849,
+        "sha256": "f2a85d2a2adcb52b541bed9b27a23ca169b56bb1b23283abeebfb8dfb8a42fe5",
+        "urls": [
+          "https://modelscope.cn/api/v1/models/jiangjiang419/voxcpm-studio-updates/repo?Revision=master&FilePath=runtime%2Fpy312-20261018-v1%2Fumap_learn-0.5.12-py3-none-any.whl"
+        ]
+      },
+      {
+        "name": "urllib3-2.8.0-py3-none-any.whl",
+        "size": 135717,
+        "sha256": "0cf3cae568d36aa9576b28dfb35f11328f1cb974ca7647d9475ebb86c75ac6e3",
+        "urls": [
+          "https://modelscope.cn/api/v1/models/jiangjiang419/voxcpm-studio-updates/repo?Revision=master&FilePath=runtime%2Fpy312-20261018-v1%2Furllib3-2.8.0-py3-none-any.whl"
+        ]
+      },
+      {
+        "name": "uvicorn-0.46.0-py3-none-any.whl",
+        "size": 70926,
+        "sha256": "bbebbcbed972d162afca128605223022bedd345b7bc7855ce66deb31487a9048",
+        "urls": [
+          "https://modelscope.cn/api/v1/models/jiangjiang419/voxcpm-studio-updates/repo?Revision=master&FilePath=runtime%2Fpy312-20261018-v1%2Fuvicorn-0.46.0-py3-none-any.whl"
+        ]
+      },
+      {
+        "name": "wetext-0.1.2-py3-none-any.whl",
+        "size": 1771722,
+        "sha256": "7467ac08a4bb44523780626437b9b0718cd611b1ccb4304bc49b649fe29370ee",
+        "urls": [
+          "https://modelscope.cn/api/v1/models/jiangjiang419/voxcpm-studio-updates/repo?Revision=master&FilePath=runtime%2Fpy312-20261018-v1%2Fwetext-0.1.2-py3-none-any.whl"
+        ]
+      },
+      {
+        "name": "wheel-0.47.0-py3-none-any.whl",
+        "size": 32218,
+        "sha256": "212281cab4dff978f6cedd499cd893e1f620791ca6ff7107cf270781e587eced",
+        "urls": [
+          "https://modelscope.cn/api/v1/models/jiangjiang419/voxcpm-studio-updates/repo?Revision=master&FilePath=runtime%2Fpy312-20261018-v1%2Fwheel-0.47.0-py3-none-any.whl"
+        ]
+      },
+      {
+        "name": "xxhash-4.0.1-cp312-cp312-win_amd64.whl",
+        "size": 37073,
+        "sha256": "5c2d525a3afabcd8e3549d85fc7e111fde6bc302d06a1893fe73adb79823415e",
+        "urls": [
+          "https://modelscope.cn/api/v1/models/jiangjiang419/voxcpm-studio-updates/repo?Revision=master&FilePath=runtime%2Fpy312-20261018-v1%2Fxxhash-4.0.1-cp312-cp312-win_amd64.whl"
+        ]
+      },
+      {
+        "name": "yarl-1.25.1-cp312-cp312-win_amd64.whl",
+        "size": 102593,
+        "sha256": "7d575b54cb3863ef9bc290ea4b009999d55dc237326131e4853cf33e888fee03",
+        "urls": [
+          "https://modelscope.cn/api/v1/models/jiangjiang419/voxcpm-studio-updates/repo?Revision=master&FilePath=runtime%2Fpy312-20261018-v1%2Fyarl-1.25.1-cp312-cp312-win_amd64.whl"
+        ]
+      },
+      {
+        "name": "yt_dlp-2026.8.19-py3-none-any.whl",
+        "size": 3185533,
+        "sha256": "1d57897e94c6665a0a6f9bc54b34e584284e32c034ffab3a7df25d8f7b24eedf",
+        "urls": [
+          "https://modelscope.cn/api/v1/models/jiangjiang419/voxcpm-studio-updates/repo?Revision=master&FilePath=runtime%2Fpy312-20261018-v1%2Fyt_dlp-2026.8.19-py3-none-any.whl"
+        ]
+      }
+    ]
+  },
+  "distribution": {
+    "repository": "jiangjiang419/voxcpm-studio-updates",
+    "prefix": "runtime/py312-20261018-v1",
+    "source": "modelscope"
+  }
 }

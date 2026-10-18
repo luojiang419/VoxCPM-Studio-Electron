@@ -1,6 +1,6 @@
 # VoxCPM Studio Electron
 
-现已提供[轻量分发与自动补齐](./docs/轻量版与自动补齐.md)：仅分发 Electron 壳和源码，点击运行后自动从国内镜像与魔搭补齐 Python、依赖和模型，并为 RTX 50 系自动选择 CUDA 12.8。
+现已提供[轻量分发与自动补齐](./docs/轻量版与自动补齐.md)：可仅分发约 36 KB 的 Windows 原生启动器，点击运行后从魔搭补齐 Electron 桌面、Python、固定依赖和模型，为 RTX 50 系自动选择 CUDA 12.8。也保留完整 Electron 壳的轻量 ZIP。
 
 这是 `VoxCPM Studio` 的 Electron 原生桌面版源码仓库目录，包含：
 
