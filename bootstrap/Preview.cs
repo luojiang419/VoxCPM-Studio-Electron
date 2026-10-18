@@ -14,9 +14,9 @@ public static class BootstrapPreview {
         var manifest = new JavaScriptSerializer().Deserialize<Manifest>(File.ReadAllText(args[0], Encoding.UTF8));
         string output = Path.GetFullPath(args[1]); Directory.CreateDirectory(output);
         foreach (bool dark in new[] { false, true }) foreach (string state in new[] { "idle", "downloading", "paused", "ready", "disk-blocked", "disk-scroll", "runtime-long", "filename-long", "switch-off" }) {
-            Func<string> detector = state == "disk-blocked" ? (Func<string>)(() => { throw new IOException("其他分区空间均不足。\n至少需要 25 GiB；D盘 8.2 GiB，E盘 3.6 GiB。请释放空间后重新检测。不会自动安装到 C 盘。"); }) : null;
+            Func<string> detector = state == "disk-blocked" ? (Func<string>)(() => { throw new IOException("没有可用的安装分区。\n需要至少 25 GiB 可用空间；请释放空间或选择可写目录后重新检测。"); }) : null;
             Func<InstallDrive[]> survey = state == "disk-blocked" ? (Func<InstallDrive[]>)(() => new[] {
-                new InstallDrive { root=@"C:\", ready=true, free=100L*1073741824 },
+                new InstallDrive { root=@"C:\", ready=true, free=10L*1073741824 },
                 new InstallDrive { root=@"D:\", ready=true, free=(long)(8.2*1073741824) },
                 new InstallDrive { root=@"E:\", ready=true, free=(long)(3.6*1073741824) }
             }) : null;

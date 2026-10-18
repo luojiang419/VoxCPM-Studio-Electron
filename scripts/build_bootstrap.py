@@ -55,7 +55,7 @@ def build(payload: Path, output: Path, release_id: str, payload_url: str | None 
         "安装器会从魔搭补齐应用、依赖和模型，服务就绪后创建快捷方式并登记 Windows 卸载入口。\n"
         "不需要预先安装 Python；Windows 10/11 自带的 .NET Framework 可运行启动器。\n"
         "默认安装到非 C 盘的 Program Files\\VoxCPMStudio，至少需要 25 GiB 可用空间和读写权限；也可手动更改。\n"
-        "仅有 C 盘时才使用 C 盘用户目录；其他分区均不满足条件时会提示，释放空间后可重新检测。\n"
+        "C 盘自动检测多个当前用户专用目录的 EXE 写入权限，无需管理员权限；其他分区不可用时也可回退到 C 盘。\n"
         "采用当前用户安装，无需管理员权限。\n"
         "可在 Windows 设置的应用列表或开始菜单卸载；默认保留个人数据，可勾选删除。\n"
         "已下载资源会校验复用；暂停或网络中断后可继续。RTX 50 系自动选择 CUDA 12.8。\n"

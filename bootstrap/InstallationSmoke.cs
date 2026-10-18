@@ -1,7 +1,10 @@
 using System;
 using System.Diagnostics;
 using System.IO;
+using System.Linq;
 using System.Runtime.InteropServices;
+using System.Security.AccessControl;
+using System.Security.Principal;
 using System.Text;
 using System.Threading;
 using System.Web.Script.Serialization;
@@ -39,7 +42,8 @@ public static class InstallationSmoke {
     [STAThread] public static int Main(string[] args) {
         var json = new JavaScriptSerializer();
         var manifest = json.Deserialize<Manifest>(File.ReadAllText(args[0], Encoding.UTF8));
-        string output = Path.GetFullPath(args[5]), root = Path.Combine(output, "fixtures", Guid.NewGuid().ToString("N"), "Program Files", "VoxCPMStudio");
+        bool standardUser = args.Length > 7 && args[7] == "--standard-user";
+        string output = Path.GetFullPath(args[5]), root = standardUser ? Path.Combine(output, "中文 用户", "VoxCPMStudio") : Path.Combine(output, "fixtures", Guid.NewGuid().ToString("N"), "Program Files", "VoxCPMStudio");
         string key = Installer.UninstallKey + ".Test." + Guid.NewGuid().ToString("N");
         string runtime = Path.GetFullPath(args[3]), models = Path.GetFullPath(args[4]);
         string pth = Path.Combine(runtime, "managed", "py312-cu126", "python312._pth");
@@ -47,14 +51,32 @@ public static class InstallationSmoke {
         Process child = null; var progress = new ProgressLog();
         Directory.CreateDirectory(output);
         try {
+            if (standardUser) {
+                Check(!new WindowsPrincipal(WindowsIdentity.GetCurrent()).IsInRole(WindowsBuiltInRole.Administrator), "验收进程仍拥有管理员权限");
+                Check(Path.GetPathRoot(root).Equals(@"C:\", StringComparison.OrdinalIgnoreCase), "未在 C 盘验收");
+                string denied = Path.Combine(output, "禁止写入"); Directory.CreateDirectory(denied);
+                var directory = new DirectoryInfo(denied); var original = directory.GetAccessControl(); var blocked = directory.GetAccessControl();
+                blocked.AddAccessRule(new FileSystemAccessRule(WindowsIdentity.GetCurrent().User, FileSystemRights.Write, InheritanceFlags.ContainerInherit | InheritanceFlags.ObjectInherit, PropagationFlags.None, AccessControlType.Deny));
+                try {
+                    directory.SetAccessControl(blocked);
+                    var drives = new[] { new InstallDrive { root = @"C:\", ready = true, free = Installer.RequiredSpace * 2 } };
+                    Check(Installer.SelectAutomaticRoot(drives, new[] { denied, root }, Installer.ProbeWritable) == root, "没有避开拒绝写入的 C 盘目录");
+                } finally { directory.SetAccessControl(original); }
+            }
             Installer.ValidateDestinationCapacity(root);
             var state = Installer.Begin(root, manifest, false, key);
             string cache = Path.Combine(root, "data", "cache", "bootstrap"); Directory.CreateDirectory(cache);
             File.Copy(args[1], Path.Combine(cache, manifest.package.name));
             Core.Prepare(root, manifest, CancellationToken.None, progress);
-            File.Copy(args[2], Path.Combine(root, "uninstall.exe"));
+            Installer.InstallUninstaller(root, args[2]);
             File.Copy(args[6], Path.Combine(root, "voxcpm.ico"));
-            Junction(Path.Combine(root, "runtime"), runtime); Junction(Path.Combine(root, "models"), models);
+            if (standardUser) {
+                string source = Path.Combine(runtime, "managed", "py312-cu126"), target = Path.Combine(root, "runtime", "managed", "py312-cu126");
+                Directory.CreateDirectory(Path.Combine(target, "Lib"));
+                foreach (string file in Directory.GetFiles(source)) if (new[] { ".exe", ".dll", ".pyd", ".zip", "._pth", ".json" }.Contains(Path.GetExtension(file))) File.Copy(file, Path.Combine(target, Path.GetFileName(file)));
+                Junction(Path.Combine(target, "Lib", "site-packages"), Path.Combine(source, "Lib", "site-packages"));
+            } else Junction(Path.Combine(root, "runtime"), runtime);
+            Junction(Path.Combine(root, "models"), models);
             string session = Guid.NewGuid().ToString("N"), report = Path.Combine(root, "data", "cache", "install", session + ".json");
             Directory.CreateDirectory(Path.GetDirectoryName(report));
             child = Installer.StartPreparation(root, report, session);
@@ -89,7 +111,7 @@ public static class InstallationSmoke {
             Check(File.Exists(Path.Combine(runtime, "managed", "py312-cu126", "python.exe")) && Directory.Exists(models), "卸载跨越测试连接");
             using (var entry = Registry.CurrentUser.OpenSubKey(key)) Check(entry == null, "测试卸载入口未清理");
             File.WriteAllText(Path.Combine(output, "result.json"), json.Serialize(new { root, readyReport = json.DeserializeObject(ready), desktopPrepared = true, hiddenUntilReady = true,
-                secondInstanceShown = true, shortcutsAndRegistry = true, uninstallPreservedData = true, borrowedRuntimeAndModels = true, testedGpu = "RTX 4070 Ti SUPER / cu126" }), Encoding.UTF8);
+                secondInstanceShown = true, shortcutsAndRegistry = true, uninstallPreservedData = true, borrowedRuntimeAndModels = true, standardUser = standardUser, chinesePath = standardUser, deniedDirectorySkipped = standardUser, testedGpu = "RTX 4070 Ti SUPER / cu126" }), Encoding.UTF8);
             Console.WriteLine("PASS 实际桌面展开、GPU环境复检、API/renderer握手、隐藏窗口展示、隔离系统集成和卸载"); return 0;
         } catch (Exception error) { Console.Error.WriteLine(error); return 1; }
         finally {
@@ -98,7 +120,7 @@ public static class InstallationSmoke {
                 string link = Path.Combine(root, name);
                 if (Directory.Exists(link) && (File.GetAttributes(link) & FileAttributes.ReparsePoint) != 0) Directory.Delete(link);
             }
-            File.WriteAllBytes(pth, originalPth);
+            if (!standardUser) File.WriteAllBytes(pth, originalPth);
             Registry.CurrentUser.DeleteSubKeyTree(key, false);
         }
     }

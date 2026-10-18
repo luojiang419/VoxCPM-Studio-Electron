@@ -181,23 +181,48 @@ public static class InstallationTests {
                 Check(Installer.SelectAutomaticRoot(drives, @"C:\Users\test\AppData\Local\Programs\VoxCPMStudio", p => p.StartsWith(@"D:\")) == @"D:\Program Files\VoxCPMStudio", "未跳过不可写分区");
                 var attempted = new List<string>();
                 Reject(() => Installer.SelectAutomaticRoot(drives, @"C:\test", p => { attempted.Add(p); return false; }), "所有目录不可写却通过");
-                Check(attempted.SequenceEqual(new[] { @"E:\Program Files\VoxCPMStudio", @"D:\Program Files\VoxCPMStudio" }), "默认目录不可写时仍回退根目录或其他目录");
+                Check(attempted.SequenceEqual(new[] { @"E:\Program Files\VoxCPMStudio", @"D:\Program Files\VoxCPMStudio", @"C:\test" }), "默认目录不可写时仍回退根目录或其他目录");
                 Check(Installer.RootOnDrive(drives[2], drives, false) == @"E:\Program Files\VoxCPMStudio", "磁盘卡片与自动选址目录不一致");
             });
-            test("其他分区空间不足/不可用时明确提示，不能回退 C 盘", () => {
+            test("其他分区不可用时回退可写 C 盘，手动选择也允许 C 盘", () => {
                 var drives = new[] {
                     new InstallDrive { root = @"C:\", ready = true, free = Installer.RequiredSpace * 8 },
-                    new InstallDrive { root = @"D:\", ready = true, free = Installer.RequiredSpace - 1 },
-                    new InstallDrive { root = @"E:\", ready = true, free = 0 }
+                    new InstallDrive { root = @"D:\", ready = true, free = Installer.RequiredSpace - 1 }
                 };
-                string message = ""; int probes = 0;
-                try { Installer.SelectAutomaticRoot(drives, @"C:\test", p => { probes++; return true; }); } catch (IOException error) { message = error.Message; }
-                Check(message.Contains("其他分区空间均不足") && message.Contains("D盘") && message.Contains("重新检测") && probes == 0, "空间不足提示或无 C 回退策略错误");
-                drives[1].ready = drives[2].ready = false;
-                Reject(() => Installer.SelectAutomaticRoot(drives, @"C:\test", p => true), "离线分区被误判为仅 C 盘");
-                Reject(() => Installer.ValidateDestinationCapacity(@"C:\VoxCPMStudio", drives), "手动输入 C 盘绕过策略");
-                drives[1].ready = true;
-                Reject(() => Installer.ValidateDestinationCapacity(@"D:\Program Files\VoxCPMStudio", drives), "手动选择空间不足的分区通过");
+                Check(Installer.SelectAutomaticRoot(drives, @"C:\用户\VoxCPMStudio", p => true) == @"C:\用户\VoxCPMStudio", "未回退可用的 C 盘");
+                drives[1].ready = false;
+                Check(Installer.SelectAutomaticRoot(drives, @"C:\用户\VoxCPMStudio", p => true) == @"C:\用户\VoxCPMStudio", "不可用分区阻止 C 盘安装");
+                Installer.ValidateDestinationCapacity(@"C:\VoxCPMStudio", drives);
+                Check(Installer.DriveProblem(drives[0], drives) == null, "C 盘卡片仍被禁用");
+                Reject(() => Installer.ValidateDestinationCapacity(@"D:\Program Files\VoxCPMStudio", drives), "不可用分区通过");
+            });
+            test("C 盘多个候选逐个检查，拒绝跨盘路径并兼容中文", () => {
+                var drives = new[] { new InstallDrive { root = @"C:\", ready = true, free = Installer.RequiredSpace * 2 } };
+                string[] candidates = { @"D:\错盘", @"C:\Users\中文用户\AppData\Local\受限", @"C:\Users\中文用户\Apps\VoxCPMStudio" };
+                var attempted = new List<string>();
+                string chosen = Installer.SelectAutomaticRoot(drives, candidates, folder => { attempted.Add(folder); return folder == candidates[2]; });
+                Check(chosen == candidates[2] && attempted.SequenceEqual(candidates.Skip(1)), "候选避让或中文路径选择失败");
+                Check(Installer.SystemCandidates(@"C:\Users\中文用户\AppData\Local", @"C:\Users\中文用户")[0] == @"C:\Users\中文用户\AppData\Local\VoxCPMStudio", "C 盘仍默认 Programs 或未使用当前用户目录");
+            });
+            test("实际 EXE 创建/重命名检查和卸载器锁定检查，保留被占用文件", () => {
+                string root = Path.Combine(fixtures, "中文权限检查");
+                Check(Installer.ProbeWritable(root) && !Directory.Exists(root), "新目录 EXE 权限探测失败或残留");
+                Begin(root, Key()); string file = Path.Combine(root, "uninstall.exe");
+                File.Copy(Assembly.GetExecutingAssembly().Location, file);
+                using (var held = new FileStream(file, FileMode.Open, FileAccess.Read, FileShare.None)) Check(!Installer.ProbeWritable(root), "被占用卸载器仍被判定可写");
+                Check(Installer.ProbeWritable(root), "释放占用后仍不可写");
+                File.SetAttributes(file, File.GetAttributes(file) | FileAttributes.ReadOnly);
+                try { Check(!Installer.ProbeWritable(root), "只读卸载器仍通过权限检查"); }
+                finally { File.SetAttributes(file, FileAttributes.Normal); }
+            });
+            test("卸载器原子更新、相同版本复用与写入失败保留原内容", () => {
+                string root = Path.Combine(fixtures, "卸载器更新"), key = Key(); Begin(root, key);
+                string source = Path.Combine(fixtures, "new-installer.exe"), target = Path.Combine(root, "uninstall.exe"); Put(source, "new installer bytes"); Put(target, "old bytes");
+                Installer.InstallUninstaller(root, source); Check(File.ReadAllText(target) == "new installer bytes", "卸载器未更新");
+                using (var held = new FileStream(target, FileMode.Open, FileAccess.Read, FileShare.Read)) Installer.InstallUninstaller(root, source);
+                Put(source, "newer installer bytes");
+                using (var held = new FileStream(target, FileMode.Open, FileAccess.Read, FileShare.Read)) Reject(() => Installer.InstallUninstaller(root, source), "锁定卸载器仍被覆盖");
+                Check(File.ReadAllText(target) == "new installer bytes" && !Directory.GetFiles(root, ".uninstall-*.exe").Any(), "失败破坏旧卸载器或残留临时文件");
             });
             test("仅 C 盘时使用可写用户目录且严格检查容量阈值", () => {
                 string root = @"C:\Users\test\AppData\Local\Programs\VoxCPMStudio";
@@ -233,7 +258,7 @@ public static class InstallationTests {
                     var panel = (DiskStrip)form.Controls["local-disks"];
                     var d = (DiskCard)panel.Controls["drive-D"]; var e = (DiskCard)panel.Controls["drive-E"];
                     var c = (DiskCard)panel.Controls["drive-C"]; var g = (DiskCard)panel.Controls["drive-G"];
-                    Check(!c.Enabled && !g.Enabled && d.Selected, "不可选磁盘状态错误");
+                    Check(c.Enabled && !g.Enabled && d.Selected, "不可选磁盘状态错误");
                     Check(!panel.HasOverflow && !panel.VerticalScroll.Visible, "四张卡片产生了多余滚动条");
                     e.Choose(); Check(form.Controls["destination"].Text == @"E:\Program Files\VoxCPMStudio" && e.Selected && !d.Selected, "点击卡片未使用专用目录或选中状态未切换");
                     Check(e.IsAnimating, "选择未触发动画");
@@ -241,7 +266,8 @@ public static class InstallationTests {
                     Check(intermediate > 1 && intermediate < 1.17, "图标没有平滑放大");
                     e.AdvanceAnimation(1); Check(Math.Abs(e.IconScale-1.17)<.0001 && !e.IsAnimating, "缩放动画没有正确结束");
                     Check((e.AccessibilityObject.State & AccessibleStates.Checked) != 0, "辅助功能没有选中状态");
-                    c.Choose(); g.Choose(); Check(form.Controls["destination"].Text == @"E:\Program Files\VoxCPMStudio", "禁用分区仍可被选择");
+                    g.Choose(); Check(form.Controls["destination"].Text == @"E:\Program Files\VoxCPMStudio", "禁用分区仍可被选择");
+                    c.Choose(); Check(Path.GetPathRoot(form.Controls["destination"].Text) == @"C:\" && c.Selected, "可用 C 盘未选择用户目录");
                     d.Choose(); e.AdvanceAnimation(1); Check(e.IconScale == 1, "切换后旧图标未恢复");
                     form.Close();
                 }

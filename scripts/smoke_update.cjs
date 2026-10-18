@@ -8,6 +8,7 @@ const root = path.resolve(__dirname, "..");
 const original = path.resolve(process.argv[2] && !process.argv[2].startsWith("--") ? process.argv[2] : path.join(root, "builds/VoxCPM-Studio-Electron-Portable-2.0.1"));
 const testRoot = path.join(root, "builds", "update-smoke-" + Date.now());
 const fromVersion = process.argv.includes("--same-version") ? "2.0.2" : "2.0.1";
+const lightweight = process.argv.includes("--lightweight");
 const sleep = (ms) => new Promise((resolve) => setTimeout(resolve, ms));
 let activeClient;
 async function until(fn, timeout = 60000) {
@@ -55,7 +56,13 @@ async function cdp(port) {
   }
   // 大型固定资源共享只读目录；更新器白名单禁止写入这些目录。
   for (const directory of ["runtime", "models", "ffmpeg"]) {
-    fs.symlinkSync(path.join(original, directory), path.join(testRoot, directory), "junction");
+    if (lightweight && directory === "runtime") {
+      const source = path.join(root, "builds/bootstrap-validation/runtime/managed/py312-cu126"), target = path.join(testRoot, "runtime/managed/py312-cu126");
+      fs.mkdirSync(path.join(target, "Lib"), { recursive: true });
+      for (const entry of fs.readdirSync(source, { withFileTypes: true })) if (entry.isFile() && /\.(exe|dll|pyd|zip|_pth|json)$/.test(entry.name)) fs.copyFileSync(path.join(source, entry.name), path.join(target, entry.name));
+      fs.symlinkSync(path.join(source, "Lib/site-packages"), path.join(target, "Lib/site-packages"), "junction");
+    } else if (lightweight && directory === "models") fs.symlinkSync(path.resolve(root, "../models"), path.join(testRoot, directory), "junction");
+    else if (fs.existsSync(path.join(original, directory))) fs.symlinkSync(path.join(original, directory), path.join(testRoot, directory), "junction");
   }
   const appDir = path.join(testRoot, "resources/app");
   const packagePath = path.join(appDir, "package.json");
@@ -67,11 +74,11 @@ async function cdp(port) {
   const sentinel = path.join(testRoot, "data", "config", "update-test-user-data.txt");
   fs.mkdirSync(path.dirname(sentinel), { recursive: true }); fs.writeFileSync(sentinel, "用户配置、音频和模型不得被升级覆盖");
   const dataHash = await digest(sentinel);
-  const modelConfig = path.join(testRoot, "models/config.json");
+  const modelConfig = path.join(testRoot, fs.existsSync(path.join(testRoot, "models/config.json")) ? "models/config.json" : "models/openbmb__VoxCPM2/config.json");
   const modelHash = await digest(modelConfig);
   console.log("测试副本：" + testRoot);
   const exe = path.join(testRoot, "VoxCPM Studio.exe");
-  const child = spawn(exe, ["--remote-debugging-port=19228"], { cwd: testRoot, windowsHide: true, stdio: "ignore" });
+  const child = spawn(exe, ["--voxcpm-run", "--remote-debugging-port=19228"], { cwd: testRoot, windowsHide: true, stdio: "ignore" });
   const client = await cdp(19228);
   activeClient = client;
   await until(async () => client.evaluate("Boolean(window.voxcpmDesktop && document.querySelector('button'))"));
@@ -121,6 +128,7 @@ async function cdp(port) {
   assert.equal(JSON.parse(fs.readFileSync(packagePath)).version, "2.0.2");
   assert.equal(await digest(sentinel), dataHash);
   assert.equal(await digest(modelConfig), modelHash);
+  if (lightweight) assert.ok(fs.readFileSync(path.join(testRoot, "data/cache/runtime-bootstrap.log"), "utf8").includes("已复用验证通过的本地环境"), "更新重启未复用已验证运行时");
   const backendState = JSON.parse(fs.readFileSync(path.join(testRoot, "data/cache/electron_backend_state.json")));
   const health = await (await fetch(backendState.serviceUrl + "/api/health")).json();
   const report = { result: "passed", fromVersion, toVersion: "2.0.2", testRoot, session: service.session,

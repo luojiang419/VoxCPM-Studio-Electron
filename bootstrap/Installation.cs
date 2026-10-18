@@ -5,6 +5,8 @@ using System.IO;
 using System.Linq;
 using System.Reflection;
 using System.Runtime.InteropServices;
+using System.Security.Principal;
+using System.Security.Cryptography;
 using System.Threading;
 using System.Threading.Tasks;
 using System.Web.Script.Serialization;
@@ -32,35 +34,38 @@ namespace VoxBootstrap {
         public const long RequiredSpace = 25L * 1024 * 1024 * 1024;
         public static string DriveProblem(InstallDrive drive, IEnumerable<InstallDrive> all) {
             if (!drive.ready) return "分区暂不可用";
-            if (String.Equals(drive.root, @"C:\", StringComparison.OrdinalIgnoreCase) && all.Any(d => !String.Equals(d.root, @"C:\", StringComparison.OrdinalIgnoreCase))) return "存在其他分区，暂不使用 C 盘";
             if (drive.free < RequiredSpace) return "空间不足，至少需要 25 GiB";
             return null;
         }
+        public static string[] SystemCandidates(string local = null, string profile = null) {
+            local = local ?? Environment.GetFolderPath(Environment.SpecialFolder.LocalApplicationData);
+            profile = profile ?? Environment.GetFolderPath(Environment.SpecialFolder.UserProfile);
+            string id = WindowsIdentity.GetCurrent().User.Value;
+            return new[] { Path.Combine(local, "VoxCPMStudio"), Path.Combine(local, "Apps", "VoxCPMStudio"),
+                Path.Combine(profile, "Apps", "VoxCPMStudio"), Path.Combine(profile, "VoxCPMStudio"),
+                Path.Combine(@"C:\VoxCPMStudio", id) };
+        }
         public static string RootOnDrive(InstallDrive drive, IEnumerable<InstallDrive> all, bool probeWrites = true) {
             string problem = DriveProblem(drive, all); if (problem != null) throw new IOException(problem);
-            string cFolder = Path.Combine(Environment.GetFolderPath(Environment.SpecialFolder.LocalApplicationData), "Programs", "VoxCPMStudio");
-            return SelectAutomaticRoot(new[] { drive }, cFolder, probeWrites ? (Func<string, bool>)ProbeWritable : path => true);
+            return SelectAutomaticRoot(new[] { drive }, SystemCandidates(), probeWrites ? (Func<string, bool>)ProbeWritable : folder => true);
         }
         public static string SelectAutomaticRoot(IEnumerable<InstallDrive> drives, string onlyCFolder, Func<string, bool> writable) {
+            return SelectAutomaticRoot(drives, new[] { onlyCFolder }, writable);
+        }
+        public static string SelectAutomaticRoot(IEnumerable<InstallDrive> drives, IEnumerable<string> cFolders, Func<string, bool> writable) {
             var list = drives.ToArray();
-            var other = list.Where(d => !String.Equals(Path.GetPathRoot(d.root), @"C:\", StringComparison.OrdinalIgnoreCase)).ToArray();
-            if (other.Length > 0) {
-                var enough = other.Where(d => d.ready && d.free >= RequiredSpace).OrderByDescending(d => d.free).ToArray();
-                foreach (var drive in enough) {
-                    string candidate = Path.Combine(drive.root, "Program Files", "VoxCPMStudio");
-                    if (writable(candidate)) return Canonical(candidate);
-                }
-                if (!other.Any(d => d.ready)) throw new IOException("其他分区暂不可用。\n请确认分区可正常访问，再点击重新检测。");
-                if (enough.Length == 0) {
-                    string detail = String.Join("，", other.Where(d => d.ready).Select(d => d.root.Substring(0, 1) + "盘 " + (d.free / 1073741824.0).ToString("0.0") + " GB"));
-                    throw new IOException("其他分区空间均不足。\n至少需要 25 GiB；" + detail.Replace(" GB", " GiB") + "。请释放空间后重新检测。不会自动安装到 C 盘。");
-                }
-                throw new IOException("其他分区的 Program Files 目录无法安装。\n请确认目录可读写且没有同名目录冲突，或通过“更改”选择非 C 盘的可写专用目录，再重新检测。");
+            foreach (var drive in list.Where(d => !String.Equals(Path.GetPathRoot(d.root), @"C:\", StringComparison.OrdinalIgnoreCase) && d.ready && d.free >= RequiredSpace).OrderByDescending(d => d.free)) {
+                string candidate = Path.Combine(drive.root, "Program Files", "VoxCPMStudio");
+                if (writable(candidate)) return Canonical(candidate);
             }
             var system = list.FirstOrDefault(d => String.Equals(Path.GetPathRoot(d.root), @"C:\", StringComparison.OrdinalIgnoreCase));
-            if (system == null || !system.ready || system.free < RequiredSpace) throw new IOException("C 盘空间不足或不可用。\n当前仅有 C 盘，需要至少 25 GiB 可用空间。请释放空间后重新检测。");
-            if (!String.Equals(Path.GetPathRoot(onlyCFolder), @"C:\", StringComparison.OrdinalIgnoreCase) || !writable(onlyCFolder)) throw new IOException("C 盘用户目录不可写。\n请选择有读写权限的用户目录，无需以管理员身份运行。");
-            return Canonical(onlyCFolder);
+            if (system != null && system.ready && system.free >= RequiredSpace) {
+                foreach (string candidate in cFolders.Where(p => !String.IsNullOrWhiteSpace(p)).Distinct(StringComparer.OrdinalIgnoreCase)) {
+                    if (String.Equals(Path.GetPathRoot(candidate), @"C:\", StringComparison.OrdinalIgnoreCase) && writable(candidate)) return Canonical(candidate);
+                }
+                throw new IOException("未找到可写的安装位置。\n已尝试 C 盘多个当前用户专用目录；请选择允许创建和替换 EXE 的专用文件夹，或检查安全软件的拦截记录，无需提升管理员权限。");
+            }
+            throw new IOException("没有可用的安装分区。\n需要至少 25 GiB 可用空间以及程序文件读写权限；请释放空间或选择可写目录后重新检测。");
         }
         public static InstallDrive[] SurveyDrives() {
             var drives = new List<InstallDrive>();
@@ -72,38 +77,70 @@ namespace VoxBootstrap {
             } catch (IOException) { }
             return drives.ToArray();
         }
-        static bool ProbeWritable(string root) {
-            bool created = false; string probe = null;
+        public static bool ProbeWritable(string root) {
+            bool created = false; string probe = null, renamed = null;
             try {
                 ValidateRoot(root);
                 if (Directory.Exists(root) && !File.Exists(Path.Combine(root, Marker)) && Directory.EnumerateFileSystemEntries(root).Any()) return false;
                 created = !Directory.Exists(root); Directory.CreateDirectory(root);
-                probe = Path.Combine(root, ".voxcpm-permission-test-" + Guid.NewGuid().ToString("N"));
-                using (var stream = new FileStream(probe, FileMode.CreateNew, FileAccess.ReadWrite, FileShare.None)) { stream.WriteByte(1); stream.Position = 0; if (stream.ReadByte() != 1) return false; }
+                string uninstaller = Path.Combine(root, "uninstall.exe");
+                if (File.Exists(uninstaller)) using (new FileStream(uninstaller, FileMode.Open, FileAccess.ReadWrite, FileShare.None)) { }
+                probe = Path.Combine(root, ".voxcpm-permission-test-" + Guid.NewGuid().ToString("N") + ".exe");
+                renamed = probe + ".renamed.exe";
+                File.Copy(Assembly.GetExecutingAssembly().Location, probe);
+                using (var stream = new FileStream(probe, FileMode.Open, FileAccess.ReadWrite, FileShare.None)) { if (stream.Length == 0) return false; }
+                File.Move(probe, renamed); File.Delete(renamed);
                 return true;
             } catch (IOException) { return false; } catch (UnauthorizedAccessException) { return false; }
             finally {
                 try {
                     if (probe != null && File.Exists(probe)) File.Delete(probe);
-                    // 只删除本次创建且仍为空的目录，不递归，不接管既有目录。
+                    if (renamed != null && File.Exists(renamed)) File.Delete(renamed);
                     if (created && Directory.Exists(root) && !Directory.EnumerateFileSystemEntries(root).Any()) Directory.Delete(root);
                 } catch (IOException) { } catch (UnauthorizedAccessException) { }
             }
         }
+        public static void InstallUninstaller(string root, string source = null) {
+            ReadState(root);
+            source = source ?? Assembly.GetExecutingAssembly().Location;
+            string target = Path.Combine(root, "uninstall.exe");
+            if (SamePath(source, target)) return;
+            if (File.Exists(target)) using (var hash = SHA256.Create()) {
+                byte[] first, second;
+                using (var input = File.OpenRead(source)) first = hash.ComputeHash(input);
+                using (var input = File.OpenRead(target)) second = hash.ComputeHash(input);
+                if (first.SequenceEqual(second)) return;
+            }
+            string temp = Path.Combine(root, ".uninstall-" + Guid.NewGuid().ToString("N") + ".exe");
+            try {
+                File.Copy(source, temp);
+                for (int attempt = 0; ; attempt++) {
+                    try { Core.ReplaceFile(temp, target); break; }
+                    catch (IOException) { if (attempt == 2) throw; Thread.Sleep(200 * (attempt + 1)); }
+                    catch (UnauthorizedAccessException) { if (attempt == 2) throw; Thread.Sleep(200 * (attempt + 1)); }
+                }
+            } catch (Exception error) {
+                if (!(error is IOException) && !(error is UnauthorizedAccessException)) throw;
+                throw new IOException("无法写入卸载程序。请关闭正在运行的卸载器，或重新检测以选择可写安装目录；如被安全软件拦截，请查看拦截记录。\n" + target, error);
+            } finally { try { if (File.Exists(temp)) File.Delete(temp); } catch (IOException) { } catch (UnauthorizedAccessException) { } }
+        }
         public static string DefaultRoot(bool probeWrites = true) {
+            InstallState saved = null;
             using (var key = Registry.CurrentUser.OpenSubKey(SettingsKey)) {
                 string value = key == null ? null : key.GetValue("InstallLocation") as string;
-                if (!String.IsNullOrWhiteSpace(value)) try { ReadState(value); return Canonical(value); } catch { }
+                if (!String.IsNullOrWhiteSpace(value)) try { saved = ReadState(value); } catch { }
             }
-            string cFolder = Path.Combine(Environment.GetFolderPath(Environment.SpecialFolder.LocalApplicationData), "Programs", "VoxCPMStudio");
-            return SelectAutomaticRoot(SurveyDrives(), cFolder, probeWrites ? (Func<string, bool>)ProbeWritable : path => true);
+            if (saved != null && saved.state != "uninstalled") {
+                if (!probeWrites || ProbeWritable(saved.root)) return Canonical(saved.root);
+                if (saved.state == "complete") throw new IOException("现有安装目录不可写或卸载器被占用。\n请先关闭卸载器或检查安全软件限制，原有作品和模型已保留，不会自动迁移已完成的安装。");
+            }
+            return SelectAutomaticRoot(SurveyDrives(), SystemCandidates(), probeWrites ? (Func<string, bool>)ProbeWritable : folder => true);
         }
         public static void ValidateDestinationCapacity(string root, IEnumerable<InstallDrive> surveyed = null) {
             ValidateRoot(root); root = Canonical(root);
             // 已由本安装器接管的目录继续原地恢复，避免下载后剩余空间下降造成无法续装。
             if (File.Exists(Path.Combine(root, Marker)) && ReadState(root).state != "uninstalled") return;
             var drives = (surveyed ?? SurveyDrives()).ToArray();
-            if (String.Equals(Path.GetPathRoot(root), @"C:\", StringComparison.OrdinalIgnoreCase) && drives.Any(d => !String.Equals(d.root, @"C:\", StringComparison.OrdinalIgnoreCase))) throw new IOException("当前存在其他本地分区，请选择非 C 盘目录。其他分区条件不足时，请先释放空间或调整权限。");
             var drive = drives.FirstOrDefault(d => String.Equals(d.root, Path.GetPathRoot(root), StringComparison.OrdinalIgnoreCase));
             if (drive == null || !drive.ready || drive.free < RequiredSpace) throw new IOException("所选分区可用空间不足 25 GiB，或暂不可用。请调整安装位置或释放空间后重新检测。");
         }

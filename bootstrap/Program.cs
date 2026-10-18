@@ -566,9 +566,8 @@ namespace VoxBootstrap {
                 lease = Installer.AcquireRoot(root);
                 Installer.Begin(root, manifest, lockHeld: true);
                 owned = true;
+                await Task.Run(() => Installer.InstallUninstaller(root));
                 await Task.Run(() => Core.Prepare(root, manifest, cancellation.Token, reporter));
-                string uninstaller = Path.Combine(root, "uninstall.exe");
-                if (!Installer.SamePath(Assembly.GetExecutingAssembly().Location, uninstaller)) File.Copy(Assembly.GetExecutingAssembly().Location, uninstaller, true);
                 Installer.ExtractResource("app.ico", Path.Combine(root, "voxcpm.ico"));
                 Installer.ExtractResource("installer.ico", Path.Combine(root, "voxcpm-installer.ico"));
                 installPhase = 1; fraction = 0; total = 0; Invalidate();
