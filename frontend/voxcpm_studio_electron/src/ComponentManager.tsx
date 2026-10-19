@@ -25,7 +25,7 @@ export default function ComponentManager({ onRun, backendRunning }: { onRun: () 
     <dialog ref={dialog} className="runtime-dialog" aria-label="功能与模型管理">
       <div className="runtime-dialog-kicker">VOXCPM STUDIO · 组件选择</div>
       <h2>选择功能与音乐模型</h2>
-      <p className="runtime-intro">配音、语音识别和降噪自动准备。选中功能全部补齐后进入工作区；已移除的模型在更新时保持移除。</p>
+      <p className="runtime-intro">正常启动直接进入工作区，使用模型时单独校验。此处可主动完整准备所选功能；已移除的模型在更新时保持移除。</p>
       {options.map(option => <div className="component-option" key={option.id}>
         <label><input type="checkbox" role="switch" aria-label={option.label} disabled={busy || working} checked={profile.selected.includes(option.id)} onChange={e => {
           setProfile({ ...profile, selected: e.target.checked ? [...profile.selected, option.id] : profile.selected.filter(id => id !== option.id),
@@ -47,7 +47,7 @@ export default function ComponentManager({ onRun, backendRunning }: { onRun: () 
         {backendRunning && !working && <button type="button" className="ghost-button" onClick={() => invoke(async () => { await window.voxcpmDesktop.stopBackend(); await refresh(); })}>停止引擎</button>}
         <button type="button" className="ghost-button" onClick={() => dialog.current?.close()}>关闭</button>
         <button type="button" className="primary-button" disabled={busy || working} onClick={() => invoke(async () => {
-          await window.voxcpmDesktop.selectComponents(profile); dialog.current?.close(); onRun();
+          await window.voxcpmDesktop.selectComponents(profile); dialog.current?.close(); await window.voxcpmDesktop.startBackend({ prepare: true });
         })}>保存并准备</button>
       </div>
     </dialog>

@@ -512,7 +512,7 @@ def create_api_app(studio: Optional[Any] = None, model_dir: Optional[str] = None
         with lipsync.lock:
             if lipsync.active or lipsync.preparing:
                 raise HTTPException(status_code=409, detail="视频正在使用显卡，请等待完成后再识别参考音频。")
-            text = studio_service.recognize_audio(payload.audio_path)
+            text = workspace_call(studio_service.recognize_audio, payload.audio_path)
             return {"text": text}
 
     @app.post("/api/tasks/warmup")

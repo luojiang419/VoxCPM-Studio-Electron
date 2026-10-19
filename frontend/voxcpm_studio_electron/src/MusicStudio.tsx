@@ -126,7 +126,7 @@ export default function MusicStudio({ backendBaseUrl }: { backendBaseUrl: string
       const components = await window.voxcpmDesktop.getComponents();
       const profile = components.profile || { selected: [], removed: [], defaultModel: "ace-xl-turbo" };
       await window.voxcpmDesktop.selectComponents({ ...profile, defaultModel: modelId, selected: [...new Set([...profile.selected, modelId])], removed: profile.removed.filter((id: string) => id !== modelId) });
-      const backend = await window.voxcpmDesktop.startBackend();
+      const backend = await window.voxcpmDesktop.startBackend({ prepare: true });
       // 组件准备会重建音乐页；若页面仍在原处，也必须从恢复后的服务读取就绪状态。
       if (!mounted.current) return;
       const state = await musicRequest<Status>(backend.backendBaseUrl || backendBaseUrl, "/api/music/status");

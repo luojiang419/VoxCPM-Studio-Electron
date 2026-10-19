@@ -226,6 +226,17 @@ class RuntimeService {
     fs.appendFileSync(this.logPath, text, "utf8");
   }
   cancel() { this.controller?.abort(new Error("资源准备已暂停，下次启动可继续")); }
+  async launch({ existingPython, existingModel, managed = false } = {}) {
+    // 正常启动只定位解释器。完整准备仅用于安装器或用户显式修复。
+    if (!existingPython || !fs.existsSync(existingPython)) return this.prepare({ existingPython, existingModel, managed });
+    this.controller = new AbortController();
+    this.env = { ...process.env, PYTHONUTF8: "1", PYTHONIOENCODING: "utf-8", PYTHONNOUSERSITE: "1",
+      VOXCPM_RUNTIME_CONFIG: path.join(this.appDir, "runtime-config.json"), VOXCPM_LAZY_STARTUP: "1" };
+    this.emit({ status: "checking", activity: "startup", phase: "service", cached: true,
+      message: "正在连接本地服务，模型将在使用时单独校验", modelName: "", modelState: "", name: "", size: 0 });
+    const modelDir = existingModel || safePath(this.root, `models/${this.config.models[0].folder}`);
+    return this.runtimeResult(existingPython, modelDir, managed || path.dirname(path.dirname(existingPython)) === path.join(this.root, "runtime", "managed"));
+  }
   check(partial) { this.emit({ status: this.state.status === "working" ? "working" : "checking", ...partial }); }
   assetProgress(value) {
     if (value.downloading) this.emit({ status: "working", activity: "prepare", message: `正在下载缺失资源：${value.name}`, ...value });

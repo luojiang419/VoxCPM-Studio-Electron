@@ -130,6 +130,18 @@ function resolveBackendLogPath() {
   return path.join(resolveDataRoot(), "cache", "electron_backend.log");
 }
 
+function readBackendLogTail() {
+  let descriptor;
+  try {
+    descriptor = fs.openSync(resolveBackendLogPath(), "r");
+    const size = fs.fstatSync(descriptor).size;
+    const buffer = Buffer.alloc(Math.min(size, 24000));
+    const count = fs.readSync(descriptor, buffer, 0, buffer.length, Math.max(0, size - buffer.length));
+    return buffer.subarray(0, count).toString("utf8");
+  } catch { return ""; }
+  finally { if (descriptor !== undefined) fs.closeSync(descriptor); }
+}
+
 function resolveBackendStatePath() {
   return path.join(resolveDataRoot(), "cache", "electron_backend_state.json");
 }
@@ -544,13 +556,14 @@ function waitForServer(url, timeoutMs = SERVER_WAIT_TIMEOUT_MS) {
     const deadline = Date.now() + timeoutMs;
 
     const probe = () => {
+      if (!isBackendRunning()) { resolve(false); return; }
       const request = http.get(url, { timeout: 2000 }, (response) => {
         response.resume();
         resolve(response.statusCode < 500);
       });
 
       request.on("error", () => {
-        if (Date.now() >= deadline) {
+        if (!isBackendRunning() || Date.now() >= deadline) {
           resolve(false);
           return;
         }
@@ -593,8 +606,9 @@ function findFreePort(start = SERVICE_PORT_START, end = SERVICE_PORT_END) {
   });
 }
 
-async function startBackend() {
-  if (isBackendRunning() && bootstrapState.status === "ready") {
+async function startBackend({ prepare = false } = {}) {
+  const fullPreparation = prepare || Boolean(installSession);
+  if (!fullPreparation && isBackendRunning() && bootstrapState.status === "ready") {
     return summarizeBootstrapState();
   }
   if (backendStartPromise) {
@@ -619,7 +633,7 @@ async function startBackend() {
   sendRuntimeEvent("boot", summarizeBootstrapState());
   let runtime;
   try {
-    runtime = await runtimeService.prepare({ existingPython: pythonCommand, existingModel: modelDir,
+    runtime = await runtimeService[fullPreparation ? "prepare" : "launch"]({ existingPython: pythonCommand, existingModel: modelDir,
       managed: fs.existsSync(path.join(projectRoot, "lightweight.json")) });
     pythonCommand = runtime.python;
     modelDir = runtime.modelDir || modelDir;
@@ -685,6 +699,7 @@ async function startBackend() {
     VOXCPM_PROJECT_ROOT: projectRoot,
     VOXCPM_PYTHON_EXE: pythonCommand,
     VOXCPM_MODEL_DIR: modelDir,
+    VOXCPM_LAZY_STARTUP: fullPreparation ? "0" : "1",
     HF_HOME: path.join(dataRoot, "cache", "hf-home"),
     HUGGINGFACE_HUB_CACHE: path.join(dataRoot, "cache", "hf-hub"),
     TRANSFORMERS_CACHE: path.join(dataRoot, "cache", "transformers"),
@@ -759,13 +774,14 @@ async function startBackend() {
         `Python 启动命令：${pythonCommand} ${launchArgs.join(" ")}`,
         "",
         "最近日志片段：",
-        backendLogBuffer || "暂无日志输出，请检查依赖、模型目录和端口占用。",
+        backendLogBuffer || readBackendLogTail() || "暂无日志输出，请检查依赖、模型目录和端口占用。",
       ].join("\n"),
     );
   }
 
   setBootstrapState({ status: "preparing", statusText: "音频系统启动中", detail: "音频服务加载完成，正在检查所选功能。" });
-  componentReceipt = await componentService.prepare({ url: serviceUrl, runtime });
+  if (fullPreparation) componentReceipt = await componentService.prepare({ url: serviceUrl, runtime });
+  else runtimeService.emit({ status: "ready", activity: "startup", phase: "ready", message: "工作区已就绪，模型将在使用时校验和加载", modelName: "", modelState: "", name: "", size: 0 });
   setBootstrapState({
     status: "ready",
     statusText: "控制台已就绪",
@@ -824,7 +840,7 @@ ipcMain.handle("runtime:set-theme-source", (_event, themeSource) => {
   return summarizeBootstrapState();
 });
 
-ipcMain.handle("runtime:start-backend", async () => startBackend());
+ipcMain.handle("runtime:start-backend", async (_event, options) => startBackend({ prepare: options?.prepare === true }));
 ipcMain.handle("runtime:preparation-state", () => runtimeService.state);
 ipcMain.handle("runtime:cancel-preparation", () => { runtimeService.cancel(); return true; });
 ipcMain.handle("components:state", () => componentService.state());

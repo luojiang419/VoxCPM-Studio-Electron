@@ -8,7 +8,7 @@ contextBridge.exposeInMainWorld("voxcpmDesktop", {
   installUpdate: () => ipcRenderer.invoke("update:install"),
   setAutoCheckUpdate: (enabled) => ipcRenderer.invoke("update:auto-check", enabled),
   getBootstrapState: () => ipcRenderer.invoke("runtime:get-bootstrap-state"),
-  startBackend: () => ipcRenderer.invoke("runtime:start-backend"),
+  startBackend: (options) => ipcRenderer.invoke("runtime:start-backend", options),
   getPreparationState: () => ipcRenderer.invoke("runtime:preparation-state"),
   cancelPreparation: () => ipcRenderer.invoke("runtime:cancel-preparation"),
   getComponents: () => ipcRenderer.invoke("components:state"),

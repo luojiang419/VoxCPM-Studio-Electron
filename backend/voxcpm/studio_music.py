@@ -19,6 +19,7 @@ import uuid
 from .music_graph import graph_for
 from .music_prompts import MusicBrief, MusicPromptService, compile_packet
 from .studio_assistant import AssistantStore
+from .studio_resources import verify_model_resources
 
 
 class MusicCancelled(Exception):
@@ -160,6 +161,8 @@ class MusicService:
         run.mkdir(parents=True)
         packet = None
         try:
+            progress(1, '正在校验当前音乐模型资源，其他模型不会加载')
+            verify_model_resources(brief.model_id, root=self.root, data_root=self.data_root, cancelled=cancelled)
             packet = self.load_prompt(payload.prompt_id) if payload.prompt_id else None
             if payload.auto_optimize and (packet is None or packet['briefFingerprint'] != fingerprint(brief) or packet.get('rulesVersion') != self.prompts.manifest['version']):
                 packet = self.compose(brief, lambda n, text: progress(round(n * .25), text), cancelled)

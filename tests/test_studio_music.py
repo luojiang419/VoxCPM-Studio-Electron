@@ -18,6 +18,7 @@ from voxcpm.studio_music import MusicCancelled, MusicService, music_filename
 
 @pytest.fixture
 def setup(tmp_path, monkeypatch):
+    monkeypatch.setattr("voxcpm.studio_music.verify_model_resources", lambda *_args, **_kwargs: None)
     monkeypatch.delenv('VOXCPM_DATA_ROOT', raising=False)
     monkeypatch.delenv('VOXCPM_PROJECT_ROOT', raising=False)
     studio = SimpleNamespace(runtime_summary_payload=lambda: {'data_root': str(tmp_path)}, settings_payload=lambda: {'output_dir': str(tmp_path / 'outputs')},

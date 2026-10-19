@@ -19,16 +19,55 @@ from typing import Any, Optional
 if os.name == "nt":
     locale.setlocale(locale.LC_CTYPE, ".UTF8")
 
-import gradio as gr
-import numpy as np
-import soundfile as sf
-import torch
+import importlib
 import yaml
-from funasr import AutoModel
-from huggingface_hub import snapshot_download
+from .studio_resources import verify_model_resources
 
-from .core import VoxCPM
-from .model.voxcpm import LoRAConfig
+
+class _LazyModule:
+    def __init__(self, name):
+        self.name = name
+
+    def __getattr__(self, name):
+        return getattr(importlib.import_module(self.name), name)
+
+
+gr = _LazyModule("gradio")
+np = _LazyModule("numpy")
+sf = _LazyModule("soundfile")
+torch = _LazyModule("torch")
+
+
+def VoxCPM(*args, **kwargs):
+    from .core import VoxCPM as factory
+    return factory(*args, **kwargs)
+
+
+def LoRAConfig(*args, **kwargs):
+    from .model.voxcpm import LoRAConfig as factory
+    return factory(*args, **kwargs)
+
+
+def AutoModel(*args, **kwargs):
+    from funasr import AutoModel as factory
+    return factory(*args, **kwargs)
+
+
+def snapshot_download(*args, **kwargs):
+    from huggingface_hub import snapshot_download as download
+    return download(*args, **kwargs)
+
+
+# 安装器/显式完整准备仍执行真实导入；正常桌面启动由主进程显式选择延迟导入。
+if os.environ.get("VOXCPM_LAZY_STARTUP") != "1":
+    import gradio as gr
+    import numpy as np
+    import soundfile as sf
+    import torch
+    from funasr import AutoModel
+    from huggingface_hub import snapshot_download
+    from .core import VoxCPM
+    from .model.voxcpm import LoRAConfig
 
 
 os.environ.setdefault("TOKENIZERS_PARALLELISM", "false")
@@ -89,18 +128,20 @@ GENERATION_MODES = [
     "极致克隆",
 ]
 
-APP_THEME = gr.themes.Base(
-    primary_hue="slate",
-    secondary_hue="slate",
-    neutral_hue="slate",
-    font=[
-        gr.themes.GoogleFont("Manrope"),
-        gr.themes.GoogleFont("IBM Plex Sans"),
-        "Microsoft YaHei UI",
-        "ui-sans-serif",
-        "sans-serif",
-    ],
-)
+def app_theme():
+    return gr.themes.Base(
+        primary_hue="slate",
+        secondary_hue="slate",
+        neutral_hue="slate",
+        font=[
+            gr.themes.GoogleFont("Manrope"),
+            gr.themes.GoogleFont("IBM Plex Sans"),
+            "Microsoft YaHei UI",
+            "ui-sans-serif",
+            "sans-serif",
+        ],
+    )
+
 
 CUSTOM_CSS = """
 :root {
@@ -1202,7 +1243,7 @@ class StudioSettings:
 class VoxCPMStudio:
     def __init__(self, model_dir: Optional[str] = None) -> None:
         self.settings = self._load_settings(model_dir)
-        self.device = "cuda" if torch.cuda.is_available() else "cpu"
+        self.device = "按需检测" if os.environ.get("VOXCPM_LAZY_STARTUP") == "1" else "cuda" if torch.cuda.is_available() else "cpu"
         self.voxcpm_model: Optional[VoxCPM] = None
         self.asr_model: Optional[AutoModel] = None
         self.loaded_model_key: Optional[str] = None
@@ -1382,7 +1423,7 @@ class VoxCPMStudio:
         entries: list[dict[str, Any]] = []
         for rel_path in self.scan_lora_checkpoints():
             lora_dir = LORA_ROOT / rel_path
-            lora_config, base_model = self.load_lora_config_from_checkpoint(rel_path)
+            lora_config, base_model = self.read_lora_config_from_checkpoint(rel_path)
             config_path = lora_dir / "lora_config.json"
             weights_path = lora_dir / "lora_weights.safetensors"
             ckpt_path = lora_dir / "lora_weights.ckpt"
@@ -1400,12 +1441,12 @@ class VoxCPMStudio:
                     "weights_path": str(weights_path if weights_path.exists() else ckpt_path if ckpt_path.exists() else ""),
                     "updated_at": updated_at or "",
                     "loaded": self.loaded_lora == rel_path,
-                    "config": lora_config.model_dump() if lora_config else None,
+                    "config": lora_config or None,
                 }
             )
         return entries
 
-    def load_lora_config_from_checkpoint(self, rel_path: str) -> tuple[LoRAConfig | None, str | None]:
+    def read_lora_config_from_checkpoint(self, rel_path: str) -> tuple[dict | None, str | None]:
         config_file = LORA_ROOT / rel_path / "lora_config.json"
         if not config_file.exists():
             return None, None
@@ -1417,7 +1458,11 @@ class VoxCPMStudio:
         lora_payload = payload.get("lora_config")
         if not lora_payload:
             return None, payload.get("base_model")
-        return LoRAConfig(**lora_payload), payload.get("base_model")
+        return lora_payload, payload.get("base_model")
+
+    def load_lora_config_from_checkpoint(self, rel_path: str) -> tuple[LoRAConfig | None, str | None]:
+        payload, base_model = self.read_lora_config_from_checkpoint(rel_path)
+        return (LoRAConfig(**payload) if payload else None), base_model
 
     def default_lora_config(self) -> LoRAConfig:
         return LoRAConfig(
@@ -1546,6 +1591,7 @@ class VoxCPMStudio:
         selected_lora = selected_lora or NO_LORA_LABEL
         model_source = self.resolve_model_source(selected_lora)
         resolved_model_dir = self.ensure_model_directory(model_source)
+        verify_model_resources(0, resolved_model_dir)
 
         lora_config, _ = self.load_lora_config_from_checkpoint(selected_lora) if selected_lora != NO_LORA_LABEL else (None, None)
         lora_config = lora_config or self.default_lora_config()
@@ -1571,6 +1617,9 @@ class VoxCPMStudio:
 
         optimize = not self.settings.disable_optimize
 
+        if enable_denoiser:
+            verify_model_resources(2, zipenhancer_path if Path(zipenhancer_path).is_dir() else None)
+        self.device = "cuda" if torch.cuda.is_available() else "cpu"
         self.voxcpm_model = VoxCPM(
             voxcpm_model_path=resolved_model_dir,
             zipenhancer_model_path=zipenhancer_path if enable_denoiser else None,
@@ -1584,6 +1633,7 @@ class VoxCPMStudio:
         return self.voxcpm_model
 
     def get_or_load_asr(self) -> AutoModel:
+        verify_model_resources(1)
         if self.asr_model is not None:
             return self.asr_model
         device = "cuda:0" if torch.cuda.is_available() else "cpu"
@@ -1982,18 +2032,21 @@ class VoxCPMStudio:
         ffmpeg_path = shutil.which("ffmpeg") or ""
         repo_fallback = self.settings.hf_repo_id or DEFAULT_HF_MODEL_ID
         model_hint = self.loaded_model_dir or self.resolve_model_source()
-        torch_version = getattr(torch, "__version__", "unknown")
-        torch_cuda_build = getattr(torch.version, "cuda", None) or "none"
+        loaded_torch = sys.modules.get("torch")
+        torch_version = getattr(loaded_torch, "__version__", "按需加载")
+        torch_cuda_build = getattr(getattr(loaded_torch, "version", None), "cuda", None) or "none"
+        cuda_available = bool(loaded_torch and loaded_torch.cuda.is_available())
         gpu_names = [
             torch.cuda.get_device_name(index)
             for index in range(torch.cuda.device_count())
-        ] if torch.cuda.is_available() else []
+        ] if cuda_available else []
         training_status = self.training_status_payload()
         return {
             "device": self.device,
             "torch_version": torch_version,
             "torch_cuda_build": torch_cuda_build,
-            "cuda_available": torch.cuda.is_available(),
+            "cuda_available": cuda_available,
+            "runtime_pending": loaded_torch is None,
             "gpu_names": gpu_names,
             "data_root": str(DATA_ROOT),
             "config_path": str(CONFIG_PATH),
@@ -2314,7 +2367,7 @@ def build_interface(studio: VoxCPMStudio) -> gr.Blocks:
             gr.update(value="收起说明" if next_visible else "项目说明"),
         )
 
-    with gr.Blocks(theme=APP_THEME, css=CUSTOM_CSS, title="VoxCPM Studio Console") as app:
+    with gr.Blocks(theme=app_theme(), css=CUSTOM_CSS, title="VoxCPM Studio Console") as app:
         with gr.Row(elem_classes=["studio-shell"]):
             with gr.Column(scale=1, min_width=236, elem_classes=["sidebar-panel", "sidebar-column"]):
                 gr.HTML(

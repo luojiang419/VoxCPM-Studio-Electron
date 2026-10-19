@@ -9,6 +9,7 @@ import UpdateNotification from "./UpdateNotification";
 import ComponentManager from "./ComponentManager";
 import MusicStudio from "./MusicStudio";
 import AssistantSettings from "./AssistantSettings";
+import SettingsLayout from "./SettingsLayout";
 import brandIcon from "../app-icon.png";
 import type { GenerationConfig, StudioVoice } from "./production-types";
 
@@ -37,6 +38,7 @@ type RuntimeSummary = {
   torch_version: string;
   torch_cuda_build: string;
   cuda_available: boolean;
+  runtime_pending?: boolean;
   gpu_names: string[];
   data_root: string;
   config_path: string;
@@ -1043,19 +1045,10 @@ function App() {
     </div>
   );
 
-  if (bootstrap?.status !== "ready") return <main className="startup-gate">
-    <div className="runtime-dialog-kicker">VOXCPM STUDIO</div>
-    <h1>{bootstrap?.status === "error" ? "音频系统启动未完成" : "音频系统启动中"}</h1>
-    <p>{bootstrap?.statusText || "正在检查运行环境"}</p>
-    <p className="runtime-intro">{bootstrap?.detail || "所选功能的依赖和模型全部就绪后，自动进入工作区。"}</p>
-    <ComponentManager onRun={handleStartService} backendRunning={Boolean(bootstrap?.backendRunning)} />
-    <RuntimePreparation onRun={handleStartService} backendStatus={bootstrap?.status || "booting"} backendDetail={bootstrap?.detail || ""} />
-  </main>;
-
   return (
     <div className={`app-shell studio-shell ${["production", "voices", "history"].includes(page) ? "studio-creative-page" : ""}`}>
       <UpdateNotification onOpen={() => { setPage("settings"); setUpdateFocusRequest(value => value + 1); }} />
-      <RuntimePreparation onRun={handleStartService} backendStatus={bootstrap?.status || ""} backendDetail={bootstrap?.detail || ""} />
+      <RuntimePreparation onRun={handleStartService} backendStatus={bootstrap?.status || "booting"} backendDetail={bootstrap?.detail || ""} />
       <aside className="sidebar">
         <div className="sidebar-top">
           <div className="studio-brand">
@@ -1244,7 +1237,7 @@ function App() {
                   <div className="overview-section-heading"><h3>运行环境</h3><span>本地部署</span></div>
                   <dl className="overview-hardware">
                     {[
-                      ["GPU", runtime ? (runtime.cuda_available ? runtime.gpu_names.join(" / ") : "不可用") : "待检测"],
+                      ["GPU", runtime ? (runtime.runtime_pending ? "使用时检测" : runtime.cuda_available ? runtime.gpu_names.join(" / ") : "不可用") : "待检测"],
                       ["推理设备", runtime?.device || "待检测"],
                       ["PyTorch", runtime?.torch_version || "待检测"],
                       ["CUDA 构建", runtime?.torch_cuda_build || "未检测到"],
@@ -1633,8 +1626,7 @@ function App() {
           ) : null}
 
           {page === "settings" ? (
-            <div className="panel-grid settings-grid">
-              <AssistantSettings backendBaseUrl={backendBaseUrl} />
+            <SettingsLayout focusRequest={updateFocusRequest} assistant={<AssistantSettings backendBaseUrl={backendBaseUrl} />} system={
               <section className="panel-card">
                 <div className="panel-head">
                   <div>
@@ -1709,8 +1701,8 @@ function App() {
                   <button type="button" className="ghost-button" onClick={() => refreshAll()}>刷新状态</button>
                 </div>
               </section>
+              } appearance={
               <section className="panel-card settings-tools-card">
-                <UpdatePanel focusRequest={updateFocusRequest} />
                 <div className="panel-head panel-head-compact">
                   <div>
                     <p className="panel-kicker">界面与工具</p>
@@ -1740,7 +1732,7 @@ function App() {
                   </div>
                 </div>
               </section>
-            </div>
+              } updates={<UpdatePanel focusRequest={updateFocusRequest} />} />
           ) : null}
         </section>
         {page === "workspace" && <WorkspacePlayer
@@ -1834,7 +1826,7 @@ function RuntimeList(props: { runtime: RuntimeSummary | null; large?: boolean })
         ["配置文件", runtime.config_path],
         ["Torch", runtime.torch_version],
         ["CUDA 构建", runtime.torch_cuda_build],
-        ["GPU", runtime.cuda_available ? runtime.gpu_names.join(", ") : "不可用"],
+        ["GPU", runtime.runtime_pending ? "使用时检测" : runtime.cuda_available ? runtime.gpu_names.join(", ") : "不可用"],
         ["当前模型", runtime.current_model_source],
         ["当前 LoRA", runtime.loaded_lora || "无"],
         ["输出目录", runtime.output_dir],

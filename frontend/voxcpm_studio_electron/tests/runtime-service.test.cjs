@@ -193,6 +193,29 @@ async function startupFixture(t, managed = false) {
     options: { managed, existingPython: python, existingModel: path.join(root, "models/model-0") } };
 }
 
+test("正常启动不探测设备、不检查其他模型、不启动推理自检，缺失模型也可进入服务", async t => {
+  const f = await startupFixture(t);
+  await fs.rm(path.join(f.options.existingModel, "weights.bin"));
+  const service = f.create();
+  service.detect = async () => { throw Error("不应执行设备探测"); };
+  service.prepare = async () => { throw Error("不应执行完整准备"); };
+  const result = await service.launch(f.options);
+  assert.equal(result.python, f.python);
+  assert.equal(result.modelDir, f.options.existingModel);
+  assert.equal(result.env.VOXCPM_LAZY_STARTUP, "1");
+  assert.equal(result.env.VOXCPM_RUNTIME_CONFIG, path.join(f.appDir, "runtime-config.json"));
+  assert.deepEqual(f.calls, []);
+});
+
+test("缺少解释器的首次安装仍走完整准备", async t => {
+  const f = await startupFixture(t);
+  const service = f.create();
+  let options;
+  service.prepare = async value => { options = value; return { python: "prepared" }; };
+  assert.equal((await service.launch({ existingPython: path.join(f.root, "missing.exe") })).python, "prepared");
+  assert.equal(options.existingPython, path.join(f.root, "missing.exe"));
+});
+
 test("连续启动复用落盘缓存，不重复完整导入、pip 检查或模型哈希，也不进入补齐状态", async t => {
   const f = await startupFixture(t);
   await f.create().prepare(f.options);

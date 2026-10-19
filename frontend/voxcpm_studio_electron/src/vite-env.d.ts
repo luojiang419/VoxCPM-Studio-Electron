@@ -10,7 +10,7 @@ declare global {
       installUpdate: () => Promise<boolean>;
       setAutoCheckUpdate: (enabled: boolean) => Promise<any>;
       getBootstrapState: () => Promise<any>;
-      startBackend: () => Promise<any>;
+      startBackend: (options?: { prepare?: boolean }) => Promise<any>;
       getPreparationState: () => Promise<any>;
       cancelPreparation: () => Promise<boolean>;
       getComponents: () => Promise<any>;

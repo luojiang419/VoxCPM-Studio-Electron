@@ -33,7 +33,8 @@ async function launch(autoCheck) {
   child = spawn(path.join(frontend, 'node_modules/electron/dist/electron.exe'), [run, '--voxcpm-run', '--remote-debugging-port=19251', `--user-data-dir=${path.join(run, 'profile')}`, '--disable-backgrounding-occluded-windows', '--disable-renderer-backgrounding'], { cwd: run, env, windowsHide: true, stdio: ['ignore', log, log] });
   fs.closeSync(log);
   client = await connect(19251);
-  await until(() => client.evaluate("document.querySelector('.runtime-startup-dialog')?.open"));
+  await until(() => client.evaluate("!!document.querySelector('.studio-shell')"));
+  assert.equal(await client.evaluate("document.querySelector('.runtime-startup-dialog')?.open"), false);
   assert.equal(await client.evaluate("document.querySelector('#runtime-title').textContent"), '音频系统启动中');
   await shot('actual-startup-' + launches.length);
   const boot = await until(async () => {
