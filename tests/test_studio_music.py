@@ -66,11 +66,13 @@ def test_manual_generation_retains_real_inputs_history_and_seekable_audio(setup,
     monkeypatch.setitem(sys.modules, 'torch', None)
     def render(packet, output, progress, cancelled, run):
         assert packet['inputs']['lyrics'] == '[Verse]\n我的中文歌词'
+        assert packet['inputs']['tags'] == 'Cinematic strings and brass'
+        assert 'captionZh' not in packet['inputs']
         sf.write(output, np.zeros(24000), 24000)
         return {'normalizationGain': 1}
     monkeypatch.setattr(app.state.music, '_comfy', render)
     body = {'brief': {'idea': '史诗', 'lyrics': '[Verse]\n我的中文歌词'}, 'autoOptimize': False,
-            'draft': {'title': '火种', 'caption': 'Cinematic strings and brass', 'lyrics': '[Verse]\n我的中文歌词', 'metadata': {'bpm': 92, 'keyScale': 'D minor'}}}
+            'draft': {'title': '火种', 'caption': 'Cinematic strings and brass', 'captionZh': '电影感弦乐与铜管', 'lyrics': '[Verse]\n我的中文歌词', 'metadata': {'bpm': 92, 'keyScale': 'D minor'}}}
     response = client.post('/api/music/generate', json=body); assert response.status_code == 200, response.text
     state = await_task(client, '/api/tasks/', response.json()['taskId'])
     assert state['status'] == 'succeeded', state
@@ -78,6 +80,8 @@ def test_manual_generation_retains_real_inputs_history_and_seekable_audio(setup,
     assert Path(result['outputPath']).name == '火种.wav'
     assert result['fileName'] == '火种.wav'
     assert result['packet']['inputs']['bpm'] == 92
+    assert result['packet']['draft']['captionZh'] == '电影感弦乐与铜管'
+    assert json.loads(Path(result['requestPath']).read_text(encoding='utf8'))['draft']['captionZh'] == '电影感弦乐与铜管'
     assert client.get('/api/music/results').json()['items'][0]['outputPath'] == result['outputPath']
     audio = client.get(result['previewUrl'], headers={'Range': 'bytes=0-63'})
     assert audio.status_code == 206 and len(audio.content) == 64
@@ -225,7 +229,7 @@ def test_auto_creation_before_generation_and_cached_seed_change(setup, monkeypat
     calls = []
     def complete(provider, key, system, user):
         calls.append(user)
-        return json.dumps({'title': '自动创作', 'caption': 'cinematic piano', 'lyrics': '[Verse]\nAI创作中文歌词',
+        return json.dumps({'title': '自动创作', 'caption': 'cinematic piano', 'captionZh': '电影感钢琴', 'lyrics': '[Verse]\nAI创作中文歌词',
             'metadata': {'bpm': 90, 'keyScale': 'D minor', 'language': 'zh', 'timeSignature': '4/4'}})
     store.transport = complete
     rendered = []

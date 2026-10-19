@@ -1,6 +1,7 @@
 """实际调用用户配置的AI助手，为四模型创作/适配同一首原创中文歌曲。"""
 import argparse
 import json
+import re
 from pathlib import Path
 import sys
 import types
@@ -28,6 +29,9 @@ def main():
         brief = MusicBrief(modelId=model, idea=idea, requirements=requirements, lyrics=lyrics, preserveLyrics=True,
                            duration=60, bpm=92, keyScale='D minor', timeSignature='4/4', language='zh')
         packet = service.compose(brief, lambda n, text: print(model, n, text, flush=True))
+        assert re.search('[\u3400-\u9fff]', packet['draft']['captionZh']), '缺少中文展示稿'
+        assert not re.search('[\u3400-\u9fff]', packet['draft']['caption']), '英文生成稿混入中文'
+        assert 'captionZh' not in packet['inputs'], '中文展示字段进入模型输入'
         if lyrics:
             assert packet['draft']['lyrics'] == lyrics, '模型切换后歌词被改变'
         lyrics = packet['draft']['lyrics']
@@ -36,7 +40,7 @@ def main():
         target = args.output / (model + '-prompt.json')
         target.parent.mkdir(parents=True, exist_ok=True)
         target.write_text(json.dumps(packet, ensure_ascii=False, indent=2), encoding='utf8')
-        print('PROMPT_VERIFIED', model, 'chars', len(packet['draft']['caption']), 'lyrics', len(lyrics), flush=True)
+        print('PROMPT_VERIFIED', model, 'english', len(packet['draft']['caption']), 'chinese', len(packet['draft']['captionZh']), 'lyrics', len(lyrics), flush=True)
 
 
 if __name__ == '__main__':

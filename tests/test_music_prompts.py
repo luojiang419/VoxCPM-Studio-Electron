@@ -11,7 +11,7 @@ from voxcpm.studio_assistant import AssistantError, AssistantStore
 
 
 def raw(caption='Cinematic orchestral, brass and strings, restrained male baritone, clear melodic phrasing'):
-    return {'title': '火种', 'caption': caption, 'lyrics': '[Verse]\n火种照亮荒原\n[Chorus]\n愿长夜止于今天',
+    return {'title': '火种', 'caption': caption, 'captionZh': '电影感管弦乐，铜管与弦乐，克制的男中音，旋律清晰。', 'lyrics': '[Verse]\n火种照亮荒原\n[Chorus]\n愿长夜止于今天',
             'metadata': {'bpm': 92, 'keyScale': 'D minor', 'language': 'zh', 'timeSignature': '4/4'}}
 
 
@@ -88,13 +88,15 @@ def test_minimax_progressive_references_and_exact_headings(tmp_path):
         if '{"templates"' in system:
             path = re.search(r'`(templates/[a-zA-Z0-9_-]+\.txt)`', system).group(1)
             return json.dumps({'templates': [path]})
-        if '{"caption":"..."}' in system:
-            return json.dumps({'caption': final})
+        if '{"caption":"...","captionZh":"..."}' in system:
+            return json.dumps({'caption': final, 'captionZh': '整体风格\n电影感管弦乐，由克制走向希望。\n人声细节\n清晰男中音。\n编曲发展\n弦乐前奏，主歌加入铜管，副歌展开，尾声收束。'})
         return json.dumps(raw())
     service = MusicPromptService(store(tmp_path, complete))
     result = service.compose(MusicBrief(modelId='minimax-music3', idea='史诗交响战争歌曲', lyrics='[Verse]\n保留歌词', language='zh'))
     assert len(calls) == 4 and structured_caption(result['inputs']['caption'])
     assert result['inputs']['lyrics'] == '[Verse]\n保留歌词'
+    assert result['draft']['captionZh'].startswith('整体风格')
+    assert '尾声收束' in result['draft']['captionZh']
     assert 'templates' not in result and 'families' not in result
 
 
@@ -129,3 +131,51 @@ def test_ai_text_cannot_define_workflow_code():
     assert graph['4']['inputs']['tags'] == data['caption']
     assert graph['7']['inputs']['steps'] == 8 and graph['7']['inputs']['cfg'] == 1.0
     assert not any(node['class_type'] == 'ExecuteCommand' for node in graph.values())
+
+
+@pytest.mark.parametrize('model', ['ace-xl-turbo', 'yue2', 'heartmula'])
+def test_bilingual_composition_in_one_call_submits_only_english(tmp_path, model):
+    calls = []
+    english = 'piano,melancholic,male vocal' if model == 'heartmula' else 'Melancholic piano, clear male vocal, sparse intro and resolved outro'
+    chinese = '忧郁钢琴，清晰男声，稀疏前奏与完整收束的尾声'
+    def complete(provider, key, system, user):
+        calls.append((system, json.loads(user)))
+        return json.dumps({**raw(english), 'captionZh': chinese})
+    result = MusicPromptService(store(tmp_path, complete)).compose(MusicBrief(modelId=model, captionZh=chinese))
+    assert len(calls) == 1
+    assert calls[0][1]['captionZh'] == chinese
+    assert '同一次创作' in calls[0][0]
+    assert result['draft']['captionZh'] == chinese
+    assert result['draft']['caption'] == english
+    inputs = result['inputs']
+    assert inputs.get('tags', inputs.get('style', '')).startswith(english)
+    assert 'captionZh' not in inputs and chinese not in json.dumps(inputs, ensure_ascii=False)
+
+
+@pytest.mark.parametrize('invalid', [
+    {'captionZh': ''}, {'captionZh': 'English only'}, {'caption': '忧郁 piano'},
+])
+def test_bilingual_invalid_output_repairs_both_versions_together(tmp_path, invalid):
+    calls = []
+    def complete(provider, key, system, user):
+        calls.append(system)
+        return json.dumps({**raw(), **(invalid if len(calls) == 1 else {})})
+    result = MusicPromptService(store(tmp_path, complete)).compose(MusicBrief(idea='电影配乐'))
+    assert len(calls) == 2
+    assert result['draft']['captionZh'] == raw()['captionZh']
+    assert result['inputs']['tags'] == raw()['caption']
+
+
+def test_missing_chinese_never_passes_after_repair(tmp_path):
+    data = raw(); data.pop('captionZh')
+    service = MusicPromptService(store(tmp_path, lambda *args: json.dumps(data)))
+    with pytest.raises(ValueError, match='captionZh'):
+        service.compose(MusicBrief(idea='电影配乐'))
+
+
+def test_edited_chinese_cannot_compile_stale_english_and_legacy_is_supported():
+    data = raw()
+    with pytest.raises(ValueError, match='重新适配'):
+        compile_packet(MusicBrief(), {**data, 'captionZh': '改成轻快女声', 'captionNeedsAdaptation': True})
+    legacy = {key: value for key, value in data.items() if key != 'captionZh'}
+    assert compile_packet(MusicBrief(), legacy)['inputs']['tags'] == data['caption']

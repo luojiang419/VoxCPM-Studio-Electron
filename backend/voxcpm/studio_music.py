@@ -171,7 +171,7 @@ class MusicService:
                     return packet
             elif not payload.auto_optimize:
                 provenance = {key: packet[key] for key in ('assistant', 'assistantSeconds', 'rulesVersion', 'source') if packet and key in packet}
-                raw = payload.draft or {'caption': brief.caption, 'lyrics': brief.lyrics, 'metadata': {}}
+                raw = payload.draft or {'caption': brief.caption, 'captionZh': brief.caption_zh, 'lyrics': brief.lyrics, 'metadata': {}}
                 packet = {**compile_packet(brief, raw), **provenance}
             else:
                 # 种子不参与提示词缓存，但每次音频生成必须使用用户当前种子。
