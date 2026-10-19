@@ -19,7 +19,7 @@ import uuid
 from .music_graph import graph_for
 from .music_prompts import MusicBrief, MusicPromptService, compile_packet
 from .studio_assistant import AssistantStore
-from .studio_resources import verify_model_resources
+from .studio_resources import ensure_model_resources, ResourceCancelled
 
 
 class MusicCancelled(Exception):
@@ -139,7 +139,7 @@ class MusicService:
                 raise ValueError('已有音乐生成任务，请等待完成或取消后再试')
             state = self.status()
             selected = next(m for m in state['models'] if m['id'] == model)
-            if not selected['ready']:
+            if not selected['selected'] or not state['runtimeReady']:
                 raise ValueError('请先在功能与模型管理中启用该模型并补齐所需资源')
             self.active = True
 
@@ -161,8 +161,9 @@ class MusicService:
         run.mkdir(parents=True)
         packet = None
         try:
-            progress(1, '正在校验当前音乐模型资源，其他模型不会加载')
-            verify_model_resources(brief.model_id, root=self.root, data_root=self.data_root, cancelled=cancelled)
+            progress(1, '正在检查当前音乐模型，缺失或损坏的文件会自动修复')
+            ensure_model_resources(brief.model_id, self.models, root=self.root, data_root=self.data_root, catalog=self.catalog,
+                cancelled=cancelled, progress=lambda n, text: progress(1 + round(n * .09), text))
             packet = self.load_prompt(payload.prompt_id) if payload.prompt_id else None
             if payload.auto_optimize and (packet is None or packet['briefFingerprint'] != fingerprint(brief) or packet.get('rulesVersion') != self.prompts.manifest['version']):
                 packet = self.compose(brief, lambda n, text: progress(round(n * .25), text), cancelled)
@@ -206,7 +207,7 @@ class MusicService:
             atomic_json(run / 'result.json', result)
             progress(100, '音乐已生成，可以试听并查看实际提示词')
             return result
-        except MusicCancelled:
+        except (MusicCancelled, ResourceCancelled):
             return {'cancelled': True, 'status': '音乐生成已取消，原有作品与已完成的提示词保留', 'packet': packet}
         except Exception as error:
             if packet:

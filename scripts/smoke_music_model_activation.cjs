@@ -15,7 +15,7 @@ const reactRoot=createRoot(document.getElementById('root'));
 function Harness(){const [screen,setScreen]=useState('music'),[base,setBase]=useState('http://before');window.setScreen=setScreen;window.setBase=setBase;
 return screen==='music'?<MusicStudio backendBaseUrl={base}/>:<p>{screen}</p>;}
 window.reset=(mode,target,withProfile=true)=>{
-  window.mode=mode;window.target=target;window.installed=ids.filter(id=>id!==target);window.calls=[];window.preparing=false;window.prepared=false;
+  window.mode=mode;window.target=target;window.installed=ids.filter(id=>id!==target);window.calls=[];window.preparing=false;window.prepared=false;window.runtimeReady=true;window.repairTask=false;window.repairCancelled=false;
   window.profile=withProfile?{selected:['lipsync',...ids.filter(id=>id!==target&&id!=='heartmula')],removed:[...new Set([target,'heartmula'])],defaultModel:ids.find(id=>id!==target)}:null;
   window.initialProfile=JSON.parse(JSON.stringify(window.profile));
   window.seed={brief:{modelId:ids.find(id=>id!==target),idea:'测试音乐需求',title:'保留作品名',lyrics:'保留输入歌词',instrumental:false},
@@ -37,11 +37,12 @@ window.voxcpmDesktop={
 window.fetch=async(url,options={})=>{
   window.calls.push({kind:'fetch',url,body:options.body?JSON.parse(options.body):null});
   let data={};
-  if(url.endsWith('/api/music/status'))data={models:ids.map(id=>({id,name:id,ready:window.installed.includes(id)&&!!window.profile?.selected.includes(id)&&!window.profile?.removed.includes(id),installed:window.installed.includes(id),selected:!!window.profile?.selected.includes(id),size:1024**3})),defaultModel:window.profile?.defaultModel||ids[0],runtimeReady:true,rules:{version:'fixture',models:[]}};
+  if(url.endsWith('/api/music/status'))data={models:ids.map(id=>({id,name:id,ready:window.runtimeReady&&window.installed.includes(id)&&!!window.profile?.selected.includes(id)&&!window.profile?.removed.includes(id),installed:window.installed.includes(id),selected:!!window.profile?.selected.includes(id)&&!window.profile?.removed.includes(id),size:1024**3})),defaultModel:window.profile?.defaultModel||ids[0],runtimeReady:window.runtimeReady,rules:{version:'fixture',models:[]}};
   else if(url.endsWith('/api/assistant/settings'))data={autoOptimizeMusic:true,providers:[]};
   else if(url.endsWith('/api/music/results'))data={items:[]};
   else if(url.endsWith('/api/music/generate'))data={taskId:'fixture-audio',status:'queued'};
-  else if(url.endsWith('/api/tasks/fixture-audio'))data={status:'failed',error:'测试结束，不调用GPU'};
+  else if(url.endsWith('/api/tasks/fixture-audio/cancel')){window.repairCancelled=true;data={status:'running',cancelRequested:true};}
+  else if(url.endsWith('/api/tasks/fixture-audio'))data=window.repairTask?{status:window.repairCancelled?'cancelled':'running',progressText:'正在自动修复 weights.safetensors · 37%',result:window.repairCancelled?{cancelled:true,status:'修复已取消，草稿保留'}:undefined}:{status:'failed',error:'测试结束，不调用GPU'};
   return {ok:true,json:async()=>data};
 };
 window.reset('stay','minimax-music3');`;
@@ -118,13 +119,20 @@ async function checkDraft(target) {
   await until(() => client.evaluate('window.preparing'));
   await client.evaluate('window.finishPreparation(false)');
   await until(() => client.evaluate("document.body.textContent.includes('模型尚未就绪')"));
+  assert.equal(await generateDisabled(), false);
+  assert.equal(await client.evaluate("Array.from(document.querySelectorAll('button')).some(b=>b.textContent==='启用并补齐此模型')"), false);
+  assert.ok(await client.evaluate("document.body.textContent.includes('生成时自动补齐')"));
+  checks.push('已启用模型的环境就绪而文件缺失时，直接生成并自动修复');
+  await client.evaluate('window.repairTask=true');
+  const preparationCalls=await client.evaluate("window.calls.filter(c=>c.kind==='select').length");
+  await click('生成音乐');
+  await until(()=>client.evaluate("document.body.textContent.includes('正在自动修复 weights.safetensors · 37%')"));
   assert.equal(await generateDisabled(), true);
-  checks.push('准备返回但模型未就绪时仍禁用生成');
-  await click('启用并补齐此模型');
-  await until(() => client.evaluate('window.preparing'));
-  await client.evaluate('window.finishPreparation()');
-  await until(async () => !await generateDisabled());
-  checks.push('失败后再次补齐成功自动恢复生成');
+  await click('取消任务');
+  await until(()=>client.evaluate("document.body.textContent.includes('修复已取消')"));
+  assert.equal(await generateDisabled(), false);await checkDraft('minimax-music3');
+  assert.equal(await client.evaluate("window.calls.filter(c=>c.kind==='select').length"),preparationCalls);
+  checks.push('自动修复显示文件与百分比，任务期间锁定，取消后保留草稿且可再次生成，无全量准备/重启');
   await client.evaluate("document.querySelector('.workspace-action-bar').scrollIntoView({block:'end'})");
   const shot = await client.send('Page.captureScreenshot', { format: 'png' });
   fs.writeFileSync(path.join(out, 'activated.png'), Buffer.from(shot.data, 'base64'));

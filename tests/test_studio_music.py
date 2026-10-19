@@ -18,7 +18,7 @@ from voxcpm.studio_music import MusicCancelled, MusicService, music_filename
 
 @pytest.fixture
 def setup(tmp_path, monkeypatch):
-    monkeypatch.setattr("voxcpm.studio_music.verify_model_resources", lambda *_args, **_kwargs: None)
+    monkeypatch.setattr("voxcpm.studio_music.ensure_model_resources", lambda *_args, **_kwargs: None)
     monkeypatch.delenv('VOXCPM_DATA_ROOT', raising=False)
     monkeypatch.delenv('VOXCPM_PROJECT_ROOT', raising=False)
     studio = SimpleNamespace(runtime_summary_payload=lambda: {'data_root': str(tmp_path)}, settings_payload=lambda: {'output_dir': str(tmp_path / 'outputs')},
@@ -39,7 +39,7 @@ def await_task(client, path, identity):
 
 
 def ready_status():
-    return {'models': [{'id': name, 'ready': True} for name in ['ace-xl-turbo', 'minimax-music3', 'yue2', 'heartmula']]}
+    return {'runtimeReady': True, 'models': [{'id': name, 'ready': True, 'selected': True} for name in ['ace-xl-turbo', 'minimax-music3', 'yue2', 'heartmula']]}
 
 
 def test_catalog_exposes_actual_official_sources_and_missing_models_need_preparation(setup):
