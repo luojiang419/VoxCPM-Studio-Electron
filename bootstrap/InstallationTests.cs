@@ -194,7 +194,8 @@ public static class InstallationTests {
                 Check(Installer.SelectAutomaticRoot(drives, @"C:\用户\VoxCPMStudio", p => true) == @"C:\用户\VoxCPMStudio", "不可用分区阻止 C 盘安装");
                 Installer.ValidateDestinationCapacity(@"C:\VoxCPMStudio", drives);
                 Check(Installer.DriveProblem(drives[0], drives) == null, "C 盘卡片仍被禁用");
-                Reject(() => Installer.ValidateDestinationCapacity(@"D:\Program Files\VoxCPMStudio", drives), "不可用分区通过");
+                // 避免命中本机真实安装记录的续装容量豁免。
+                Reject(() => Installer.ValidateDestinationCapacity(@"D:\VoxCPM-Capacity-Test-" + Guid.NewGuid().ToString("N"), drives), "不可用分区通过");
             });
             test("C 盘多个候选逐个检查，拒绝跨盘路径并兼容中文", () => {
                 var drives = new[] { new InstallDrive { root = @"C:\", ready = true, free = Installer.RequiredSpace * 2 } };

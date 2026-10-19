@@ -133,6 +133,7 @@ namespace VoxStandaloneUpdater {
         }
 
         void LayoutContent() {
+            if (WindowState == FormWindowState.Minimized || ClientSize.Width <= 0 || ClientSize.Height <= 0) return;
             float sx = ClientSize.Width / 720f, sy = ClientSize.Height / 580f;
             message.SetBounds((int)(64*sx), (int)(313*sy), (int)(592*sx), (int)(48*sy));
             detail.SetBounds((int)(64*sx), (int)(364*sy), (int)(592*sx), (int)(22*sy));
@@ -171,6 +172,7 @@ namespace VoxStandaloneUpdater {
 
         protected override void OnPaint(PaintEventArgs e) {
             base.OnPaint(e);
+            if (WindowState == FormWindowState.Minimized || ClientSize.Width <= 0 || ClientSize.Height <= 0) return;
             var g = e.Graphics; g.SmoothingMode = SmoothingMode.AntiAlias;
             g.TextRenderingHint = System.Drawing.Text.TextRenderingHint.AntiAliasGridFit;
             g.ScaleTransform(ClientSize.Width/720f,ClientSize.Height/580f);

@@ -359,6 +359,8 @@ namespace VoxBootstrap {
             if (e.Button == MouseButtons.Left && e.Y < Height * .16 && e.X < Width * .82) { ReleaseCapture(); SendMessage(Handle, 0xA1, new IntPtr(2), IntPtr.Zero); }
         }
         void LayoutButtons() {
+            // 最小化会产生零尺寸 Resize；保留上次布局，恢复窗口时再更新。
+            if (WindowState == FormWindowState.Minimized || ClientSize.Width <= 0 || ClientSize.Height <= 0) return;
             float sx = ClientSize.Width / 720f, sy = ClientSize.Height / 830f;
             run.SetBounds((int)(498 * sx), (int)(764 * sy), (int)(180 * sx), (int)(46 * sy));
             pause.SetBounds((int)(392 * sx), (int)(764 * sy), (int)(92 * sx), (int)(46 * sy));
@@ -379,7 +381,9 @@ namespace VoxBootstrap {
             using (var brush = new SolidBrush(color)) g.DrawString(text, font, brush, new RectangleF(x, y, width, size * 2.7f));
         }
         protected override void OnPaint(PaintEventArgs e) {
-            base.OnPaint(e); var g = e.Graphics; g.SmoothingMode = SmoothingMode.AntiAlias;
+            base.OnPaint(e);
+            if (WindowState == FormWindowState.Minimized || ClientSize.Width <= 0 || ClientSize.Height <= 0) return;
+            var g = e.Graphics; g.SmoothingMode = SmoothingMode.AntiAlias;
             g.TextRenderingHint = System.Drawing.Text.TextRenderingHint.AntiAliasGridFit;
             g.ScaleTransform(ClientSize.Width / 720f, ClientSize.Height / 830f);
             using (var shape = Round(new RectangleF(0.5f, .5f, 719, 829), 22)) using (var border = new Pen(StudioTheme.Border(dark))) g.DrawPath(border, shape);
