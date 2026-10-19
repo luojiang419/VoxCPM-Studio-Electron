@@ -166,7 +166,15 @@ namespace VoxBootstrap {
                     finally { process.Dispose(); }
                 }
                 string cache = Path.Combine(root, "data", "cache", "bootstrap");
+#if UNIFIED
+                string payload=VoxLegacyRepair.Program.PreparePayload(Path.Combine(Environment.GetFolderPath(Environment.SpecialFolder.LocalApplicationData),"VoxCPMStudioRepair","packages"));
+                Directory.CreateDirectory(cache);
+                string embedded=Path.Combine(payload,"desktop.zip"), cached=SafePath(cache,manifest.package.name);
+                if(!Verified(embedded,manifest.package)) throw new IOException("内置安装包校验失败");
+                if(!Verified(cached,manifest.package)) File.Copy(embedded,cached,true);
+#else
                 Download(manifest.package, cache, token, progress);
+#endif
                 string staging = Path.Combine(root, ".desktop-staging-" + Guid.NewGuid().ToString("N"));
                 Directory.CreateDirectory(staging);
                 try {
@@ -451,6 +459,13 @@ namespace VoxBootstrap {
             start.EnvironmentVariables.Remove("ELECTRON_RUN_AS_NODE"); start.EnvironmentVariables["VOXCPM_DATA_ROOT"] = Path.Combine(root, "data"); Process.Start(start);
         }
         async Task Start() {
+#if UNIFIED
+            if(VoxLegacyRepair.Program.NeedsMaintenance(installPath.Text.Trim())) {
+                string maintenanceRoot=installPath.Text.Trim(); Hide();
+                try { VoxLegacyRepair.Program.Maintain(maintenanceRoot); } finally { Close(); }
+                return;
+            }
+#endif
             ComponentSelection selection = null;
             if (manifest.componentProtocol >= 2) {
                 int memory = await Task.Run(() => ComponentPicker.GpuMemory());
@@ -511,6 +526,24 @@ namespace VoxBootstrap {
                 using (var stream = Assembly.GetExecutingAssembly().GetManifestResourceStream("bootstrap-manifest.json"))
                 using (var reader = new StreamReader(stream)) manifest = new JavaScriptSerializer().Deserialize<Manifest>(reader.ReadToEnd());
                 Core.Validate(manifest);
+#if UNIFIED
+                string specified=null, report=null; bool exit=args.Contains("--exit-on-complete");
+                for(int i=0;i<args.Length;i++) {
+                    if(args[i]=="--root" && i+1<args.Length) specified=args[++i];
+                    else if(args[i]=="--report" && i+1<args.Length) report=args[++i];
+                    else if(args[i]!="--exit-on-complete" && args[i]!="--demo") throw new ArgumentException("不支持的参数："+args[i]);
+                }
+                string existing=specified ?? VoxLegacyRepair.Program.UnifiedRoot();
+                if(!args.Contains("--demo") && VoxLegacyRepair.Program.NeedsMaintenance(existing)) {
+                    using(var maintenanceMutex=new Mutex(false,"Local\\VoxCPMStudioLegacyRepair")) {
+                        bool owns=false; try { try {owns=maintenanceMutex.WaitOne(0);} catch(AbandonedMutexException){owns=true;}
+                            if(!owns) throw new IOException("另一个检查或修复正在运行，请查看已有窗口。");
+                            VoxLegacyRepair.Program.Maintain(existing,report,exit);
+                        } finally {if(owns) maintenanceMutex.ReleaseMutex();}
+                    }
+                    return;
+                }
+#endif
                 string identity;
                 using (var hash = SHA256.Create()) identity = BitConverter.ToString(hash.ComputeHash(System.Text.Encoding.UTF8.GetBytes(AppDomain.CurrentDomain.BaseDirectory.ToUpperInvariant()))).Replace("-", "");
                 using (var mutex = new Mutex(false, "Local\\VoxCPM-Bootstrap-" + identity)) {
@@ -519,7 +552,11 @@ namespace VoxBootstrap {
 #if DEMO
                     demo = true;
 #endif
-                    try { Application.Run(new Launcher(manifest, demo)); } finally { mutex.ReleaseMutex(); }
+                    try { Application.Run(new Launcher(manifest, demo
+#if UNIFIED
+                        ,detectRoot: specified==null ? (Func<string>)null : (() => specified)
+#endif
+                        )); } finally { mutex.ReleaseMutex(); }
                 }
             } catch (Exception error) { MessageBox.Show(error.Message, "VoxCPM Studio 启动未完成", MessageBoxButtons.OK, MessageBoxIcon.Error); Environment.ExitCode = 1; }
         }

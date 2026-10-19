@@ -16,7 +16,11 @@ parser.add_argument("--request", type=Path, required=True)
 args = parser.parse_args()
 request = json.loads(args.request.read_text("utf-8-sig"))
 try:
-    engine.repair(request)
+    if request.get('maintenance'):
+        import maintenance
+        maintenance.maintain(request)
+    else:
+        engine.repair(request)
 except Exception as error:
     import traceback
     traceback.print_exc()

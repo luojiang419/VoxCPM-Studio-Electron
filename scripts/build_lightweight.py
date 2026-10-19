@@ -48,7 +48,7 @@ def build(output: Path, skip_build: bool = False, skip_zip: bool = False) -> Pat
     shutil.copytree(FRONTEND / "dist", app / "dist")
     backend = output / "app"
     backend.mkdir()
-    for name in ("desktop_api.py", "app.py", "pyproject.toml", "LICENSE"):
+    for name in ("desktop_api.py", "desktop_app.py", "app.py", "pyproject.toml", "LICENSE"):
         shutil.copy2(PROJECT / name, backend / name)
     for name in ("src/voxcpm", "assets", "conf"):
         shutil.copytree(PROJECT / name, backend / name, ignore=shutil.ignore_patterns("__pycache__", "*.pyc", "*.pyo"))
@@ -56,7 +56,7 @@ def build(output: Path, skip_build: bool = False, skip_zip: bool = False) -> Pat
                     ignore=shutil.ignore_patterns("__pycache__", "*.pyc"))
     scripts = backend / "scripts"
     scripts.mkdir()
-    for name in ("train_voxcpm_finetune.py", "test_voxcpm_ft_infer.py", "test_voxcpm_lora_infer.py"):
+    for name in ("train_voxcpm_finetune.py", "test_voxcpm_ft_infer.py", "test_voxcpm_lora_infer.py", "download_bundle_model.py", "portable_self_check.py"):
         shutil.copy2(PROJECT / "scripts" / name, scripts / name)
     for name in ("setup_lipsync.py", "requirements-lipsync.txt"):
         if (ROOT / "scripts" / name).is_file():

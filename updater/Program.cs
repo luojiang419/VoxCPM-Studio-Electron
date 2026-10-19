@@ -41,6 +41,8 @@ namespace VoxStandaloneUpdater {
         readonly object logLock = new object();
         readonly bool preview;
         readonly bool repairMode;
+        readonly bool maintenance;
+        bool healthy;
         readonly TextBox repairRoot = new TextBox();
         readonly SoftButton browseRoot = new SoftButton();
         bool repairStarted;
@@ -60,8 +62,9 @@ namespace VoxStandaloneUpdater {
             repairMode = repair;
             ResultCode = 1;
             try { settings = Read(Path.Combine(session, "session.json")); } catch { }
+            maintenance = settings != null && settings.ContainsKey("maintenance") && (bool)settings["maintenance"];
             dark = forceDark ?? (settings != null && settings.ContainsKey("theme") && Convert.ToString(settings["theme"]) == "dark");
-            Text = repairMode ? "VoxCPM Studio · 更新修复器" : "VoxCPM Studio · 独立更新器";
+            Text = maintenance ? "VoxCPM Studio · 安装与修复" : repairMode ? "VoxCPM Studio · 更新修复器" : "VoxCPM Studio · 独立更新器";
             ClientSize = new Size(720, 580);
             AutoScaleMode = AutoScaleMode.None;
             FormBorderStyle = FormBorderStyle.None;
@@ -80,7 +83,11 @@ namespace VoxStandaloneUpdater {
             logs.Text = "查看更新日志"; logs.AccessibleName = "打开本次更新日志目录";
             logs.Click += delegate { Process.Start(new ProcessStartInfo("explorer.exe", Quote(session)) { UseShellExecute = true }); };
             close.Text = "正在更新，请稍候"; close.Enabled = false;
-            close.Click += delegate { if (repairMode && (!repairStarted || (finished && ResultCode != 0))) BeginRepair(); else Close(); };
+            close.Click += delegate { if(maintenance && finished && ResultCode==0) {
+                var start=new ProcessStartInfo(Path.Combine(Convert.ToString(settings["repairRoot"]),"VoxCPM Studio.exe"),"--voxcpm-run --voxcpm-show") {UseShellExecute=false,WorkingDirectory=Convert.ToString(settings["repairRoot"])};
+                start.EnvironmentVariables.Remove("ELECTRON_RUN_AS_NODE");
+                Process.Start(start); Close();
+            } else if (repairMode && (!repairStarted || (finished && ResultCode != 0))) BeginRepair(); else Close(); };
             theme.Glyph = dark ? ButtonGlyph.Sun : ButtonGlyph.Moon; theme.AccessibleName = "切换更新器主题";
             minimize.Glyph = ButtonGlyph.Minimize; minimize.AccessibleName = "最小化更新器";
             windowClose.Glyph = ButtonGlyph.Close; windowClose.AccessibleName = "关闭更新器"; windowClose.Enabled = false;
@@ -98,7 +105,7 @@ namespace VoxStandaloneUpdater {
                 } };
                 Controls.Add(repairRoot); Controls.Add(browseRoot);
                 message.Visible = false; close.Enabled = windowClose.Enabled = true; close.Text = "开始修复并升级  →";
-                detail.Text = "请先保存任务；修复会自动关闭并强制结束本目录残留进程。";
+                detail.Text = maintenance ? "正在检查已安装程序；发现问题后自动修复，保留模型与作品。" : "请先保存任务；修复会自动关闭并强制结束本目录残留进程。";
             }
             FormClosing += delegate(object sender, FormClosingEventArgs e) { if (!finished && (!repairMode || repairStarted)) e.Cancel = true; };
             Shown += delegate {
@@ -171,9 +178,9 @@ namespace VoxStandaloneUpdater {
             using (var shape=StudioTheme.Round(new RectangleF(.5f,.5f,719,579),22)) using(var pen=new Pen(StudioTheme.Border(dark))) g.DrawPath(pen,shape);
             if (brandMark != null) g.DrawImage(brandMark,new Rectangle(36,28,50,50));
             TextAt(g,"VOXCPM",14,ink,new RectangleF(92,35,160,22),true); TextAt(g,"STUDIO",10,muted,new RectangleF(93,57,140,20));
-            TextAt(g,repairMode?"更新修复器":"独立更新器",11,muted,new RectangleF(470,43,112,20));
-            TextAt(g,view=="error"?(repairMode?"修复需要处理。":"更新暂未完成。"):finished?(repairMode?"修复完成，安心创作。":"更新完成，继续创作。"):repairMode?"修好更新，安心创作。":"更新交给我们。",31,ink,new RectangleF(40,133,420,48));
-            TextAt(g,view=="error"?"请保留原目录，查看日志了解原因。":repairMode?"修复旧版更新通道，保留模型与作品。":"独立完成更新，准备好后自动回到工作台。",14,muted,new RectangleF(43,184,390,42));
+            TextAt(g,maintenance?"安装与修复":repairMode?"更新修复器":"独立更新器",11,muted,new RectangleF(470,43,112,20));
+            TextAt(g,healthy?"一切正常，开始创作吧。":maintenance && !finished?"检查一下，安心创作。":view=="error"?(repairMode?"修复需要处理。":"更新暂未完成。"):finished?(repairMode?"修复完成，安心创作。":"更新完成，继续创作。"):repairMode?"修好更新，安心创作。":"更新交给我们。",31,ink,new RectangleF(40,133,420,48));
+            TextAt(g,healthy?"无需再次安装，你的创作空间已准备好。":maintenance?"检查安装完整性，有问题自动修复。":view=="error"?"请保留原目录，查看日志了解原因。":repairMode?"修复旧版更新通道，保留模型与作品。":"独立完成更新，准备好后自动回到工作台。",14,muted,new RectangleF(43,184,390,42));
             using(var pen=new Pen(dark?Color.FromArgb(48,52,46):Color.FromArgb(234,232,221))) { g.DrawEllipse(pen,470,109,150,150); g.DrawEllipse(pen,493,132,104,104); }
             for(int i=0;i<37;i++) {
                 double envelope=Math.Pow(Math.Sin((i+1)*Math.PI/38),1.8);
@@ -181,7 +188,7 @@ namespace VoxStandaloneUpdater {
                 using(var pen=new Pen(i>14&&i<24?accent:(dark?Color.FromArgb(115,120,108):Color.FromArgb(181,186,171)),2.8f) { StartCap=LineCap.Round,EndCap=LineCap.Round }) g.DrawLine(pen,444+i*5.7f,184-height/2,444+i*5.7f,184+height/2);
             }
             using(var shape=StudioTheme.Round(new RectangleF(42,268,636,158),18)) using(var brush=new SolidBrush(StudioTheme.Card(dark))) g.FillPath(brush,shape);
-            TextAt(g,view=="error"?"需要处理":repairMode&&!repairStarted?"原软件安装目录":repairMode?"修复与升级":"软件更新",12,muted,new RectangleF(64,286,380,22));
+            TextAt(g,maintenance?"安装检查与修复":view=="error"?"需要处理":repairMode&&!repairStarted?"原软件安装目录":repairMode?"修复与升级":"软件更新",12,muted,new RectangleF(64,286,380,22));
             TextAt(g,view=="error"?"未完成":finished?"已完成":repairMode&&!repairStarted?"待开始":progressValue>=90?"验证中":progressValue+"%",12,muted,new RectangleF(578,286,78,22));
             RectangleF bar=new RectangleF(64,391,592,5);
             using(var shape=StudioTheme.Round(bar,2.5f)) using(var brush=new SolidBrush(StudioTheme.Track(dark))) g.FillPath(brush,shape);
@@ -192,7 +199,7 @@ namespace VoxStandaloneUpdater {
             } else if(progressValue>0) using(var shape=StudioTheme.Round(new RectangleF(64,391,(float)(592*progressValue/100.0),5),2.5f)) using(var brush=new SolidBrush(accent)) g.FillPath(brush,shape);
             TextAt(g,view=="error"?"查看日志了解原因，原目录与个人数据会保留。":repairMode?"自带修复环境 · 无需安装开发工具":"独立运行 · 安装完成后自动打开新版",10,muted,new RectangleF(64,405,592,18));
             int phase=finished&&view!="error"?3:progressValue<30?0:progressValue<90?1:2;
-            string[] steps=repairMode?new[] {"检查旧版","修复升级","启动验证","通道验证"}:new[] {"核验更新","安装文件","启动检查","更新完成"};
+            string[] steps=maintenance?new[] {"识别安装","检查文件","环境与修复","最终复检"}:repairMode?new[] {"检查旧版","修复升级","启动验证","通道验证"}:new[] {"核验更新","安装文件","启动检查","更新完成"};
             for(int i=0;i<4;i++) {
                 int x=44+i*159; bool active=i==phase;
                 using(var brush=new SolidBrush(active?accent:StudioTheme.Track(dark))) g.FillEllipse(brush,x,450,20,20);
@@ -221,11 +228,11 @@ namespace VoxStandaloneUpdater {
             settings["repairRoot"]=Path.GetFullPath(root);
             Write(Path.Combine(session,"session.json"),settings);
             Write(Path.Combine(session,"repair-request.json"),new { root=Path.GetFullPath(root), work=session,
-                payload=Convert.ToString(settings["payload"]), resultPath=Convert.ToString(settings["resultPath"]) });
+                maintenance=maintenance, payload=Convert.ToString(settings["payload"]), resultPath=Convert.ToString(settings["resultPath"]) });
             foreach(string name in new[] {"status.json","host-ready.json"}) if(File.Exists(Path.Combine(session,name))) File.Delete(Path.Combine(session,name));
             finished=false; repairStarted=true; view="working"; ResultCode=1;
             repairRoot.Visible=browseRoot.Visible=false; message.Visible=true;
-            close.Enabled=windowClose.Enabled=false; close.Text="正在修复，请稍候";
+            close.Enabled=windowClose.Enabled=false; close.Text=maintenance?"正在检查，请稍候":"正在修复，请稍候";
             UpdateProgress("正在检查原安装与更新通道…",0); animation.Start(); StartWorker();
         }
 
@@ -322,6 +329,14 @@ namespace VoxStandaloneUpdater {
                 Text = repairMode ? "VoxCPM Studio · 修复完成" : "VoxCPM Studio · 更新完成";
                 message.Text = repairMode ? "修复完成，更新通道已验证。" : "更新完成，新版软件已启动。"; progressValue = 100;
                 detail.Text = repairMode ? "后续请在软件内检查更新，无需重复运行修复器。" : "所有检查已通过，可以继续创作。"; view = "complete"; Invalidate();
+                if(maintenance) {
+                    var result=Read(Path.Combine(session,"status.json"));
+                    healthy=result.ContainsKey("status") && Convert.ToString(result["status"])=="healthy";
+                    Text=healthy?"VoxCPM Studio · 一切正常":"VoxCPM Studio · 修复完成";
+                    message.Text=healthy?"一切正常，无需再次安装。":"问题已修复，开始创作吧。";
+                    detail.Text=healthy?"开始创作吧！已有作品、模型和设置保持完好。":"修复后检查已通过，作品、模型与设置已保留。";
+                    close.Text="开始创作  →"; AccessibleDescription=Convert.ToString(result["message"]); Invalidate();
+                }
                 if(repairMode && (!settings.ContainsKey("exitOnComplete") || !(bool)settings["exitOnComplete"])) return;
                 var timer = new Timer { Interval = 1800 };
                 timer.Tick += delegate { timer.Stop(); timer.Dispose(); Close(); }; timer.Start();

@@ -18,7 +18,7 @@ def sha(file):
         return hashlib.file_digest(stream, "sha256").hexdigest()
 
 
-def build(snapshot, output=None):
+def build(snapshot, output=None, desktop_manifest=None, desktop_package=None):
     from cryptography.hazmat.primitives.asymmetric.ed25519 import Ed25519PublicKey
     envelope=json.loads((snapshot/"envelope.json").read_text("utf-8"))
     config=json.loads((FRONTEND/"update-config.json").read_text("utf-8"))
@@ -32,8 +32,9 @@ def build(snapshot, output=None):
         signed_profile=json.loads(z.read("resources/app/updater-runtime-config.json"))
     if signed_profile!=profile:
         raise ValueError("修复器与签名应用要求的独立环境不一致")
-    build_id=hashlib.sha256(b"".join((ROOT/p).read_bytes() for p in ("repair/engine.py","repair/worker.py","repair/Program.cs","updater/Program.cs","bootstrap/SharedTheme.cs","frontend/voxcpm_studio_electron/updater.py"))).hexdigest()[:10]
-    output=output or ROOT/"builds/正式分发"/("VoxCPM-老用户更新修复器-"+manifest["releaseId"]+"-"+build_id)
+    unified = desktop_manifest is not None
+    build_id=hashlib.sha256(b"".join((ROOT/p).read_bytes() for p in ("repair/engine.py","repair/worker.py","repair/Program.cs","updater/Program.cs","bootstrap/SharedTheme.cs","frontend/voxcpm_studio_electron/updater.py")) + (b"".join((ROOT/p).read_bytes() for p in ("repair/maintenance.py","bootstrap/Program.cs","bootstrap/Installation.cs")) + desktop_manifest.read_bytes() if unified else b"")).hexdigest()[:10]
+    output=output or ROOT/"builds/正式分发"/(("VoxCPM-安装修复一体版-" if unified else "VoxCPM-老用户更新修复器-")+manifest["releaseId"]+"-"+build_id)
     output.mkdir(parents=True,exist_ok=False)
     stage=ROOT/"builds/repairer-build"/(manifest["releaseId"]+"-"+build_id)
     stage.mkdir(parents=True,exist_ok=False)
@@ -42,6 +43,10 @@ def build(snapshot, output=None):
     for name in ("engine.py","worker.py"):
         shutil.copy2(ROOT/"repair"/name,payload/name)
     shutil.copy2(FRONTEND/"updater.py",payload/"updater.py")
+    if unified:
+        shutil.copy2(ROOT/"repair/maintenance.py",payload/"maintenance.py")
+        shutil.copy2(desktop_manifest,payload/"desktop-manifest.json")
+        shutil.copy2(desktop_package,payload/"desktop.zip")
     (payload/"snapshot").mkdir()
     shutil.copy2(snapshot/"envelope.json",payload/"snapshot/envelope.json")
     shutil.copy2(package,payload/"snapshot"/package.name)
@@ -56,14 +61,19 @@ def build(snapshot, output=None):
                 records.append({"path":relative,"size":file.stat().st_size,"sha256":sha(file)})
     bundle=stage/"repair-bundle.json"
     bundle.write_text(json.dumps({"product":"voxcpm-studio-repairer","releaseId":manifest["releaseId"],"sha256":sha(archive),"files":records},indent=2),encoding="utf-8")
-    executable=output/"VoxCPM更新修复器.exe"
-    subprocess.run(["C:/Windows/Microsoft.NET/Framework64/v4.0.30319/csc.exe","/nologo","/target:winexe","/platform:anycpu","/optimize+","/main:VoxLegacyRepair.Program","/out:"+str(executable),
+    executable=output/("VoxCPM安装器.exe" if unified else "VoxCPM更新修复器.exe")
+    subprocess.run(["C:/Windows/Microsoft.NET/Framework64/v4.0.30319/csc.exe","/nologo","/target:winexe","/platform:anycpu","/optimize+",*( ["/main:VoxBootstrap.Program", "/define:UNIFIED"] if unified else ["/main:VoxLegacyRepair.Program"] ),"/out:"+str(executable),
         "/win32icon:"+str(ROOT/"assets/brand/voxcpm-app.ico"),"/resource:"+str(ROOT/"assets/brand/voxcpm-app-256.png")+",app-mark.png",
         "/resource:"+str(archive)+",repair-payload.zip","/resource:"+str(bundle)+",repair-bundle.json",
         "/reference:System.Windows.Forms.dll","/reference:System.Drawing.dll","/reference:Accessibility.dll","/reference:System.Web.Extensions.dll","/reference:System.IO.Compression.dll","/reference:System.IO.Compression.FileSystem.dll",
+        *(["/resource:"+str(desktop_manifest)+",bootstrap-manifest.json",
+            *["/resource:"+str(ROOT/"assets/brand"/file)+","+name for file,name in [("voxcpm-app.ico","app.ico"),("voxcpm-installer.ico","installer.ico"),("disk-local-256.png","disk-local.png")]],
+            *[str(ROOT/"bootstrap"/name) for name in ("Program.cs","Installation.cs","Components.cs","DiskCard.cs")]] if unified else []),
         str(ROOT/"bootstrap/SharedTheme.cs"),str(ROOT/"updater/Program.cs"),str(ROOT/"repair/Program.cs")],check=True)
     (output/"使用说明.txt").write_text("请先保存作品并停止生成或训练，双击 VoxCPM更新修复器.exe。\n自动识别原安装位置，也可以手动选择。点击“开始修复并升级”。\n会自动关闭本目录工作台及更新器，隐藏进程无法正常退出时会强制结束；未保存内容和进行中的任务可能丢失。\n自带修复环境，不需要安装Python或开发工具。保留已保存的模型、配置、音色和作品。\n修复完成后直接在软件内检查更新，不需要每次运行修复器。\n请勿卸载或删除旧目录；若失败，使用“查看更新日志”保留错误记录。权限不足可右键以管理员身份运行。\n",encoding="utf-8-sig")
-    report={"version":manifest["version"],"releaseId":manifest["releaseId"],"buildId":build_id,"executable":str(executable),"size":executable.stat().st_size,"sha256":sha(executable),"runtimeId":profile["id"],"payload":str(payload),"autoTerminateOwnedProcesses":True}
+    if unified:
+        (output/"使用说明.txt").write_text("双击 VoxCPM安装器.exe。\n首次运行选择安装位置和功能，自动准备依赖与模型。\n再次运行自动检查原安装：有问题自动修复并显示进度，无问题提示一切正常，无需再次安装，开始创作吧。\n检查不关闭工作台；发现问题后修复会关闭本目录进程，请先保存正在编辑的任务。\n保留作品、模型、密钥和功能选择；无法完成检查时会显示原因，不会冒充一切正常。\n桌面和修复环境内置，缺失依赖、模型或新版修复资源仍需要网络。\n",encoding="utf-8-sig")
+    report={"unified":unified,"version":manifest["version"],"releaseId":manifest["releaseId"],"buildId":build_id,"executable":str(executable),"size":executable.stat().st_size,"sha256":sha(executable),"runtimeId":profile["id"],"payload":str(payload),"autoTerminateOwnedProcesses":True}
     (output/"构建记录.json").write_text(json.dumps(report,ensure_ascii=False,indent=2),encoding="utf-8")
     print(json.dumps(report,ensure_ascii=False,indent=2))
     return report

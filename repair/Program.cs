@@ -45,7 +45,7 @@ namespace VoxLegacyRepair {
                     var settings=new { session=work,payload,pythonExecutable=Path.Combine(payload,"runtime","python.exe"),
                         workerScript=Path.Combine(payload,"worker.py"),repairRoot=root ?? "",resultPath=result,autoRepair=auto,exitOnComplete=exit };
                     File.WriteAllText(Path.Combine(work,"session.json"),Json.Serialize(settings),new UTF8Encoding(false));
-                    using(var form=new UpdateForm(work,false,null,true)) { Application.Run(form); Environment.ExitCode=form.ResultCode; }
+                    using(var form=new UpdateForm(work,false,null,true)) { if(Application.MessageLoop) form.ShowDialog(); else Application.Run(form); Environment.ExitCode=form.ResultCode; }
                 } catch(Exception error) {
                     if(!exit) MessageBox.Show(error.Message,"VoxCPM 修复器未能启动",MessageBoxButtons.OK,MessageBoxIcon.Error);
                     else if(report!=null) { Directory.CreateDirectory(Path.GetDirectoryName(Path.GetFullPath(report))); File.WriteAllText(report,Json.Serialize(new {status="error",message=error.Message}),new UTF8Encoding(false)); }
@@ -71,6 +71,45 @@ namespace VoxLegacyRepair {
             return found.Length==1?found[0]:null;
         }
 
+#if UNIFIED
+        public static bool NeedsMaintenance(string root) {
+            if(String.IsNullOrWhiteSpace(root) || !Directory.Exists(root)) return false;
+            string marker=Path.Combine(root,".voxcpm-install.json");
+            if(File.Exists(marker)) {
+                try {
+                    var state=Json.Deserialize<Dictionary<string,object>>(File.ReadAllText(marker));
+                    string status=state.ContainsKey("state")?Convert.ToString(state["state"]):"";
+                    if(status=="preparing" || status=="uninstalled") return false;
+                    return true;
+                } catch { return true; }
+            }
+            return File.Exists(Path.Combine(root,"runtime_manifest.json"));
+        }
+        public static string UnifiedRoot() {
+            foreach(string path in new[] { @"Software\VoxCPMStudio\Installer", @"Software\Microsoft\Windows\CurrentVersion\Uninstall\VoxCPMStudio" })
+                using(var key=Registry.CurrentUser.OpenSubKey(path)) {
+                    string value=key==null?null:key.GetValue("InstallLocation") as string;
+                    if(NeedsMaintenance(value)) return Path.GetFullPath(value);
+                }
+            string adjacent=Path.GetDirectoryName(Assembly.GetExecutingAssembly().Location);
+            if(NeedsMaintenance(adjacent)) return adjacent;
+            return DetectRoot(adjacent);
+        }
+        public static void Maintain(string root, string report=null, bool exit=false) {
+            VoxBootstrap.Installer.ValidateRoot(root);
+            string home=Path.Combine(Environment.GetFolderPath(Environment.SpecialFolder.LocalApplicationData),"VoxCPMStudioRepair");
+            string payload=PreparePayload(Path.Combine(home,"packages"));
+            string work=Path.Combine(home,"sessions","maintenance-"+Guid.NewGuid().ToString("N"));
+            Directory.CreateDirectory(work);
+            string result=report==null?Path.Combine(work,"result.json"):Path.GetFullPath(report);
+            Directory.CreateDirectory(Path.GetDirectoryName(result));
+            File.WriteAllText(Path.Combine(work,"session.json"),Json.Serialize(new {session=work,payload,
+                pythonExecutable=Path.Combine(payload,"runtime/python.exe"),workerScript=Path.Combine(payload,"worker.py"),
+                repairRoot=root,resultPath=result,autoRepair=true,exitOnComplete=exit,maintenance=true}),new UTF8Encoding(false));
+            using(var form=new UpdateForm(work,false,null,true)) { if(Application.MessageLoop) form.ShowDialog(); else Application.Run(form); Environment.ExitCode=form.ResultCode; }
+        }
+#endif
+
         static string Digest(Stream stream) { using(var hash=SHA256.Create()) return BitConverter.ToString(hash.ComputeHash(stream)).Replace("-","").ToLowerInvariant(); }
         static string Digest(string file) { using(var stream=File.OpenRead(file)) return Digest(stream); }
         static string Safe(string root,string relative) {
@@ -89,7 +128,7 @@ namespace VoxLegacyRepair {
                 return true;
             } catch(IOException) { return false; } catch(UnauthorizedAccessException) { return false; }
         }
-        static string PreparePayload(string packages) {
+        public static string PreparePayload(string packages) {
             var assembly=Assembly.GetExecutingAssembly();
             Dictionary<string,object> manifest;
             using(var stream=assembly.GetManifestResourceStream("repair-bundle.json")) using(var reader=new StreamReader(stream,Encoding.UTF8)) manifest=Json.Deserialize<Dictionary<string,object>>(reader.ReadToEnd());
