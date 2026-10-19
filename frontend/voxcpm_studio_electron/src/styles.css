@@ -694,15 +694,18 @@ body[data-theme="light"] .control-status-card {
 .update-auto-check {
   display: flex;
   align-items: center;
-  gap: 10px;
+  justify-content: space-between;
+  gap: 24px;
+  max-width: 560px;
+  padding: 18px 20px;
+  border: 1px solid var(--line);
+  border-radius: 14px;
+  background: var(--panel-soft);
+  cursor: pointer;
 }
-
-.update-auto-check input {
-  width: 16px;
-  height: 16px;
-  margin: 0;
-  flex: none;
-}
+.update-auto-check > span { display: grid; gap: 5px; }
+.update-auto-check strong { color: var(--text); font-size: 13px; font-weight: 500; }
+.update-auto-check small { color: var(--muted); font-size: 12px; line-height: 1.6; }
 
 .settings-tool-section {
   display: grid;

@@ -5,7 +5,6 @@ import WorkspacePlayer from "./WorkspacePlayer";
 import SaveVoiceDialog from "./SaveVoiceDialog";
 import LipSyncStudio from "./LipSyncStudio";
 import RuntimePreparation from "./RuntimePreparation";
-import UpdateNotification from "./UpdateNotification";
 import ComponentManager from "./ComponentManager";
 import MusicStudio from "./MusicStudio";
 import AssistantSettings from "./AssistantSettings";
@@ -1047,7 +1046,6 @@ function App() {
 
   return (
     <div className={`app-shell studio-shell ${["production", "voices", "history"].includes(page) ? "studio-creative-page" : ""}`}>
-      <UpdateNotification onOpen={() => { setPage("settings"); setUpdateFocusRequest(value => value + 1); }} />
       <RuntimePreparation onRun={handleStartService} backendStatus={bootstrap?.status || "booting"} backendDetail={bootstrap?.detail || ""} />
       <aside className="sidebar">
         <div className="sidebar-top">

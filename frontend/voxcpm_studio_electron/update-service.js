@@ -110,10 +110,13 @@ async function prepareUpdater(session, manifest, python) {
 }
 
 class UpdateService {
-  constructor({ root, dataRoot, appDir, currentVersion, pythonExecutable, getTheme = () => "light", onState = () => {}, config }) {
+  constructor({ root, dataRoot, appDir, currentVersion, pythonExecutable, getTheme = () => "light", onState = () => {}, onInstallReady = () => {}, config }) {
     this.root = root; this.dataRoot = dataRoot; this.appDir = appDir;
     this.currentVersion = currentVersion; this.onState = onState;
     this.getTheme = getTheme;
+    this.onInstallReady = onInstallReady;
+    this.prompt = null;
+    this.startupNotified = new Set();
     this.python = pythonExecutable || resolveManagedPython(root) || path.join(root, "runtime", "python", "python.exe");
     this.backendPython = this.python;
     this.config = config || JSON.parse(fs.readFileSync(path.join(appDir, "update-config.json"), "utf8"));
@@ -132,7 +135,13 @@ class UpdateService {
     atomicJson(this.settingsPath, { autoCheck: Boolean(enabled) });
     return this.setState({ autoCheck: Boolean(enabled) });
   }
-  setState(patch) { Object.assign(this.state, patch); this.onState({ ...this.state }); return { ...this.state }; }
+  setState(patch) {
+    Object.assign(this.state, patch);
+    if (this.prompt) atomicJson(path.join(this.prompt.folder, "prompt-state.json"), {
+      status: this.state.status, message: this.state.message, progress: this.state.progress,
+    });
+    this.onState({ ...this.state }); return { ...this.state };
+  }
   getState() {
     try { this.state.lastResult = JSON.parse(fs.readFileSync(path.join(this.cache, "last-result.json"), "utf8")); } catch { /* 无更新记录。 */ }
     return { ...this.state };
@@ -200,7 +209,7 @@ class UpdateService {
     return this.python;
   }
   async check({ source = "manual" } = {}) {
-    if (this.running || ["downloaded", "installing"].includes(this.state.status)) return this.state;
+    if (this.running || this.prompt || ["downloaded", "installing"].includes(this.state.status)) return this.state;
     this.running = true;
     this.setState({ status: "checking", checkSource: source, message: "正在检查新版本…", progress: 0 });
     try {
@@ -217,6 +226,84 @@ class UpdateService {
       this.envelope = null; this.manifest = null;
       return this.setState({ status: "error", canDownload: false, latestVersion: undefined, notes: undefined, message: String(error.message || error) });
     } finally { this.running = false; }
+  }
+  async checkAndPrompt({ source = "manual" } = {}) {
+    const state = await this.check({ source });
+    if (["available", "downloaded"].includes(state.status) || (state.status === "error" && state.canDownload)) {
+      const key = `${state.latestVersion}/${state.latestReleaseId || state.publishedAt || ""}`;
+      if (source !== "startup" || !this.startupNotified.has(key)) {
+        try { await this.showPrompt(); this.startupNotified.add(key); }
+        catch (error) { this.setState({ message: `独立更新器未能打开：${error.message}。请点击“现在更新”重试。` }); }
+      }
+    }
+    return this.getState();
+  }
+  async showPrompt() {
+    if (this.prompt) return this.getState();
+    if (!this.manifest || this.running || !["available", "downloaded", "error"].includes(this.state.status)) throw new Error("请先检查更新");
+    const folder = path.join(this.cache, "prompt-" + crypto.randomUUID());
+    fs.mkdirSync(folder, { recursive: true });
+    // 选择窗口使用随应用发布的本地原生程序；不为弹窗下载包或准备 Python。
+    const executable = path.join(folder, "VoxCPM Updater.exe");
+    fs.copyFileSync(path.join(this.appDir, "standalone-updater.exe"), executable);
+    atomicJson(path.join(folder, "session.json"), { mode: "prompt", session: folder, parentPid: process.pid,
+      theme: this.getTheme(), version: this.manifest.version, releaseId: this.manifest.releaseId,
+      notes: this.manifest.notes || "", size: this.manifest.package.size });
+    const prompt = { folder, busy: false, child: null, timer: null };
+    this.prompt = prompt;
+    this.setState({ promptOpen: true });
+    try {
+      const child = spawn(executable, ["--session", folder], { detached: true, stdio: "ignore", windowsHide: false, cwd: folder,
+        env: Object.fromEntries(Object.entries(process.env).filter(([key]) => key !== "ELECTRON_RUN_AS_NODE")) });
+      prompt.child = child;
+      await new Promise((resolve, reject) => { child.once("spawn", resolve); child.once("error", reject); });
+      let exited = false;
+      child.once("exit", () => { exited = true; if (this.prompt === prompt && !prompt.busy) this.closePrompt(); });
+      child.unref();
+      const deadline = Date.now() + 10000;
+      while (true) {
+        const file = path.join(folder, "prompt-ready.json");
+        if (fs.existsSync(file)) {
+          const ready = JSON.parse(fs.readFileSync(file, "utf8"));
+          if (ready.session === folder && ready.hostPid === child.pid) break;
+        }
+        if (exited || Date.now() >= deadline) throw new Error("更新选择窗口未就绪，工作台保持运行");
+        await new Promise(resolve => setTimeout(resolve, 100));
+      }
+      if (this.prompt !== prompt) return this.getState();
+      prompt.timer = setInterval(() => {
+        if (!prompt.busy) void this.handlePromptChoice(prompt).catch(error => {
+          this.setState({ status: "error", canDownload: true, message: String(error.message || error) });
+        });
+      }, 200);
+      prompt.timer.unref();
+      return this.getState();
+    } catch (error) { this.closePrompt(); throw error; }
+  }
+  closePrompt() {
+    const prompt = this.prompt;
+    if (!prompt) return;
+    clearInterval(prompt.timer);
+    atomicJson(path.join(prompt.folder, "prompt-state.json"), { status: "closed" });
+    this.prompt = null;
+    this.setState({ promptOpen: false });
+  }
+  async handlePromptChoice(prompt) {
+    const file = path.join(prompt.folder, "choice.json");
+    if (this.prompt !== prompt || !fs.existsSync(file)) return;
+    const choice = JSON.parse(fs.readFileSync(file, "utf8"));
+    fs.unlinkSync(file);
+    if (choice.session !== prompt.folder || choice.hostPid !== prompt.child.pid) return;
+    if (choice.action === "later") { this.closePrompt(); return; }
+    if (choice.action !== "now") return;
+    prompt.busy = true;
+    try {
+      if (this.state.status !== "downloaded") await this.download();
+      if (this.state.status !== "downloaded") return; // 下载错误已显示在原生窗口，可直接重试。
+      await this.launch();
+      this.closePrompt();
+      await this.onInstallReady(); // 仅在签名新更新器和事务均就绪后允许主程序退出。
+    } finally { prompt.busy = false; }
   }
   async download() {
     if (this.running) return this.state;

@@ -29,5 +29,7 @@ for item in observations:
     assert item["controlsInsideClient"]
 (output / "report.json").write_text(json.dumps({"passed": True, "nativeFormRendered": True, "states": 6,
     "themes": ["light", "dark"], "scales": observations, "themeSwitchPreservesStatus": True,
-    "closeBlockedWhileUpdating": True, "closeAllowedAfterCompletion": True}, indent=2), encoding="utf-8")
+    "closeBlockedWhileUpdating": True, "closeAllowedAfterCompletion": True,
+    "promptThemes": ["light", "dark"], "promptDeferralCloses": True,
+    "promptConfirmationWritesChoice": True, "promptDoesNotStartWorker": True}, indent=2), encoding="utf-8")
 print(output)

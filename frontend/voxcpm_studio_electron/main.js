@@ -66,7 +66,7 @@ function scheduleStartupUpdate() {
   startupUpdateScheduled = true;
   void rendererReady.then(() => {
     setTimeout(() => {
-      if (bootstrapState.status === "ready" && updateService.getAutoCheck()) void updateService.check({ source: "startup" });
+      if (bootstrapState.status === "ready" && updateService.getAutoCheck()) void updateService.checkAndPrompt({ source: "startup" });
     }, 1000).unref();
   });
 }
@@ -819,17 +819,11 @@ ipcMain.handle("runtime:get-bootstrap-state", () => {
 
 ipcMain.handle("update:state", () => updateService?.getState());
 ipcMain.handle("runtime:renderer-ready", () => { rendererReadyResolve(); return true; });
-ipcMain.handle("update:check", () => updateService.check());
+ipcMain.handle("update:check", () => updateService.checkAndPrompt());
 ipcMain.handle("update:download", () => updateService.download());
 ipcMain.handle("update:auto-check", (_event, enabled) => updateService.setAutoCheck(enabled));
 ipcMain.handle("update:install", async () => {
-  const answer = await dialog.showMessageBox(mainWindow, { type: "question", title: "启动独立更新器",
-    message: "即将打开独立更新器。请确认生成与训练任务已结束。",
-    detail: "更新器准备完成后工作台会关闭，独立窗口将继续安装并自动打开新版。模型、配置与已有作品会保留。",
-    buttons: ["取消", "启动独立更新器"], defaultId: 0, cancelId: 0 });
-  if (answer.response !== 1) return false;
-  await updateService.launch();
-  app.quit();
+  await updateService.showPrompt();
   return true;
 });
 
@@ -933,6 +927,7 @@ app.whenReady().then(async () => {
     }
   }
   updateService = new UpdateService({ root: resolveProjectRoot(), dataRoot: resolveDataRoot(), appDir: __dirname,
+    onInstallReady: () => app.quit(),
     getTheme: () => currentThemeSource === "system" ? (nativeTheme.shouldUseDarkColors ? "dark" : "light") : currentThemeSource,
     pythonExecutable: resolvePythonCommand(resolveAppRoot(), resolveProjectRoot()),
     currentVersion: app.getVersion(), onState: (state) => sendRuntimeEvent("update-state", { update: state }) });

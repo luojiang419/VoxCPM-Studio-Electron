@@ -123,3 +123,45 @@ test("更新器未能启动时保留主程序，并记录取消避免延迟安�
   fs.writeFileSync(path.join(service.cache, "last-result.json"), JSON.stringify({ status: "rolled-back", message: "服务启动失败", session: service.session }));
   assert.equal(service.getState().lastResult.status, "rolled-back");
 });
+
+test("启动提醒按发布去重，手动检查可重新打开，失败后允许重试", async (t) => {
+  const temp = fs.mkdtempSync(path.join(os.tmpdir(), "voxcpm-prompt-dedup-"));
+  t.after(() => fs.rmSync(temp, { recursive: true, force: true }));
+  const service = new UpdateService({ root: temp, dataRoot: temp, appDir: temp, currentVersion: "2.0.2", config: {} });
+  let opens = 0, failed = false;
+  service.check = async () => ({ status: "available", latestVersion: "2.0.2", latestReleaseId: "20261019000002" });
+  service.showPrompt = async () => { opens++; if (failed) throw Error("native unavailable"); };
+  await service.checkAndPrompt({ source: "startup" });
+  await service.checkAndPrompt({ source: "startup" });
+  assert.equal(opens, 1);
+  await service.checkAndPrompt(); assert.equal(opens, 2);
+  service.check = async () => ({ status: "available", latestVersion: "2.0.2", latestReleaseId: "20261019000003" });
+  failed = true; await service.checkAndPrompt({ source: "startup" });
+  assert.match(service.state.message, /native unavailable/);
+  failed = false; await service.checkAndPrompt({ source: "startup" }); assert.equal(opens, 4);
+});
+
+test("延期不下载或退出；立即更新自动衔接，失败不退出且可重试", async (t) => {
+  const temp = fs.mkdtempSync(path.join(os.tmpdir(), "voxcpm-prompt-choice-"));
+  t.after(() => fs.rmSync(temp, { recursive: true, force: true }));
+  let quits = 0;
+  const service = new UpdateService({ root: temp, dataRoot: temp, appDir: temp, currentVersion: "2.0.2", config: {}, onInstallReady: () => quits++ });
+  const folder = path.join(temp, "prompt"); fs.mkdirSync(folder);
+  const createPrompt = () => (service.prompt = { folder, child: { pid: 123 }, busy: false });
+  const choose = (action, hostPid = 123) => fs.writeFileSync(path.join(folder, "choice.json"), JSON.stringify({ session: folder, hostPid, action }));
+  const order = []; let failedDownload = false, failedLaunch = false;
+  service.download = async () => { order.push("download"); return service.setState({ status: failedDownload ? "error" : "downloaded" }); };
+  service.launch = async () => { order.push("ready"); if (failedLaunch) throw Error("handshake failed"); };
+  let prompt = createPrompt(); service.state.status = "available";
+  choose("now", 999); await service.handlePromptChoice(prompt); assert.deepEqual(order, []);
+  choose("later"); await service.handlePromptChoice(prompt);
+  assert.deepEqual(order, []); assert.equal(quits, 0); assert.equal(service.getAutoCheck(), true);
+  assert.equal(service.prompt, null); assert.equal(JSON.parse(fs.readFileSync(path.join(folder, "prompt-state.json"))).status, "closed");
+  prompt = createPrompt(); failedDownload = true; choose("now"); await service.handlePromptChoice(prompt);
+  assert.equal(quits, 0); assert.equal(service.prompt, prompt); assert.equal(prompt.busy, false);
+  failedDownload = false; failedLaunch = true; choose("now"); await assert.rejects(service.handlePromptChoice(prompt), /handshake failed/);
+  assert.equal(quits, 0); assert.equal(prompt.busy, false);
+  failedLaunch = false; service.state.status = "available"; choose("now"); await service.handlePromptChoice(prompt);
+  assert.deepEqual(order, ["download", "download", "ready", "download", "ready"]);
+  assert.equal(quits, 1); assert.equal(service.prompt, null);
+});

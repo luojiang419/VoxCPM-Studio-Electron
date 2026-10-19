@@ -41,14 +41,14 @@ export default function UpdatePanel({ focusRequest = 0 }: { focusRequest?: numbe
     <p className="paragraph" role="status">{error || state?.message || "正在读取更新状态…"}</p>
     {state?.notes && <p className="paragraph" style={{ whiteSpace: "pre-wrap" }}>{state.notes}</p>}
     {state?.status === "downloading" && <progress max={100} value={state.progress} style={{ width: "100%" }} aria-label="更新下载进度" />}
-    <label className="paragraph update-auto-check"><input type="checkbox" checked={state?.autoCheck ?? true} disabled={!state}
-      onChange={(event) => run(() => window.voxcpmDesktop.setAutoCheckUpdate(event.target.checked))} /> 启动时自动检查更新</label>
+    <label className="update-auto-check"><span><strong>启动时自动检查更新</strong><small>发现新版时打开独立更新器，由你选择更新时间。</small></span>
+      <input className="music-switch" type="checkbox" role="switch" aria-label="启动时自动检查更新" checked={state?.autoCheck ?? true} disabled={!state}
+      onChange={(event) => run(() => window.voxcpmDesktop.setAutoCheckUpdate(event.target.checked))} /></label>
     <div className="settings-tool-grid" style={{ marginTop: 12 }}>
       <button type="button" className="ghost-button" disabled={busy || state?.status === "downloaded"} onClick={() => run(() => window.voxcpmDesktop.checkUpdate())}>检查更新</button>
       {(state?.status === "available" || (state?.status === "error" && state.canDownload)) &&
-        <button type="button" className="primary-button" disabled={busy} onClick={() => run(() => window.voxcpmDesktop.downloadUpdate())}>
-          下载更新{state.size ? `（${(state.size / 1024 / 1024).toFixed(1)} MB）` : ""}</button>}
-      {state?.status === "downloaded" && <button type="button" className="primary-button" onClick={() => run(() => window.voxcpmDesktop.installUpdate())}>启动独立更新器</button>}
+        <button type="button" className="primary-button" disabled={busy} onClick={() => run(() => window.voxcpmDesktop.installUpdate())}>现在更新</button>}
+      {state?.status === "downloaded" && <button type="button" className="primary-button" onClick={() => run(() => window.voxcpmDesktop.installUpdate())}>现在更新</button>}
     </div>
   </div>;
 }

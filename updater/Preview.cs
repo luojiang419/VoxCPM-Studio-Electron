@@ -53,6 +53,29 @@ namespace VoxStandaloneUpdater {
                 form.SetPreview("complete",100); close.PerformClick();
                 if(!form.IsDisposed) throw new Exception("完成后关闭按钮不可用");
             }
+            foreach(bool dark in new[] {false,true}) {
+                string folder=Path.Combine(output,"prompt-"+(dark?"dark":"light")); Directory.CreateDirectory(folder);
+                File.WriteAllText(Path.Combine(folder,"session.json"),new JavaScriptSerializer().Serialize(new { mode="prompt",version="2.0.2",releaseId="20261019000002",size=3151005,
+                    notes="新增更顺畅的更新体验。\r\n优化启动性能与助手设置，保留模型、配置与作品。", parentPid=System.Diagnostics.Process.GetCurrentProcess().Id }));
+                using(var form=new UpdateForm(folder,true,dark)) {
+                    form.ShowInTaskbar=false; form.Opacity=0; form.Show(); Application.DoEvents();
+                    var now=form.Controls.OfType<SoftButton>().Single(b=>b.AccessibleName=="现在更新");
+                    var later=form.Controls.OfType<SoftButton>().Single(b=>b.AccessibleName=="下次启动更新");
+                    if(!now.Enabled || !later.Enabled || File.Exists(Path.Combine(folder,"host-ready.json"))) throw new Exception("选择前不能启动更新事务");
+                    using(var bitmap=new Bitmap(form.ClientSize.Width,form.ClientSize.Height)) { form.DrawToBitmap(bitmap,form.ClientRectangle); bitmap.Save(Path.Combine(output,"prompt-"+(dark?"dark.png":"light.png")),ImageFormat.Png); }
+                    later.PerformClick();
+                    var choice=new JavaScriptSerializer().Deserialize<Dictionary<string,object>>(File.ReadAllText(Path.Combine(folder,"choice.json")));
+                    if(Convert.ToString(choice["action"])!="later" || !form.IsDisposed) throw new Exception("下次启动更新未正确关闭提示");
+                }
+                using(var form=new UpdateForm(folder,true,dark)) {
+                    form.ShowInTaskbar=false; form.Opacity=0; form.Show(); Application.DoEvents();
+                    form.Controls.OfType<SoftButton>().Single(b=>b.AccessibleName=="现在更新").PerformClick();
+                    var choice=new JavaScriptSerializer().Deserialize<Dictionary<string,object>>(File.ReadAllText(Path.Combine(folder,"choice.json")));
+                    if(Convert.ToString(choice["action"])!="now") throw new Exception("立即更新选择未保存");
+                    form.Close(); if(form.IsDisposed) throw new Exception("准备交接时不应提前关闭提示");
+                    form.SetPreview("complete",100); form.Close();
+                }
+            }
             Console.WriteLine("浅深主题、长文本、多尺寸与主题切换/关闭保护均通过");
         }
     }
