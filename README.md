@@ -1,6 +1,6 @@
 # JVOX Studio配音系统
 
-2026-10-19 正式发布 **JVOX Studio配音系统 2.0.3**，发布序号 `20261019103629`。原 VoxCPM Studio 正式更名，工作台、窗口、图标、安装器、快捷方式和卸载入口统一焕新；首次进入新版，第一屏直接显示更名庆祝页，点击后进入工作台，确认后不再重复提示。旧版可通过原有更新入口直接升级，保留模型、配置、音色、作品和功能选择。[下载 JVOX Studio配音系统安装器](https://modelscope.cn/api/v1/models/jiangjiang419/voxcpm-studio-updates/repo?Revision=master&FilePath=installers%2F2.0.3%2F20261019103629-1d02efcb80%2FJVOX-Studio-Installer.exe)（约 125.6 MiB），新用户安装和老用户检查修复使用同一文件。详见[分发基准包](./docs/分发基准包.md)及[安装修复一体化使用说明](./docs/安装修复一体化使用说明.md)。
+2026-10-19 正式发布 **JVOX Studio配音系统 2.0.4**，发布序号 `20261019110703`。新增[关闭窗口行为设置](./docs/退出行为说明.md)：首次关闭询问，选择关闭软件或后台运行后记住偏好，也可保留每次询问；弹窗统一深浅主题，后台可从系统托盘或再次运行软件恢复。设置→界面与工具可随时修改。旧版可通过原有更新入口直接升级，保留模型、配置、音色、作品和功能选择。[下载 JVOX Studio配音系统安装器](https://modelscope.cn/api/v1/models/jiangjiang419/voxcpm-studio-updates/repo?Revision=master&FilePath=installers%2F2.0.4%2F20261019110703-f6edd312cc%2FJVOX-Studio-Installer.exe)（约 125.7 MiB），新用户安装和老用户检查修复使用同一文件。详见[分发基准包](./docs/分发基准包.md)及[安装修复一体化使用说明](./docs/安装修复一体化使用说明.md)。
 
 ![品牌焕新庆祝弹窗](./docs/screenshots/jvox-rebrand.png)
 

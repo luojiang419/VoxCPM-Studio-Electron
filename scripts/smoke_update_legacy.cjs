@@ -24,7 +24,8 @@ let server;
     ...(promptFlow ? ['--prompt-flow','--main-install'] : ['--legacy-client']),
     ...(process.argv.includes('--lightweight') ? ['--lightweight'] : []),
     ...(process.argv.includes('--preserve-installed-identity') ? ['--preserve-installed-identity'] : []),
-    ...(process.argv.includes('--assert-native') ? ['--assert-native'] : []), '--manifest-url', base + '/latest'], { cwd: root, windowsHide: true, stdio: ['ignore', log, log] });
+    ...(process.argv.includes('--assert-native') ? ['--assert-native'] : []),
+    ...process.argv.filter(arg => arg.startsWith('--close-behavior=')), '--manifest-url', base + '/latest'], { cwd: root, windowsHide: true, stdio: ['ignore', log, log] });
   fs.closeSync(log);
   console.log((promptFlow ? '正在验证新版启动自动更新：' : '正在验证未修补旧版：') + baseline);
   await new Promise((resolve, reject) => { child.once('error', reject); child.once('exit', code => code === 0 ? resolve() : reject(new Error(`升级失败，退出 ${code}：${logfile}`))); });

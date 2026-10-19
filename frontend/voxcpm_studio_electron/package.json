@@ -1,6 +1,6 @@
 {
   "name": "voxcpm-studio-electron",
-  "version": "2.0.3",
+  "version": "2.0.4",
   "description": "JVOX Studio配音系统，本地配音、声音克隆、视频与音乐创作工作台。",
   "main": "main.js",
   "private": true,

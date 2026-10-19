@@ -103,6 +103,11 @@ __updateTestDialog.showMessageBox=(...args)=>['启动独立更新器','重启并
   fs.mkdirSync(path.dirname(sentinel), { recursive: true }); fs.writeFileSync(sentinel, "用户配置、音频和模型不得被升级覆盖");
   const componentProfile = process.argv.includes("--empty-components") ? { selected: [], removed: ["heartmula"], defaultModel: "ace-xl-turbo" } : null;
   if (componentProfile) fs.writeFileSync(path.join(testRoot, "data/component-selection.json"), JSON.stringify(componentProfile));
+  const closeBehavior = process.argv.find(arg => arg.startsWith("--close-behavior="))?.split("=")[1];
+  if (closeBehavior) {
+    assert.ok(["ask", "quit", "background"].includes(closeBehavior));
+    fs.writeFileSync(path.join(testRoot, "data/config/window-behavior.json"), JSON.stringify({ behavior: closeBehavior }));
+  }
   const dataHash = await digest(sentinel);
   const modelConfig = path.join(testRoot, fs.existsSync(path.join(testRoot, "models/config.json")) ? "models/config.json" : "models/openbmb__VoxCPM2/config.json");
   const modelHash = await digest(modelConfig);
@@ -229,6 +234,7 @@ __updateTestDialog.showMessageBox=(...args)=>['启动独立更新器','重启并
   if (!process.argv.includes("--legacy-client")) assert.equal(recheck.getState().lastResult?.status, "complete");
   assert.equal(await digest(sentinel), dataHash);
   assert.equal(await digest(modelConfig), modelHash);
+  if (closeBehavior) assert.equal(JSON.parse(fs.readFileSync(path.join(testRoot, "data/config/window-behavior.json"))).behavior, closeBehavior);
   const backendState = JSON.parse(fs.readFileSync(path.join(testRoot, "data/cache/electron_backend_state.json")));
   const health = await (await fetch(backendState.serviceUrl + "/api/health")).json();
   if (lightweight) {
@@ -248,6 +254,7 @@ __updateTestDialog.showMessageBox=(...args)=>['启动独立更新器','重启并
     installedReleaseId: installedConfig.releaseId, recheckStatus: recheck.state.status, signedUpdaterBootstrap: process.argv.includes("--fixed-client"),
     legacyClient: process.argv.includes("--legacy-client"),
     startupPromptFlow: promptFlow,
+    ...(closeBehavior ? { closeBehaviorPreserved: closeBehavior } : {}),
     nativeFailurePreservedMain,
     ...(standalone ? { standalone, previousAppDirectoryUnavailable: true } : {}),
     userDataPreserved: true, modelPreserved: true, restartedBackend: backendState.serviceUrl, health,
