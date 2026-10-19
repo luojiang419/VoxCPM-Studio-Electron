@@ -2,11 +2,11 @@
 
 [CODEX_LONG_TASK_CONTINUE_V3]
 
-状态：用户已要求逐步执行全软件更名、安装器重编译及魔搭发布；本地更名与兼容迁移、签名包、安装器、全部实机验收已完成，正在发布魔搭。
-下一步：魔搭上传与匿名回读，激活入口后验证真实公网升级和新旧客户端状态。
-TODO：魔搭发布与公网升级验收；最终记录与Git提交。
-最近验证：TypeScript 类型检查、Vite 生产构建、15 项真实 Electron 交互检查通过；窗口标题追加修改已通过 JS 语法、生产构建及真实 Electron 主窗口/页面/回退页标题验证。
-Branch：feat/jvox-studio-rebrand，基于 15ba88a。
+状态：全部完成。JVOX Studio配音系统 2.0.3 / 20261019101750 已正式发布并激活魔搭入口，安装器基准已冻结。
+下一步：新用户分发基准安装器；老用户在软件内检查更新即可升级并查看更名庆祝弹窗。
+TODO：无。
+最近验证：111项源码/签名ZIP/桌面包/实装一致；安装/检查/损坏修复/复检、旧版与新版流程本地及真实公网升级、弹窗跨进程重启持久化、公网新旧客户端状态与下载入口均通过。
+Branch/Commit：feat/jvox-studio-rebrand；实现 eb433e1，最终发布记录与本条一同提交。
 阻塞：无；已授权正式更名、重编译与魔搭发布。必要源码备份 ../backup/v075_20261019_jvox_rebrand_source.zip。
 
 统一产品名称：`JVOX Studio配音系统`。旧模型标识、数据目录、签名公钥、协议与旧安装识别需要保留兼容，不能机械替换底层 VoxCPM 模型名称和路径。保护两份用户已有便携说明修改；今日 GitHub 检查已完成，按约定只本地提交。
@@ -19,13 +19,13 @@ Branch：feat/jvox-studio-rebrand，基于 15ba88a。
 - `BrandAnnouncementPreview.tsx` 与对应 CSS：独立交互查阅页；更新按钮明确显示演示反馈，不调用正式服务。`main.tsx` 的 `?preview=jvox-announcement` 可打开，默认软件入口不变。
 - `scripts/preview_jvox_announcement.cjs`：使用现有 Electron 运行实际生产构建，隔离 userData、不加载后端或更新服务。重开命令（仓库目录）：`frontend\voxcpm_studio_electron\node_modules\electron\dist\electron.exe scripts\preview_jvox_announcement.cjs`。构建缺失时先在前端目录执行 `npm run build`。
 - 验证记录：`builds/jvox-announcement-preview/report.json`；截图 `light.png`、`dark.png`、`compact.png`。15 项覆盖模态、新名称/标题、默认焦点、桌面宽度、Tab、深色、Escape、重新打开、更新演示、延期、关闭、小窗口滚动、减弱动效、运行时异常。
-- 已完成设计预览与下述主窗口标题修改；其余正式名称、安装文件名、协议、正式版本、签名包、魔搭入口尚未修改，也未重新编译安装器。正式接入需与现有 C# 原生更新选择及 UpdateService 保持一致，不能将预览反馈冒充实际更新。
+- 预览阶段已结束；正式接入、重编译与魔搭发布完成，详见后文。独立安装与验签流程保持兼容。
 
 ## 查阅反馈：移除窗口标题 Electron 字样
 
 - 主窗口 `main.js` 的 BrowserWindow 标题、异常回退页面标题和标题正文，以及 `index.html` 的页面标题均统一为 `JVOX Studio配音系统`，防止页面加载后恢复旧标题。
 - `node --check` 与 Vite 构建通过。隔离 Electron 调用当前源码中的真实 `createWindow` 与 `loadFallbackHtml`，实际主窗口、页面、回退页标题均为新名称；记录 `builds/jvox-title-validation/report.json`。该标题检查未启动后端与 IPC 服务，因此其中缺少 IPC handler 的日志属于隔离夹具，不代表完整工作台启动验收。
-- 本次修改尚未进入安装包或魔搭发布，已安装的旧客户端需要后续打包更新才能生效。
+- 此项已进入当前 2.0.3 安装包与魔搭更新，旧客户端升级后生效。
 
 ## 正式更名与本地验收
 
@@ -38,3 +38,14 @@ Branch：feat/jvox-studio-rebrand，基于 15ba88a。
 - 正式工作台弹窗/侧栏/窗口标题、深浅主题、延期后再提醒、确认后不重复与主题持久化：`builds/jvox-brand-validation/1792405308382/report.json`。未进行模型生成推理。
 - 基准包 `builds/正式分发/基准包-2.0.3-20261019101750/`；安装器构建 ff0f78a9e7，131,751,424 字节，SHA256 `4d424cef061e1bee0b4baf8048872d476b5c30e977658f852bb826d22f10ad2a`。源码/签名ZIP/桌面包/实际安装111项一致。
 - 发现中文 package.json 在 GBK 默认读取时报错，构建读取显式 UTF-8 后通过。卸载前先删 EXE 会使动态入口解析回退旧名，已改为分别比较新旧固定路径，26项原生检查通过。旧升级冒烟原先只认旧按钮文案、UI重载夹具早于React主题生效的竞态均已按实际界面修正；未跳过实际更新步骤。
+
+## 正式发布及公网验收
+
+- 2026-10-19 北京时间 18:25:33 激活魔搭 `public/latest.json` 与新品牌 README。先上传不可变路径的安装器并匿名完整回读，再上传应用ZIP并匿名完整回读，最后切换最新入口。没有覆盖历史包或重传大型模型/运行时。
+- 不可变安装器路径：`installers/2.0.3/20261019101750-ff0f78a9e7/JVOX-Studio-Installer.exe`。应用包 `releases/2.0.3/20261019101750/JVOX-Studio-2.0.3.zip`，3,196,553 字节，SHA256 `133adf1d175b8e017d9a5f99430aebc07a9d731a43da2d201fe0c187b724dbeb`。签名公钥未变。
+- 公网未修改2.0.2客户端实际下载、验签、独立安装、移开旧前端后继续、重启API、再次current通过：`builds/update-smoke-1792405554689/smoke-result.json`。
+- 公网新流程一次选择后自动下载/安装/重启通过：`builds/update-smoke-1792405617362/smoke-result.json`。原生更新器由实际主进程启动，整个旧前端目录移开后仍独立完成；模型、作品、配置及主动移除HeartMuLa选择保持。该新流程夹具使用当前2.0.3代码并将安装版本标记置为2.0.2以触发升级，目标为真实公开签名包，不冒充历史已发布客户端。
+- `public-client-check.json` 核对旧2.0.2 available、新2.0.3 current，均真实验签；README标题、新安装器路径及SHA256一致。安装器与应用ZIP匿名完整回读证据分别是 `repairer-publication.json`、`publication.json`。
+- 正式UI补充验证实际关闭主进程并重新启动后确认不重复公告：`builds/jvox-brand-validation/1792405524449/report.json`。
+- 最终证据汇总 `builds/updates/2.0.3-20261019101750/release-final-report.json`；基准目录补齐下载地址、发布记录、公网验收与最终验收记录。所有升级/安装测试均只操作隔离副本，隔离进程已关闭；未停止或更新用户现有D盘安装，未进行模型生成推理。
+- 今日 GitHub 同步检查已完成，按用户偏好仅本地提交，不自动推送。用户两份便携说明修改保持原样。
