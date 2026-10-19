@@ -56,7 +56,7 @@ async function stop() {
   }
   fs.copyFileSync(path.join(electron,'electron.exe'),path.join(run,'VoxCPM Studio.exe'));
   fs.writeFileSync(path.join(run,'runtime_manifest.json'),'{"protocol":1}');
-  const files=['main.js','preload.js','package.json','runtime-service.js','runtime-config.json','runtime-requirements.txt','component-service.js','music-config.json','update-service.js','update-window.js','update-config.json','updater.py','standalone-updater.exe','install-protocol.js','app.ico','app-icon.png'];
+  const files=['main.js','window-behavior.js','preload.js','package.json','runtime-service.js','runtime-config.json','runtime-requirements.txt','component-service.js','music-config.json','update-service.js','update-window.js','update-config.json','updater.py','standalone-updater.exe','install-protocol.js','app.ico','app-icon.png'];
   for(const file of files)fs.copyFileSync(path.join(frontend,file),path.join(shell,file));
   fs.cpSync(path.join(frontend,'dist'),path.join(shell,'dist'),{recursive:true});
   // 实际 API，测试不依赖模型或独立Python的公网下载。

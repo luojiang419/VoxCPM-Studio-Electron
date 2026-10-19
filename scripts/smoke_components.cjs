@@ -23,7 +23,7 @@ async function screenshot(name) {
     fs.cpSync(path.join(bundle, entry), path.join(root, entry), { recursive: true });
   }
   const appDir = path.join(root, 'resources/app');
-  for (const name of ['main.js','preload.js','component-service.js','install-protocol.js','music-config.json','runtime-service.js','updater.py']) fs.copyFileSync(path.join(sourceShell,name),path.join(appDir,name));
+  for (const name of ['main.js','window-behavior.js','preload.js','component-service.js','install-protocol.js','music-config.json','runtime-service.js','updater.py']) fs.copyFileSync(path.join(sourceShell,name),path.join(appDir,name));
   fs.cpSync(path.join(sourceShell,'dist'),path.join(appDir,'dist'),{recursive:true});
   for (const name of ['music_worker.py','music_install.py']) fs.copyFileSync(path.join(repo,'backend/voxcpm',name),path.join(root,'app/src/voxcpm',name));
   const python = path.join(root, 'runtime/python'); fs.mkdirSync(python,{recursive:true});

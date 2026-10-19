@@ -1,6 +1,11 @@
 const { contextBridge, ipcRenderer } = require("electron");
 
 contextBridge.exposeInMainWorld("voxcpmDesktop", {
+  getWindowBehavior: () => ipcRenderer.invoke("window:behavior"),
+  setWindowBehavior: (behavior) => ipcRenderer.invoke("window:set-behavior", behavior),
+  requestWindowClose: () => ipcRenderer.invoke("window:request-close"),
+  resolveWindowClose: (options) => ipcRenderer.invoke("window:resolve-close", options),
+  cancelWindowClose: () => ipcRenderer.invoke("window:cancel-close"),
   rendererReady: () => ipcRenderer.invoke("runtime:renderer-ready"),
   getUpdateState: () => ipcRenderer.invoke("update:state"),
   checkUpdate: () => ipcRenderer.invoke("update:check"),

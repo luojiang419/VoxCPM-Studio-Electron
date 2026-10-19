@@ -45,6 +45,7 @@
       "standalone-updater.exe",
       "updater-runtime-config.json",
       "runtime-service.js",
+      "window-behavior.js",
       "runtime-config.json",
       "runtime-requirements.txt",
       "install-protocol.js",

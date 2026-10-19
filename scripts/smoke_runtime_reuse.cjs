@@ -42,7 +42,7 @@ async function launch(number) {
   fs.mkdirSync(path.join(fixture, 'app/src'), { recursive: true });
   for (const file of ['desktop_api.py', 'app.py', 'pyproject.toml']) fs.copyFileSync(path.resolve(root, '..', file), path.join(fixture, 'app', file));
   for (const folder of ['src/voxcpm', 'assets', 'conf']) fs.cpSync(path.resolve(root, '..', folder), path.join(fixture, 'app', folder), { recursive: true, filter: name => !name.endsWith('__pycache__') && !name.endsWith('.pyc') });
-  for (const file of ['main.js', 'preload.js', 'package.json', 'update-service.js', 'update-window.js', 'update-config.json', 'updater.py', 'runtime-service.js', 'runtime-config.json', 'runtime-requirements.txt', 'component-service.js', 'music-config.json', 'install-protocol.js', 'app.ico', 'app-icon.png']) fs.copyFileSync(path.join(frontend, file), path.join(shell, file));
+  for (const file of ['main.js', 'window-behavior.js', 'preload.js', 'package.json', 'update-service.js', 'update-window.js', 'update-config.json', 'updater.py', 'runtime-service.js', 'runtime-config.json', 'runtime-requirements.txt', 'component-service.js', 'music-config.json', 'install-protocol.js', 'app.ico', 'app-icon.png']) fs.copyFileSync(path.join(frontend, file), path.join(shell, file));
   fs.cpSync(path.join(root, 'backend/voxcpm'), path.join(fixture, 'app/src/voxcpm'), { recursive: true });
   fs.mkdirSync(path.join(data, 'config'), { recursive: true });
   fs.writeFileSync(path.join(data, 'component-selection.json'), JSON.stringify({ selected: [], removed: [], defaultModel: 'ace-xl-turbo' }));

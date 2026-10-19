@@ -6,6 +6,7 @@ const { UpdateService, atomicJson } = require("./update-service");
 const { RuntimeService, resolveManagedPython } = require("./runtime-service");
 const { installationSession } = require("./install-protocol");
 const { ComponentService } = require("./component-service");
+const { WindowBehavior } = require("./window-behavior");
 const fs = require("fs");
 const http = require("http");
 const net = require("net");
@@ -40,6 +41,7 @@ let currentThemeSource = "dark";
 let updateService = null;
 let runtimeService = null;
 let componentService = null;
+let windowBehavior = null;
 let componentReceipt = null;
 let updatePreparationHeartbeat = null;
 let installSession = null;
@@ -386,6 +388,8 @@ function createWindow() {
   mainWindow.once("ready-to-show", () => {
     if (!preparingInstallation && mainWindow && !mainWindow.isDestroyed()) mainWindow.show();
   });
+
+  windowBehavior.attach(mainWindow);
 
   const distIndex = path.join(__dirname, "dist", "index.html");
   if (fs.existsSync(distIndex)) {
@@ -955,6 +959,8 @@ app.whenReady().then(async () => {
   }
   nativeTheme.themeSource = currentThemeSource;
   setBootstrapState({});
+  windowBehavior = new WindowBehavior({ dataRoot: resolveDataRoot(), icon: path.join(__dirname, "app.ico"), onEvent: sendRuntimeEvent });
+  windowBehavior.registerIpc();
   createWindow();
   previousCpuSample = null;
 
@@ -1006,7 +1012,8 @@ app.on("window-all-closed", () => {
 });
 
 app.on("activate", () => {
-  if (BrowserWindow.getAllWindows().length === 0) {
+  if (mainWindow && !mainWindow.isDestroyed()) windowBehavior?.restore();
+  else if (windowBehavior) {
     createWindow();
   }
 });

@@ -10,6 +10,8 @@ import ComponentManager from "./ComponentManager";
 import MusicStudio from "./MusicStudio";
 import AssistantSettings from "./AssistantSettings";
 import SettingsLayout from "./SettingsLayout";
+import WindowCloseManager from "./WindowCloseManager";
+import WindowBehaviorSettings from "./WindowBehaviorSettings";
 import brandIcon from "../app-icon.png";
 import type { GenerationConfig, StudioVoice } from "./production-types";
 
@@ -551,6 +553,7 @@ function App() {
       setThemeMode((current) => current || state.themeSource || "dark");
     });
     const unsubscribe = window.voxcpmDesktop.onRuntimeEvent((payload) => {
+      if (payload.windowBehavior) return;
       if (payload.type === "runtime-preparation") return;
       if (payload.type === "update-state") {
         const update = payload.update;
@@ -1050,6 +1053,7 @@ function App() {
 
   return (
     <>
+      <WindowCloseManager />
       {brandAnnouncementOpen && <div className="jvox-entry-screen">
         <span className="jvox-entry-wordmark" aria-hidden="true">JVOX Studio配音系统</span>
         <BrandAnnouncementDialog welcome
@@ -1742,6 +1746,7 @@ function App() {
                     </button>
                   </div>
                 </div>
+                <WindowBehaviorSettings />
               </section>
               } updates={<UpdatePanel focusRequest={updateFocusRequest} />} />
           ) : null}

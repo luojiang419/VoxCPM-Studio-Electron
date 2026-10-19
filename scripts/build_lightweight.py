@@ -12,7 +12,7 @@ import zipfile
 ROOT = Path(__file__).resolve().parents[1]
 PROJECT = ROOT.parent
 FRONTEND = ROOT / "frontend/voxcpm_studio_electron"
-RUNTIME_FILES = ("runtime-service.js", "runtime-config.json", "runtime-requirements.txt", "install-protocol.js", "component-service.js", "music-config.json")
+RUNTIME_FILES = ("runtime-service.js", "window-behavior.js", "runtime-config.json", "runtime-requirements.txt", "install-protocol.js", "component-service.js", "music-config.json")
 SHELL_FILES = ("main.js", "preload.js", "package.json", "update-service.js", "update-window.js", "update-config.json", "updater.py", "standalone-updater.exe", "brand-uninstaller.exe", "updater-runtime-config.json", *RUNTIME_FILES)
 
 

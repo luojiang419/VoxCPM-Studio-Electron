@@ -72,7 +72,7 @@ async function cdp(port) {
   const appDir = path.join(testRoot, "resources/app");
   if (process.argv.includes("--fixed-client")) {
     const source = path.join(root, "frontend/voxcpm_studio_electron");
-    for (const file of ["main.js", "update-service.js", "update-window.js"]) fs.copyFileSync(path.join(source, file), path.join(appDir, file));
+    for (const file of ["main.js", "window-behavior.js", "update-service.js", "update-window.js"]) fs.copyFileSync(path.join(source, file), path.join(appDir, file));
     fs.cpSync(path.join(source, "dist"), path.join(appDir, "dist"), { recursive: true });
     // 故意破坏旧脚本，验证首次下载使用签名新版，不能沿用本机旧脚本。
     fs.writeFileSync(path.join(appDir, "updater.py"), "raise RuntimeError('旧更新器不应执行')\n");

@@ -50,7 +50,7 @@ def keys():
 def sources():
     for name in ("main.js", "preload.js", "package.json", "update-service.js", "update-window.js", "update-config.json", "updater.py",
                  "standalone-updater.exe", "brand-uninstaller.exe", "updater-runtime-config.json",
-                 "runtime-service.js", "runtime-config.json", "runtime-requirements.txt", "install-protocol.js", "component-service.js", "music-config.json", "app.ico", "app-icon.png"):
+                 "runtime-service.js", "window-behavior.js", "runtime-config.json", "runtime-requirements.txt", "install-protocol.js", "component-service.js", "music-config.json", "app.ico", "app-icon.png"):
         yield FRONTEND / name, "resources/app/" + name
     for file in sorted((FRONTEND / "dist").rglob("*")):
         if file.is_file():

@@ -55,7 +55,7 @@ async function launch(autoCheck) {
   fs.writeFileSync(path.join(data, 'component-selection.json'), JSON.stringify({ selected: [], removed: ['heartmula'], defaultModel: 'ace-xl-turbo' }));
   fs.writeFileSync(mailbox, '[]');
   fs.symlinkSync(path.join(preview, 'models'), path.join(run, 'models'), 'junction');
-  for (const file of ['main.js', 'preload.js', 'package.json', 'runtime-service.js', 'runtime-config.json', 'runtime-requirements.txt', 'component-service.js', 'music-config.json', 'update-service.js', 'update-window.js', 'update-config.json', 'updater.py', 'install-protocol.js', 'app.ico', 'app-icon.png']) fs.copyFileSync(path.join(frontend, file), path.join(shell, file));
+  for (const file of ['main.js', 'window-behavior.js', 'preload.js', 'package.json', 'runtime-service.js', 'runtime-config.json', 'runtime-requirements.txt', 'component-service.js', 'music-config.json', 'update-service.js', 'update-window.js', 'update-config.json', 'updater.py', 'install-protocol.js', 'app.ico', 'app-icon.png']) fs.copyFileSync(path.join(frontend, file), path.join(shell, file));
   fs.cpSync(path.join(frontend, 'dist'), path.join(shell, 'dist'), { recursive: true });
   const envelope = fs.readFileSync(path.join(root, 'builds/updates/2.0.2-20261018125140/envelope.json'));
   server = http.createServer((req, res) => { requests.push({ at: Date.now(), failing }); res.writeHead(failing ? 503 : 200, { 'Content-Type': 'application/json' }); res.end(failing ? '{}' : envelope); });

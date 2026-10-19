@@ -40,7 +40,7 @@ let child, client;
   const state = await client.evaluate('window.voxcpmDesktop.getBootstrapState()');
   assert.equal((await (await fetch(state.backendBaseUrl + '/api/runtime/summary')).json()).runtime_pending, true);
   const version = JSON.parse(fs.readFileSync(path.join(installed, 'resources/app/package.json'))).version;
-  await client.evaluate('setTimeout(()=>window.close(),100)'); client.close(); client = null;
+  await client.evaluate('Promise.resolve(window.voxcpmDesktop.setWindowBehavior?.("quit")).then(()=>setTimeout(()=>window.close(),100))'); client.close(); client = null;
   await until(() => child.exitCode !== null);
   child = spawn(path.join(installed, 'JVOX Studio配音系统.exe'), ['--voxcpm-run', '--remote-debugging-port=19441'], { cwd: installed, env, windowsHide: true, stdio: 'ignore' });
   client = await connect(19441); await ready();
@@ -50,7 +50,7 @@ let child, client;
     firstReadyWelcome: true, postInstallButton: true, bothThemes: true, deferRemindsNextLoad: true, acknowledgedDoesNotRepeat: true, acknowledgedDoesNotRepeatAfterProcessRestart: true, previousThemeKeyPreserved: true, noModelInference: true };
   fs.writeFileSync(path.join(out, 'report.json'), JSON.stringify(report, null, 2));
   console.log('PASS 真实工作台、更名弹窗及确认持久化：' + out);
-  await client.evaluate('setTimeout(()=>window.close(),100)'); client.close(); client = null;
+  await client.evaluate('Promise.resolve(window.voxcpmDesktop.setWindowBehavior?.("quit")).then(()=>setTimeout(()=>window.close(),100))'); client.close(); client = null;
   await until(() => child.exitCode !== null);
 })().catch(e => { console.error(e); process.exitCode = 1; }).finally(() => {
   client?.close(); if (child && !child.killed) spawnSync('taskkill', ['/PID', String(child.pid), '/T', '/F'], { windowsHide: true, stdio: 'ignore' });

@@ -15,6 +15,7 @@ let child, client;
   fs.mkdirSync(path.join(installed, 'data'), { recursive: true });
   fs.writeFileSync(path.join(installed, 'data/component-selection.json'), JSON.stringify({ selected: [], removed: [], defaultModel: 'ace-xl-turbo' }));
   const appDir = path.join(installed, 'resources/app');
+  for (const name of ['preload.js', 'window-behavior.js']) fs.copyFileSync(path.join(frontend, name), path.join(appDir, name));
   fs.cpSync(path.join(frontend, 'dist'), path.join(appDir, 'dist'), { recursive: true });
   let source = fs.readFileSync(path.join(frontend, 'main.js'), 'utf8').replaceAll('\r\n', '\n');
   const point = '  try {\n    await startBackend();'; assert.ok(source.includes(point));
@@ -32,7 +33,7 @@ let child, client;
   function launch() { return spawn(path.join(installed, 'JVOX Studio配音系统.exe'), ['--voxcpm-run','--remote-debugging-port=19443'], { cwd: installed, env, windowsHide: true, stdio: 'ignore' }); }
   async function shot(name) { const s=await client.send('Page.captureScreenshot',{format:'png'});fs.writeFileSync(path.join(run,name+'.png'),Buffer.from(s.data,'base64')); }
   async function click(selector) { await client.evaluate(`document.querySelector(${JSON.stringify(selector)}).click()`); }
-  async function close() { await client.evaluate('setTimeout(()=>window.close(),100)');client.close();client=null;await until(()=>child.exitCode!==null); }
+  async function close() { await client.evaluate('window.voxcpmDesktop.setWindowBehavior("quit").then(()=>setTimeout(()=>window.close(),100))');client.close();client=null;await until(()=>child.exitCode!==null); }
   child = launch(); client = await connect(19443);
   await until(()=>fs.existsSync(frame));
   const firstFrame=JSON.parse(fs.readFileSync(frame));assert.deepEqual(firstFrame,{welcome:true,workspaceHidden:true,entry:true});

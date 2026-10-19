@@ -3,6 +3,11 @@
 declare global {
   interface Window {
     voxcpmDesktop: {
+      getWindowBehavior: () => Promise<import("./window-behavior-types").WindowBehaviorState>;
+      setWindowBehavior: (behavior: import("./window-behavior-types").CloseBehavior) => Promise<import("./window-behavior-types").WindowBehaviorState>;
+      requestWindowClose: () => Promise<boolean>;
+      resolveWindowClose: (options: { behavior: import("./window-behavior-types").CloseBehavior; action: import("./window-behavior-types").CloseAction }) => Promise<import("./window-behavior-types").WindowBehaviorState>;
+      cancelWindowClose: () => Promise<import("./window-behavior-types").WindowBehaviorState>;
       rendererReady: () => Promise<boolean>;
       getUpdateState: () => Promise<any>;
       checkUpdate: () => Promise<any>;
