@@ -165,7 +165,25 @@ def publish(output):
         "已有旧版首次接入请参阅源码仓库 docs/自动更新说明.md。\n", "utf-8")
     repairer_report = output / "repairer-publication.json"
     repair_report = output / "repair-publication.json"
-    if repairer_report.exists():
+    unified_report = read_json(repairer_report) if repairer_report.exists() else {}
+    if unified_report.get("unified"):
+        repair = unified_report
+        if repair.get("releaseId") != manifest.get("releaseId") or not repair.get("anonymousVerification"):
+            raise ValueError("一体版发布记录与本次更新不一致")
+        with (activation / "README.md").open("a", encoding="utf-8") as stream:
+            stream.write(
+                f"\n## 当前正式更新\n\n版本：{manifest['version']}，发布序号：{manifest['releaseId']}。\n\n"
+                f"{manifest['notes']}\n\n"
+                "已安装用户可在软件内检查更新，下载后由独立更新器完成安装并自动重启。\n\n"
+                f"## 安装、检查与修复\n\n[下载 VoxCPM 安装修复一体版 EXE]({repair['repairUrl']})"
+                f"（约 {repair['size'] / 1024 ** 2:.1f} MB），新老用户使用同一个文件。\n\n"
+                "1. 首次运行选择独立安装目录和功能，自动补齐运行依赖及模型，无需预先安装 Python。\n"
+                "2. 已安装时自动识别原目录并检查；正常提示“一切正常，无需再次安装，开始创作吧”，保留运行中的工作台。\n"
+                "3. 发现损坏后显示修复进度，使用可信签名包恢复并再次检查；完成后可开始创作。\n\n"
+                "运行前请保存任务。只有需要修复才关闭本目录工作台和后台进程，残留进程可能被强制结束；保留已保存作品、模型、配置、密钥和功能选择。"
+                "首次依赖/模型下载及获取更新修复资源需要联网，禁止降级已安装的新版。失败时保留日志，不要删除原目录或更新备份。\n\n"
+                f"EXE SHA256：`{repair['sha256']}`。\n")
+    elif repairer_report.exists():
         repair = read_json(repairer_report)
         if repair.get("releaseId") != manifest.get("releaseId") or not repair.get("anonymousVerification"):
             raise ValueError("单文件修复器发布记录与本次更新不一致")

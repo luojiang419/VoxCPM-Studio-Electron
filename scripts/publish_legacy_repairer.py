@@ -1,4 +1,4 @@
-"""发布可转发的单文件老用户修复器，匿名回读后按需激活最新签名应用。"""
+"""发布单文件修复器或安装修复一体版，匿名回读后按需激活签名应用。"""
 from __future__ import annotations
 
 import argparse
@@ -26,10 +26,17 @@ def publish_repairer(snapshot: Path, executable: Path, activate=False):
         raise ValueError("修复器与构建记录不一致")
     if (version(manifest["version"]), manifest["releaseId"]) < (version(built["version"]), built["releaseId"]):
         raise ValueError("激活快照不能早于修复器内置签名版本")
+    unified = built.get("unified", False)
+    if unified:
+        validation = read_json(Path(built["validationReport"]))
+        if (not built.get("validationPassed") or not validation.get("passed")
+                or Path(validation["build"]).resolve() != (executable.parent / "构建记录.json").resolve()):
+            raise ValueError("一体版缺少对应最终构建的验收记录")
     from modelscope.hub.api import HubApi
     api = HubApi()
     repo = config["repository"]
-    remote = f"repairers/{built['version']}/{built['releaseId']}-{built['buildId']}/VoxCPM-Update-Repairer.exe"
+    remote = (f"installers/{built['version']}/{built['releaseId']}-{built['buildId']}/VoxCPM-Installer.exe" if unified else
+              f"repairers/{built['version']}/{built['releaseId']}-{built['buildId']}/VoxCPM-Update-Repairer.exe")
     url = file_url(repo, remote)
     existing = {item["Path"] for item in api.get_model_files(repo, recursive=True) if item["Type"] == "blob"}
     if remote in existing:
@@ -44,7 +51,7 @@ def publish_repairer(snapshot: Path, executable: Path, activate=False):
     report = {"version": manifest["version"], "releaseId": manifest["releaseId"], "embeddedReleaseId": built["releaseId"],
               "buildId": built["buildId"], "repository": repo, "repairUrl": url, "remotePath": remote,
               "size": len(downloaded), "sha256": built["sha256"], "anonymousVerification": True, "executable": str(executable),
-              "autoTerminateOwnedProcesses": built.get("autoTerminateOwnedProcesses", False)}
+              "autoTerminateOwnedProcesses": built.get("autoTerminateOwnedProcesses", False), "unified": unified}
     write_json(snapshot / "repairer-publication.json", report)
     write_json(executable.parent / "发布记录.json", report)
     print(json.dumps(report, ensure_ascii=False, indent=2))
