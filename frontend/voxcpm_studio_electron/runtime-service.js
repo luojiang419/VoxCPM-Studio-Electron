@@ -124,9 +124,12 @@ function offlinePipArgs(config, profile, cache, requirements) {
 }
 
 const PROBE = String.raw`
-import json, os, sys, locale
+import json, os, sys, locale, importlib
+def progress(message):
+    print('VOXCPM_PROBE ' + json.dumps(message, ensure_ascii=False), flush=True)
 if os.name == 'nt':
     locale.setlocale(locale.LC_CTYPE, '.UTF8')
+progress('加载 PyTorch 与音频运行库')
 import torch, torchaudio
 expected = sys.argv[1]
 if expected not in ('existing', 'existing-gpu'):
@@ -134,6 +137,7 @@ if expected not in ('existing', 'existing-gpu'):
     assert torch.__version__.split('+')[0] == version, 'PyTorch 版本不匹配'
     assert ('cpu' if torch.version.cuda is None else 'cu'+torch.version.cuda.replace('.', '')) == expected, 'CUDA 构建不匹配'
 if expected != 'cpu' and (expected != 'existing' or torch.cuda.is_available()):
+    progress('验证 CUDA、矩阵运算与注意力算子')
     assert torch.cuda.is_available(), 'CUDA 不可用，请更新显卡驱动'
     cap = torch.cuda.get_device_capability(0)
     if cap[0] >= 10:
@@ -144,8 +148,17 @@ if expected != 'cpu' and (expected != 'existing' or torch.cuda.is_available()):
     z = torch.nn.functional.scaled_dot_product_attention(x[None,None], x[None,None], x[None,None])
     torch.cuda.synchronize()
     assert y[0,0].item() == 32 and torch.isfinite(z).all().item(), 'GPU 运算校验失败'
-import gradio, numpy, soundfile, yaml, funasr, modelscope, transformers, librosa
-import fastapi, uvicorn, safetensors, datasets, wetext, inflect, einops, addict
+for name, label in [('gradio', '音频界面组件'), ('numpy', '数值计算组件'),
+                    ('soundfile', '音频读写组件'), ('yaml', '配置组件'),
+                    ('funasr', '语音识别框架'), ('modelscope', '模型管理组件'),
+                    ('transformers', '语音模型框架'), ('librosa', '音频分析组件'),
+                    ('fastapi', '本地服务组件'), ('uvicorn', '服务运行组件'),
+                    ('safetensors', '权重读取组件'), ('datasets', '数据组件'),
+                    ('wetext', '文本处理规则（首次加载较慢）'), ('inflect', '文本转换组件'),
+                    ('einops', '张量组件'), ('addict', '配置字典组件')]:
+    progress('加载' + label)
+    importlib.import_module(name)
+progress('核对 FFmpeg 与依赖版本')
 if expected not in ('existing', 'existing-gpu'):
     import imageio_ffmpeg
     assert os.path.isfile(imageio_ffmpeg.get_ffmpeg_exe()), 'FFmpeg 缺失'
@@ -303,13 +316,25 @@ class RuntimeService {
       const child = spawn(command, args, { windowsHide: true, cwd: this.appRoot, env: this.env || process.env, stdio: ["ignore", "pipe", "pipe"], ...options });
       let output = "", settled = false;
       const decoders = [new StringDecoder("utf8"), new StringDecoder("utf8")];
-      const collect = (text) => { output = (output + text).slice(-30000); if (!options.quiet) this.log(text); };
-      [child.stdout, child.stderr].forEach((stream, i) => stream.on("data", (b) => collect(decoders[i].write(b))));
+      const lines = ["", ""];
+      const collect = (text, index) => {
+        output = (output + text).slice(-30000);
+        if (!options.quiet) this.log(text);
+        if (options.onLine) {
+          const parts = (lines[index] + text).split(/\r?\n/);
+          lines[index] = parts.pop().slice(-30000);
+          for (const line of parts) options.onLine(line);
+        }
+      };
+      [child.stdout, child.stderr].forEach((stream, i) => stream.on("data", (b) => collect(decoders[i].write(b), i)));
       const stop = () => {
         if (process.platform === "win32" && child.pid) spawn("taskkill.exe", ["/PID", String(child.pid), "/T", "/F"], { windowsHide: true });
         else child.kill();
       };
-      const timer = setTimeout(() => { stop(); finish(new Error("运行环境检查超时，请查看补齐日志")); }, options.timeout || 30 * 60 * 1000);
+      const timer = setTimeout(() => {
+        stop();
+        finish(Object.assign(new Error("运行环境检查超时，请查看补齐日志"), { code: "RUNTIME_PROCESS_TIMEOUT" }));
+      }, options.timeout || 30 * 60 * 1000);
       const abort = () => { stop(); };
       this.controller.signal.addEventListener("abort", abort, { once: true });
       const finish = (error) => {
@@ -319,10 +344,36 @@ class RuntimeService {
       };
       child.on("error", finish);
       child.on("close", (code) => {
-        decoders.forEach((d) => collect(d.end()));
+        decoders.forEach((d, i) => { collect(d.end(), i); if (lines[i]) options.onLine?.(lines[i]); });
         finish(this.controller.signal.aborted ? this.controller.signal.reason : code === 0 ? null : new Error(`命令退出 ${code}：${output.slice(-5000)}`));
       });
     });
+  }
+  async probe(python, profile, requirements, timeout) {
+    const started = Date.now();
+    let stage = "加载音频运行库";
+    const update = () => this.check({ phase: "verify", name: "", size: 0, modelName: "", modelState: "",
+      message: `音频自检：${stage} · 已用时 ${Math.floor((Date.now() - started) / 1000)} 秒` });
+    update();
+    const timer = setInterval(update, 1000);
+    try {
+      return await this.run(python, ["-u", "-c", PROBE, profile, ...(requirements ? [requirements] : [])], {
+        quiet: true, timeout, env: { ...this.env, PYTHONPATH: path.join(this.appRoot, "src"), GRADIO_ANALYTICS_ENABLED: "False" },
+        onLine: line => {
+          this.log(line + "\n");
+          if (!line.startsWith("VOXCPM_PROBE ")) return;
+          try {
+            const value = JSON.parse(line.slice("VOXCPM_PROBE ".length));
+            if (typeof value === "string" && value.length < 200) { stage = value; update(); }
+          } catch { /* 第三方输出不影响自检。 */ }
+        }
+      });
+    } catch (error) {
+      if (error.code === "RUNTIME_PROCESS_TIMEOUT") {
+        error.message = `音频自检超时（${stage}）。已保留依赖和模型，请关闭其他高负载任务后重试；不会因超时重新安装依赖。`;
+      }
+      throw error;
+    } finally { clearInterval(timer); }
   }
   async detect() {
     let output;
@@ -361,7 +412,7 @@ class RuntimeService {
     await fsp.mkdir(path.dirname(this.logPath), { recursive: true });
     this.emit({ status: "checking", activity: "startup", phase: "detect", cached: false, message: "正在识别音频设备与已安装环境", log: "", downloaded: 0, size: 0, name: "", modelName: "", modelState: "" });
     const selected = await this.detect();
-    this.emit({ ...selected, phase: "check", message: `已识别 ${selected.label}，正在加载并检查音频组件` });
+    this.emit({ ...selected, phase: "check", message: `已识别 ${selected.label}，正在检查本地准备记录` });
     this.env = { ...process.env, PYTHONUTF8: "1", PYTHONIOENCODING: "utf-8", PYTHONNOUSERSITE: "1", PIP_DISABLE_PIP_VERSION_CHECK: "1" };
     if (selected.gpu) this.env.CUDA_VISIBLE_DEVICES = selected.gpu.index;
     const existingDirectory = existingPython ? path.resolve(path.dirname(existingPython)) : "";
@@ -369,16 +420,20 @@ class RuntimeService {
     const startupSignature = this.startupSignature(selected, { existingPython: managed ? "" : existingPython, existingModel, managed });
     const reused = await this.reuseReady(startupSignature, selected);
     if (reused) return reused;
+    // 模型下载不依赖 Python 导入；先补齐模型，避免被首次框架加载和自检阻塞。
+    const modelDir = await this.prepareModels(existingModel);
     // 完整旧包先实测；不修补其 Python，失败才创建独立托管环境。
     if (!managed && existingPython && fs.existsSync(existingPython)) {
       let existingValid = false;
       try {
-        await this.run(existingPython, ["-c", PROBE, selected.gpu ? "existing-gpu" : "existing"], { quiet: true, timeout: 90000,
-          env: { ...this.env, PYTHONPATH: path.join(this.appRoot, "src") } });
+        await this.probe(existingPython, selected.gpu ? "existing-gpu" : "existing", null, 180000);
         existingValid = true;
-      } catch (e) { this.controller.signal.throwIfAborted(); this.log(`已有环境需要独立补齐：${e.message}\n`); }
+      } catch (e) {
+        this.controller.signal.throwIfAborted();
+        if (e.code === "RUNTIME_PROCESS_TIMEOUT") throw e;
+        this.log(`已有环境需要独立补齐：${e.message}\n`);
+      }
       if (existingValid) {
-        const modelDir = await this.prepareModels(existingModel);
         await this.rememberReady(startupSignature, selected, existingPython, modelDir, false);
         this.emit({ status: "ready", phase: "environment-ready", message: "已有运行环境检查通过，正在启动服务" });
         return this.runtimeResult(existingPython, modelDir, false);
@@ -432,10 +487,16 @@ try {
     const marker = path.join(directory, "ready.json");
     // 中断后可能已安装完整，只是尚未写 ready；按真实导入、版本和依赖闭包检查复用。
     try {
-      await this.run(python, ["-c", PROBE, selected.profile, path.join(this.appDir, "runtime-requirements.txt")], { quiet: true, timeout: 120000 });
+      await this.startupProbe(python, selected, true);
+      await this.probe(python, selected.profile, path.join(this.appDir, "runtime-requirements.txt"), 180000);
+      this.check({ phase: "verify", message: "正在检查音频依赖兼容性", name: "", size: 0 });
       await this.run(python, ["-m", "pip", "check"], { quiet: true, timeout: 30000 });
       valid = true;
-    } catch (e) { this.controller.signal.throwIfAborted(); this.log(`环境复检失败，开始补齐：${e.message}\n`); }
+    } catch (e) {
+      this.controller.signal.throwIfAborted();
+      if (e.code === "RUNTIME_PROCESS_TIMEOUT") throw e;
+      this.log(`环境复检失败，开始补齐：${e.message}\n`);
+    }
     if (!valid) {
       this.emit({ status: "working", activity: "prepare", phase: "dependencies", message: "正在安装缺失的音频依赖与 CUDA 运行时", name: "", size: 0 });
       const pip = await get(this.config.pip);
@@ -478,10 +539,9 @@ try {
       if (!installed) throw lastError;
       }
       this.emit({ phase: "verify", message: "正在验证依赖与显卡实际运算", name: "", size: 0 });
-      await this.run(python, ["-c", PROBE, selected.profile, path.join(this.appDir, "runtime-requirements.txt")], { timeout: 120000 });
+      await this.probe(python, selected.profile, path.join(this.appDir, "runtime-requirements.txt"), 180000);
       await this.run(python, ["-m", "pip", "check"], { timeout: 30000 });
     }
-    const modelDir = await this.prepareModels(existingModel);
     // imageio 的官方 Windows wheel 携带 FFmpeg，无需系统安装。
     const ffmpegDir = path.join(directory, "ffmpeg");
     await fsp.mkdir(ffmpegDir, { recursive: true });

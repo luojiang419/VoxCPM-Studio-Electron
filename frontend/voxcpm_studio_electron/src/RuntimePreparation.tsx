@@ -4,8 +4,8 @@ import ComponentManager from "./ComponentManager";
 
 type State = { status: string; phase: string; message: string; activity?: "startup" | "prepare"; profile?: string; label?: string;
   name?: string; downloaded?: number; size?: number; verifying?: boolean; reused?: boolean; log?: string; modelName?: string; modelState?: string };
-const stages = ["设备检查", "音频环境", "模型检查", "音频服务", "功能自检", "启动完成"];
-const phases: Record<string, number> = { detect: 0, check: 1, python: 1, dependencies: 1, verify: 1, models: 2, "environment-ready": 2, service: 3, components: 4, ready: 5 };
+const stages = ["设备检查", "模型检查", "音频环境", "音频服务", "功能自检", "启动完成"];
+const phases: Record<string, number> = { detect: 0, check: 0, python: 2, dependencies: 2, verify: 2, models: 1, "environment-ready": 2, service: 3, components: 4, ready: 5 };
 const mb = (n: number) => `${(n / 1024 / 1024).toFixed(1)} MB`;
 
 export default function RuntimePreparation({ onRun, backendStatus, backendDetail }: { onRun: () => void; backendStatus: string; backendDetail: string }) {

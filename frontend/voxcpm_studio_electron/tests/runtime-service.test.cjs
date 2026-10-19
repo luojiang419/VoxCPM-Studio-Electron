@@ -196,7 +196,7 @@ async function startupFixture(t, managed = false) {
 test("连续启动复用落盘缓存，不重复完整导入、pip 检查或模型哈希，也不进入补齐状态", async t => {
   const f = await startupFixture(t);
   await f.create().prepare(f.options);
-  assert.equal(f.calls.filter(args => args[1] === PROBE).length, 1);
+  assert.equal(f.calls.filter(args => args.includes(PROBE)).length, 1);
   assert.ok(!f.states.some(state => state.status === "working"));
   f.calls.length = 0; f.states.length = 0;
   const restarted = f.create();
@@ -233,7 +233,7 @@ for (const change of ["模型同大小改写", "模型缺失", "包入口改写"
     restarted.prepareModels = async () => { rechecked = true; throw new Error("已进入完整复检"); };
     await assert.rejects(restarted.prepare(f.options), /已进入完整复检/);
     assert.equal(rechecked, true);
-    assert.ok(f.calls.some(args => args[1] === PROBE));
+    assert.ok(!f.calls.some(args => args.includes(PROBE)), "模型检查不能被完整音频导入阻塞");
   });
 }
 
@@ -247,7 +247,7 @@ test("快速检查异常会回到真实复检，通过时复用依赖而不强�
     return nativeProbe(...args);
   };
   await restarted.prepare(f.options);
-  assert.ok(f.calls.some(args => args[1] === PROBE));
+  assert.ok(f.calls.some(args => args.includes(PROBE)));
   assert.ok(!f.calls.some(args => args.includes("install")));
 });
 
@@ -266,4 +266,47 @@ test("丢失单个模型只补齐该文件，保留已可用的 Python 和依赖
   assert.deepEqual(await fs.readFile(target), bytes);
   assert.ok(f.states.some(state => state.status === "working" && state.phase === "models"));
   assert.ok(!f.calls.some(args => args.includes("install")));
+});
+
+test("缺失模型先下载，再加载音频框架与验证显卡", async t => {
+  const f = await startupFixture(t, true);
+  const target = path.join(f.options.existingModel, "weights.bin"), bytes = await fs.readFile(target);
+  await fs.rm(target);
+  t.mock.method(globalThis, "fetch", async () => {
+    assert.ok(!f.calls.some(args => args.includes(PROBE)), "下载前不应执行完整导入");
+    return new Response(bytes, { headers: { "Content-Length": String(bytes.length) } });
+  });
+  await f.create().prepare(f.options);
+  assert.ok(f.calls.some(args => args.includes(PROBE)));
+  assert.deepEqual(await fs.readFile(target), bytes);
+});
+
+for (const managed of [false, true]) {
+  test(`${managed ? "托管" : "已有"}音频自检超时保留环境，不强制重装依赖或标记就绪`, async t => {
+    const f = await startupFixture(t, managed), service = f.create();
+    const runner = service.processRunner;
+    service.processRunner = async (command, args, options) => {
+      if (!args.includes(PROBE)) return runner(command, args, options);
+      options.onLine('VOXCPM_PROBE "加载文本处理规则（首次加载较慢）"');
+      throw Object.assign(new Error("运行环境检查超时"), { code: "RUNTIME_PROCESS_TIMEOUT" });
+    };
+    await assert.rejects(service.prepare(f.options), /文本处理规则.*不会因超时重新安装依赖/);
+    assert.ok(!f.calls.some(args => args.includes("install")));
+    assert.equal(service.state.status, "error");
+    assert.ok(f.states.some(s => /音频自检：加载文本处理规则.*已用时/.test(s.message)));
+    await assert.rejects(fs.stat(path.join(f.dataRoot, "cache/runtime-ready.json")), { code: "ENOENT" });
+  });
+}
+
+test("真实子进程分片与多字节输出能逐行报告自检阶段，超时返回独立错误码", async t => {
+  const f = await startupFixture(t), service = f.create();
+  service.processRunner = null;
+  service.controller = new AbortController();
+  service.env = process.env;
+  service.logPath = path.join(f.root, "probe.log");
+  const lines = [];
+  const code = "const b=Buffer.from('VOXCPM_PROBE '+JSON.stringify('加载音频组件')+'\\n末行');process.stdout.write(b.subarray(0,18));setTimeout(()=>process.stdout.write(b.subarray(18)),20)";
+  await service.run(process.execPath, ["-e", code], { quiet: true, timeout: 5000, onLine: line => lines.push(line) });
+  assert.deepEqual(lines, ['VOXCPM_PROBE "加载音频组件"', '末行']);
+  await assert.rejects(service.run(process.execPath, ["-e", "setInterval(()=>{},1000)"], { quiet: true, timeout: 100 }), { code: "RUNTIME_PROCESS_TIMEOUT" });
 });
