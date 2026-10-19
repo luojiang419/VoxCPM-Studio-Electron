@@ -74,6 +74,15 @@ def api_type(value):
     return 'responses' if value in {'responses', 'OpenAI Responses API'} else 'chat-completions'
 
 
+def model_id(base_url, model):
+    model = str(model or '').strip()
+    if urlsplit(normalize_url(base_url)).hostname == 'api.deepseek.com' and (
+        not model or re.fullmatch(r'deepseek\s+(?:v[\d.]+\s+)?flash', model, re.I)
+    ):
+        return 'deepseek-flash'
+    return model
+
+
 class _NoRedirect(urllib.request.HTTPRedirectHandler):
     def redirect_request(self, req, fp, code, msg, headers, newurl):
         return None
@@ -109,7 +118,7 @@ class AssistantStore:
             value = self._read()
             return {**{k: value[k] for k in ('protocol', 'defaultProviderId', 'autoOptimizeMusic')},
                 'providers': [{k: p.get(k) for k in ('id', 'name', 'baseUrl', 'model', 'apiType', 'enabled')} |
-                              {'hasApiKey': bool(p.get('encryptedKey'))} for p in value['providers']]}
+                              {'hasApiKey': bool(p.get('encryptedKey')), 'model': model_id(p['baseUrl'], p.get('model'))} for p in value['providers']]}
 
     def save(self, payload):
         with self.lock:
@@ -126,7 +135,7 @@ class AssistantStore:
                 if not re.fullmatch(r'[a-zA-Z0-9_-]{1,100}', identity) or identity in ids:
                     raise ValueError('助手标识无效或重复')
                 ids.add(identity)
-                name, model = str(row.get('name', '')).strip(), str(row.get('model', '')).strip()
+                name, model = str(row.get('name', '')).strip(), model_id(str(row.get('baseUrl', '')), row.get('model'))
                 if not name or len(name) > 100 or not model or len(model) > 300:
                     raise ValueError('请填写助手名称和模型名称')
                 encrypted = old.get(identity, {}).get('encryptedKey', '')
@@ -194,6 +203,7 @@ class AssistantStore:
             if not provider:
                 raise AssistantError('请先在AI助手设置中配置并启用一个助手')
             provider = dict(provider)
+            provider['model'] = model_id(provider['baseUrl'], provider.get('model'))
         key = unseal(provider.get('encryptedKey', ''))
         def complete(system, user):
             text = self.transport(provider, key, system, user)
@@ -208,6 +218,50 @@ class AssistantStore:
         if not text.strip():
             raise AssistantError('助手没有返回文本')
         return {'ok': True, 'provider': provider}
+
+    def models(self, payload):
+        """查询草稿的模型列表；只有地址一致时才复用已保存密钥。"""
+        base_url = normalize_url(str(payload.get('baseUrl') or ''))
+        key = payload.get('apiKey') or ''
+        if not isinstance(key, str) or len(key) > 8192 or '\n' in key or '\r' in key:
+            raise ValueError('API Key格式无效')
+        key = key.strip()
+        if not key and not payload.get('clearKey'):
+            with self.lock:
+                saved = next((p for p in self._read()['providers'] if p['id'] == payload.get('id')), None)
+            if saved and normalize_url(saved['baseUrl']) == base_url:
+                key = unseal(saved.get('encryptedKey', ''))
+        headers = {'Accept': 'application/json'}
+        if key:
+            headers['Authorization'] = 'Bearer ' + key
+        request = urllib.request.Request(base_url + '/models', headers=headers, method='GET')
+        try:
+            with urllib.request.build_opener(_NoRedirect()).open(request, timeout=30) as response:
+                raw = response.read(2 * 1024**2 + 1)
+            if len(raw) > 2 * 1024**2:
+                raise AssistantError('模型列表响应过长')
+            data = json.loads(raw.decode('utf8'))
+        except urllib.error.HTTPError as error:
+            raise AssistantError(f'获取模型返回HTTP {error.code}，请检查地址和密钥；也可手动填写模型ID') from None
+        except (urllib.error.URLError, TimeoutError, OSError):
+            raise AssistantError('获取模型失败或超时，请检查网络和服务地址；也可手动填写模型ID') from None
+        except (ValueError, UnicodeError):
+            raise AssistantError('模型列表不是有效JSON') from None
+        rows = data.get('data') if isinstance(data, dict) else None
+        if not isinstance(rows, list):
+            raise AssistantError('服务未返回兼容的模型列表，请手动填写模型ID')
+        models = sorted({row['id'].strip() for row in rows if isinstance(row, dict)
+                         and isinstance(row.get('id'), str) and 0 < len(row['id'].strip()) <= 300})
+        if not models:
+            raise AssistantError('服务未返回可用模型，请手动填写模型ID')
+        return {'models': models}
+
+    def reveal_key(self, provider_id):
+        with self.lock:
+            provider = next((p for p in self._read()['providers'] if p['id'] == provider_id), None)
+            if provider is None:
+                raise ValueError('助手配置不存在')
+            return {'apiKey': unseal(provider.get('encryptedKey', ''))}
 
     @staticmethod
     def _request(provider, key, system, user):

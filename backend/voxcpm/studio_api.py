@@ -302,6 +302,16 @@ def create_api_app(studio: Optional[Any] = None, model_dir: Optional[str] = None
     def test_assistant(payload: dict):
         return workspace_call(music.assistants.test, str(payload.get('providerId') or ''))
 
+    @app.post('/api/assistant/models')
+    def assistant_models(payload: dict):
+        return workspace_call(music.assistants.models, payload)
+
+    @app.post('/api/assistant/reveal-key')
+    def reveal_assistant_key(payload: dict):
+        from fastapi.responses import JSONResponse
+        return JSONResponse(workspace_call(music.assistants.reveal_key, str(payload.get('providerId') or '')),
+                            headers={'Cache-Control': 'no-store'})
+
     @app.get('/api/music/status')
     def music_status():
         return workspace_call(music.status)

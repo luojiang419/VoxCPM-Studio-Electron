@@ -4,7 +4,7 @@ import threading
 
 import pytest
 
-from voxcpm.studio_assistant import AssistantError, AssistantStore, normalize_url, seal
+from voxcpm.studio_assistant import AssistantError, AssistantStore, normalize_url, seal, model_id
 
 
 def provider(**values):
@@ -64,6 +64,12 @@ def server():
     class Handler(BaseHTTPRequestHandler):
         def log_message(self, *args):
             pass
+        def do_GET(self):
+            state['requests'].append({'path': self.path, 'authorization': self.headers.get('Authorization')})
+            self.send_response(state['status']); self.send_header('Content-Type', 'application/json')
+            if state['status'] == 302:
+                self.send_header('Location', '/not-allowed')
+            self.end_headers(); self.wfile.write(json.dumps(state['payload']).encode())
         def do_POST(self):
             state['requests'].append({'path': self.path, 'body': json.loads(self.rfile.read(int(self.headers['Content-Length']))), 'authorization': self.headers.get('Authorization')})
             self.send_response(state['status']); self.send_header('Content-Type', 'application/json')
@@ -112,3 +118,51 @@ def test_empty_or_truncated_results_are_errors(server, tmp_path):
     state['payload'] = {'choices': [{'message': {'content': 'partial'}, 'finish_reason': 'length'}]}
     with pytest.raises(AssistantError, match='截断'):
         store.test()
+
+
+def test_models_draft_saved_key_and_apply_to_completion(server, tmp_path):
+    url, state = server
+    state['payload'] = {'data': [{'id': 'deepseek-flash'}, {'id': 'other'}, {'id': 'other'}, {}, {'id': ''}]}
+    store = AssistantStore(tmp_path)
+    draft = provider(baseUrl=url, model='', apiKey='unit-model-key')
+    assert store.models(draft)['models'] == ['deepseek-flash', 'other']
+    assert not store.file.exists()
+    assert state['requests'][-1]['authorization'] == 'Bearer unit-model-key'
+    store.save({'providers': [provider(baseUrl=url, model='deepseek-flash', apiKey='unit-model-key')]})
+    assert store.models(provider(baseUrl=url))['models'] == ['deepseek-flash', 'other']
+    assert state['requests'][-1]['authorization'] == 'Bearer unit-model-key'
+    store.models(provider(baseUrl=url + '/different'))
+    assert state['requests'][-1]['authorization'] is None
+    store.models(provider(baseUrl=url, clearKey=True))
+    assert state['requests'][-1]['authorization'] is None
+    state['payload'] = {'choices': [{'message': {'content': 'OK'}}]}
+    store.test()
+    assert state['requests'][-1]['body']['model'] == 'deepseek-flash'
+
+
+@pytest.mark.parametrize('status,payload,match', [(401, {'secret': 'hidden'}, 'HTTP 401'), (302, {}, 'HTTP 302'), (200, {}, '兼容'), (200, {'data': []}, '可用模型')])
+def test_model_errors_are_safe(server, tmp_path, status, payload, match):
+    url, state = server
+    state.update(status=status, payload=payload)
+    with pytest.raises(AssistantError, match=match) as error:
+        AssistantStore(tmp_path).models(provider(baseUrl=url))
+    assert 'hidden' not in str(error.value)
+    assert len(state['requests']) == 1
+
+
+def test_deepseek_default_and_display_name_migration():
+    for value in ['', 'DeepSeek V4.1 Flash', 'deepseek flash', 'deepseek-flash']:
+        assert model_id('https://api.deepseek.com/v1', value) == 'deepseek-flash'
+    assert model_id('https://api.deepseek.com/v1', 'deepseek-reasoner') == 'deepseek-reasoner'
+    assert model_id('https://example.com/v1', 'DeepSeek V4.1 Flash') == 'DeepSeek V4.1 Flash'
+
+
+def test_saved_key_revealed_only_by_explicit_request(tmp_path):
+    store = AssistantStore(tmp_path)
+    store.save({'providers': [provider(apiKey='unit-reveal-key')]})
+    assert 'unit-reveal-key' not in json.dumps(store.public())
+    assert store.reveal_key('test') == {'apiKey': 'unit-reveal-key'}
+    with pytest.raises(ValueError, match='不存在'):
+        store.reveal_key('missing')
+    store.save({'providers': [provider(clearKey=True)]})
+    assert store.reveal_key('test') == {'apiKey': ''}

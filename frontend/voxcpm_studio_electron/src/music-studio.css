@@ -69,3 +69,9 @@
 @media (max-width: 1250px) { .music-layout { grid-template-columns: minmax(0, 1fr) 280px; gap: 16px; } .music-card { padding: 20px; } .music-card-heading h2 { font-size: 20px; } .music-ai-pill { display: none; } }
 
 .music-model-description { margin: 16px 0 0; color: var(--text); font-size: 12px; line-height: 1.9; }
+
+.assistant-key-input { display: flex; align-items: center; gap: 10px; }
+.assistant-key-input input { flex: 1; min-width: 0; }
+.assistant-key-input button { display: inline-flex; padding: 10px; flex-shrink: 0; }
+
+.assistant-provider .field { align-content: start; }
