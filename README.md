@@ -1,6 +1,6 @@
 # VoxCPM Studio Electron
 
-2026-10-19 当前正式发布为 `2.0.2 / 20261019003411`，新增AI助手自动获取/选择模型和密钥查看。[下载安装修复一体版 EXE](https://modelscope.cn/api/v1/models/jiangjiang419/voxcpm-studio-updates/repo?Revision=master&FilePath=installers%2F2.0.2%2F20261019003411-d3aedcbbf3%2FVoxCPM-Installer.exe)：新用户安装，老用户自动检查，发现损坏才修复；正常检查保留运行中的工作台。详见[安装修复一体化使用说明](./docs/安装修复一体化使用说明.md)。已安装用户也可直接使用软件内「检查更新」。
+2026-10-19 当前正式发布为 `2.0.2 / 20261019032055`，修复音乐模型补齐后未自动选用、生成按钮仍不可用的问题，保留已有歌词与创作草稿；保留AI助手自动获取/选择模型和密钥查看。[下载安装修复一体版 EXE](https://modelscope.cn/api/v1/models/jiangjiang419/voxcpm-studio-updates/repo?Revision=master&FilePath=installers%2F2.0.2%2F20261019032055-8354314f00%2FVoxCPM-Installer.exe)：新用户安装，老用户自动检查，发现损坏才修复；正常检查保留运行中的工作台。详见[安装修复一体化使用说明](./docs/安装修复一体化使用说明.md)。已安装用户也可直接使用软件内「检查更新」。
 
 历史发布：2026-10-19 发布单文件老用户更新修复器及应用 `2.0.2 / 20261018235215`。更新失败的老用户可[直接下载修复器 EXE](https://modelscope.cn/api/v1/models/jiangjiang419/voxcpm-studio-updates/repo?Revision=master&FilePath=repairers%2F2.0.2%2F20261018235215-0f71f753d9%2FVoxCPM-Update-Repairer.exe)，保存任务、确认原目录、点击「开始修复并升级」，自动关闭并强制结束原目录残留进程。同时修复视频环境Arrow/NumPy冲突导致重启回滚。自带修复环境，保留已保存的模型、配置、音色、作品和功能选择，支持同发布损坏修复。修复后直接使用内置更新；独立更新运行环境缺失或损坏时自动补齐。修复器及独立更新器均复用安装器样式，工作台关闭后仍可独立执行。详见[老用户修复器使用说明](./docs/老用户更新修复器使用说明.md)与[自动更新与故障恢复](./docs/自动更新说明.md)。
 
