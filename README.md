@@ -1,6 +1,8 @@
 # JVOX Studio配音系统
 
-2026-10-19 正式发布 **JVOX Studio配音系统 2.0.4**，发布序号 `20261019122407`。本次将“功能与模型管理”移至音乐创作页的音乐模型面板右上角，替换“自由选择”，左侧原按钮移除。保留[关闭窗口行为设置](./docs/退出行为说明.md)：首次关闭询问，选择关闭软件或后台运行后记住偏好，也可保留每次询问；弹窗统一深浅主题，后台可从系统托盘或再次运行软件恢复。设置→界面与工具可随时修改。旧版可通过原有更新入口直接升级，保留模型、配置、音色、作品和功能选择。[下载 JVOX Studio配音系统安装器](https://modelscope.cn/api/v1/models/jiangjiang419/voxcpm-studio-updates/repo?Revision=master&FilePath=installers%2F2.0.4%2F20261019122407-9aa56486a0%2FJVOX-Studio-Installer.exe)（约 125.7 MiB），新用户安装和老用户检查修复使用同一文件。详见[分发基准包](./docs/分发基准包.md)及[安装修复一体化使用说明](./docs/安装修复一体化使用说明.md)。
+本次更新：音乐提示词由 AI 同时输出中文展示稿和完整英文生成稿，「风格与编曲」默认展示中文，实际使用配套英文生成；修改中文后会重新适配，覆盖 ACE、MiniMax、YuE2 与 HeartMuLa。MiniMax 保留官方三段结构，歌词原文、草稿和已有作品继续保留。详见[音乐创作说明](./docs/音乐AI助手与官方提示词技能.md)。
+
+2026-10-19 正式发布 **JVOX Studio配音系统 2.0.4**，发布序号 `20261019130543`。本版保留音乐模型面板右上角的“功能与模型管理”入口。保留[关闭窗口行为设置](./docs/退出行为说明.md)：首次关闭询问，选择关闭软件或后台运行后记住偏好，也可保留每次询问；弹窗统一深浅主题，后台可从系统托盘或再次运行软件恢复。设置→界面与工具可随时修改。旧版可通过原有更新入口直接升级，保留模型、配置、音色、作品和功能选择。[下载 JVOX Studio配音系统安装器](https://modelscope.cn/api/v1/models/jiangjiang419/voxcpm-studio-updates/repo?Revision=master&FilePath=installers%2F2.0.4%2F20261019130543-a79dab2c3b%2FJVOX-Studio-Installer.exe)（约 125.7 MiB），新用户安装和老用户检查修复使用同一文件。详见[分发基准包](./docs/分发基准包.md)及[安装修复一体化使用说明](./docs/安装修复一体化使用说明.md)。
 
 ![品牌焕新庆祝弹窗](./docs/screenshots/jvox-rebrand.png)
 
