@@ -1,6 +1,6 @@
 # Windows 轻量安装器
 
-用户只需分发 `VoxCPM安装器.exe`。安装器从魔搭获取桌面包、独立 Python、固定依赖和模型，校验 SHA-256 后安装；模型仍使用魔搭官方仓库。启动器本身不包含 Electron、Python、CUDA 或模型。
+用户只需分发 `JVOX Studio配音系统安装器.exe`。安装器从魔搭获取桌面包、独立 Python、固定依赖和模型，校验 SHA-256 后安装；模型仍使用魔搭官方仓库。启动器本身不包含 Electron、Python、CUDA 或模型。
 
 ## 安装位置
 

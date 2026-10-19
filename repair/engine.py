@@ -109,10 +109,10 @@ def validate_root(root):
     if root.is_file():
         root = root.parent
     root = root.resolve(strict=True)
-    if not (root / "VoxCPM Studio.exe").is_file():
-        raise ValueError("未找到原软件的 VoxCPM Studio.exe，请选择原安装目录")
+    if not any((root / name).is_file() for name in ("JVOX Studio配音系统.exe", "VoxCPM Studio.exe")):
+        raise ValueError("未找到原软件主程序，请选择 JVOX Studio配音系统或旧版的原安装目录")
     if not any((root / name).is_file() for name in ("runtime_manifest.json", ".voxcpm-install.json")):
-        raise ValueError("该目录没有VoxCPM安装标记，已停止操作")
+        raise ValueError("该目录没有软件安装标记，已停止操作")
     if root == Path(root.anchor) or root == Path(os.environ.get("USERPROFILE", "/__none__")):
         raise ValueError("不能把磁盘或个人资料根目录作为修复目标")
     return root
@@ -140,7 +140,7 @@ def owned_processes(root, processes):
         protected.add(current)
         current = indexed.get(current, {}).get("ParentProcessId")
     protected.add(os.getppid())
-    names = {"voxcpm studio.exe", "voxcpm updater.exe", "electron.exe", "python.exe", "pythonw.exe", "ffmpeg.exe", "ffprobe.exe", "node.exe"}
+    names = {"jvox studio配音系统.exe", "jvox updater.exe", "voxcpm studio.exe", "voxcpm updater.exe", "electron.exe", "python.exe", "pythonw.exe", "ffmpeg.exe", "ffprobe.exe", "node.exe"}
     targets, unknown = {}, []
     for item in processes:
         pid = item.get("ProcessId")
@@ -509,7 +509,7 @@ foreach($place in $places) { if(Test-Path -LiteralPath $place) { foreach($file i
  if($link.TargetPath -and ([IO.Path]::GetFileName($link.TargetPath) -in @('VoxCPM Studio.exe','electron.exe','Launch VoxCPM Studio Desktop.bat','Launch VoxCPM Studio Electron.bat')) -and ([IO.Path]::GetFullPath($link.TargetPath)).StartsWith($repairRoot+'\',[StringComparison]::OrdinalIgnoreCase)) {
   New-Item -ItemType Directory -Force -Path $backup | Out-Null
   Copy-Item -LiteralPath $file.FullName -Destination (Join-Path $backup ([guid]::NewGuid().ToString()+'.lnk'))
-  $link.TargetPath=Join-Path $repairRoot 'VoxCPM Studio.exe';$link.Arguments='--voxcpm-run';$link.WorkingDirectory=$repairRoot;$link.Save();$changed+=$file.FullName
+  $link.TargetPath=Join-Path $repairRoot $(if(Test-Path -LiteralPath (Join-Path $repairRoot 'JVOX Studio配音系统.exe')) {'JVOX Studio配音系统.exe'} else {'VoxCPM Studio.exe'});$link.Arguments='--voxcpm-run';$link.WorkingDirectory=$repairRoot;$link.Save();$changed+=$file.FullName
  }
 } } }
 ConvertTo-Json -InputObject $changed -Compress
@@ -529,7 +529,7 @@ const {UpdateService}=require(path.join(appDir,'update-service.js'));const versi
 (async()=>{const s=new UpdateService({root,dataRoot:path.join(root,'data'),appDir,currentVersion:version,pythonExecutable:'__audio_python_not_used__'});
 await s.ensureUpdaterPython();const state=await s.check();if(!['current','available'].includes(state.status)||state.updaterRuntime!=='dedicated')throw new Error(state.message);
 console.log(JSON.stringify({status:state.status,currentReleaseId:state.currentReleaseId,latestReleaseId:state.latestReleaseId,updaterRuntime:state.updaterRuntime,python:s.python}));})().catch(e=>{console.error(e.message);process.exitCode=1});"""
-    result = subprocess.run([str(root / "VoxCPM Studio.exe"), "-e", code, str(root)], capture_output=True, text=True, encoding="utf-8",
+    result = subprocess.run([str(root / ("JVOX Studio配音系统.exe" if (root / "JVOX Studio配音系统.exe").is_file() else "VoxCPM Studio.exe")), "-e", code, str(root)], capture_output=True, text=True, encoding="utf-8",
         env={**os.environ, "ELECTRON_RUN_AS_NODE": "1"}, timeout=90, creationflags=subprocess.CREATE_NO_WINDOW)
     if result.returncode:
         raise RuntimeError("程序已修复，但后续更新通道检查未通过：" + result.stderr.strip())

@@ -52,7 +52,7 @@ def finalize(build_file, validation_file, output=None):
     if output.exists():
         raise ValueError('基准包目录已存在，未覆盖：' + str(output))
     output.mkdir(parents=True)
-    distributed = output / 'VoxCPM安装器.exe'
+    distributed = output / 'JVOX Studio配音系统安装器.exe'
     shutil.copy2(exe, distributed)
     if digest(distributed) != built['sha256']:
         raise ValueError('分发副本校验失败')
@@ -63,10 +63,10 @@ def finalize(build_file, validation_file, output=None):
         'matchesCurrentSource': True, 'matchesActualInstallation': True, 'modelsAndDependencies': '按用户选择联网补齐',
         'upgradeExperience': '旧版手动升级一次后，启动提示；一次选择自动下载、安装和重启'}
     (output / '基准包记录.json').write_text(json.dumps(report, ensure_ascii=False, indent=2), encoding='utf8')
-    (output / 'SHA256.txt').write_text(built['sha256'] + '  VoxCPM安装器.exe\n', encoding='utf-8-sig')
+    (output / 'SHA256.txt').write_text(built['sha256'] + '  JVOX Studio配音系统安装器.exe\n', encoding='utf-8-sig')
     (output / '分发说明.txt').write_text(
-        f'VoxCPM Studio 新安装基准包\n版本：{built["version"]} / {built["releaseId"]}\n\n'
-        '把 VoxCPM安装器.exe 发给用户，双击选择安装位置和功能即可。\n'
+        f'JVOX Studio配音系统 新安装基准包\n版本：{built["version"]} / {built["releaseId"]}\n\n'
+        '把 JVOX Studio配音系统安装器.exe 发给用户，双击选择安装位置和功能即可。\n'
         '内置当前全部应用功能与修复，模型和运行依赖按选择联网补齐。\n'
         '已安装用户也可用同一文件检查和修复，操作前请保存正在编辑的任务。\n\n'
         '旧版用户可用原有检查更新入口手动升级一次，保留已有模型、配置与作品。\n'

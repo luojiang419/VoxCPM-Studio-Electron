@@ -13,6 +13,7 @@ import stat
 import subprocess
 import sys
 import time
+import uuid
 import zipfile
 
 from cryptography.hazmat.primitives.asymmetric.ed25519 import Ed25519PublicKey
@@ -186,6 +187,14 @@ def rollback(root: Path, session: Path):
     if not journal_path.exists():
         return
     journal = read_json(journal_path)
+    for name in journal.get("brandReplacements", []):
+        if name not in ("uninstall.exe", "voxcpm.ico"):
+            raise ValueError("更名回滚文件无效")
+        shutil.copy2(session / "brand-backup" / name, root / name)
+    # 更名入口是旧启动器的兼容副本，不能进入任意路径白名单。
+    branded = root / "JVOX Studio配音系统.exe"
+    if journal.get("brandEntryCreated") and branded.is_file() and sha256(branded) == journal.get("brandEntryHash"):
+        branded.unlink()
     for change in reversed(journal["changes"]):
         target = destination(root, change["path"])
         if change["existed"]:
@@ -254,8 +263,113 @@ def restart(root, session, health=True):
     if health:
         env["VOXCPM_UPDATE_HEALTH_FILE"] = str(session / "healthy.json")
         env["VOXCPM_UPDATE_SESSION"] = str(session)
-    return subprocess.Popen([str(root / "VoxCPM Studio.exe"), "--voxcpm-run"], cwd=root, env=env,
+    entry = root / "JVOX Studio配音系统.exe"
+    if not entry.is_file() or (not health and (root / "VoxCPM Studio.exe").is_file()):
+        entry = root / "VoxCPM Studio.exe"
+    return subprocess.Popen([str(entry), "--voxcpm-run"], cwd=root, env=env,
                             stdout=subprocess.DEVNULL, stderr=subprocess.DEVNULL)
+
+
+def prepare_brand_entry(root, session):
+    """验签安装后复用现有 Electron 引擎；保留旧 EXE 作为旧快捷方式的兼容入口。"""
+    package = read_json(root / "resources/app/package.json")
+    if package.get("build", {}).get("productName") != "JVOX Studio配音系统":
+        return
+    # 已签名的新版卸载器和图标同步到既有安装，归属标记及卸载ID保持不变。
+    if (root / ".voxcpm-install.json").is_file():
+        for name, source in (("uninstall.exe", "brand-uninstaller.exe"), ("voxcpm.ico", "app.ico")):
+            target, signed = root / name, root / "resources/app" / source
+            if target.is_symlink() or target.is_junction():
+                raise ValueError("更名文件不能是链接")
+            if target.is_file() and signed.is_file() and sha256(target) != sha256(signed):
+                backup = session / "brand-backup" / name
+                backup.parent.mkdir(exist_ok=True)
+                shutil.copy2(target, backup)
+                journal = read_json(session / "journal.json")
+                journal.setdefault("brandReplacements", []).append(name)
+                write_json(session / "journal.json", journal)
+                temporary = target.with_name(target.name + ".jvox-new")
+                shutil.copy2(signed, temporary)
+                os.replace(temporary, target)
+    entry, legacy = root / "JVOX Studio配音系统.exe", root / "VoxCPM Studio.exe"
+    if entry.is_symlink() or entry.is_junction() or legacy.is_symlink() or legacy.is_junction():
+        raise ValueError("更名入口不能是链接")
+    if entry.exists():
+        if not entry.is_file():
+            raise ValueError("更名入口被目录占用")
+        return
+    if not legacy.is_file():
+        raise ValueError("软件启动器缺失，请使用新版安装器修复")
+    journal = read_json(session / "journal.json")
+    journal.update(brandEntryCreated=True, brandEntryHash=sha256(legacy))
+    write_json(session / "journal.json", journal)
+    temporary = root / (".jvox-entry-" + uuid.uuid4().hex + ".tmp")
+    try:
+        with temporary.open("xb") as output, legacy.open("rb") as source:
+            shutil.copyfileobj(source, output)
+            output.flush(); os.fsync(output.fileno())
+        # Windows rename 不覆盖已存在目标；崩溃也不会留下可启动的半成品 EXE。
+        os.rename(temporary, entry)
+    finally:
+        temporary.unlink(missing_ok=True)
+
+
+def migrate_brand_integration(root, session):
+    """只迁移归属记录中的快捷方式及同目录卸载登记；不扫描或覆盖其他软件。"""
+    if os.name != "nt" or not (root / ".voxcpm-install.json").is_file():
+        return
+    script = r'''
+$ErrorActionPreference='Stop'
+$root=$env:JVOX_MIGRATION_ROOT
+$marker=Join-Path $root '.voxcpm-install.json'
+$state=Get-Content -LiteralPath $marker -Raw -Encoding UTF8 | ConvertFrom-Json
+if($state.product -ne 'voxcpm-studio' -or [IO.Path]::GetFullPath($state.root).TrimEnd('\') -ne [IO.Path]::GetFullPath($root).TrimEnd('\')) { throw '安装归属记录无效' }
+$shell=New-Object -ComObject WScript.Shell
+$links=@($state.shortcuts)
+foreach($file in @($state.shortcuts)) {
+ if(!(Test-Path -LiteralPath $file -PathType Leaf) -or [IO.Path]::GetExtension($file) -ne '.lnk') {continue}
+ if(((Get-Item -LiteralPath $file).Attributes -band [IO.FileAttributes]::ReparsePoint) -ne 0) {continue}
+ $old=$shell.CreateShortcut($file)
+ $target=[IO.Path]::GetFullPath($old.TargetPath)
+ $entry=[IO.Path]::GetFileName($target)
+ if([IO.Path]::GetDirectoryName($target) -ne $root -or $entry -notin @('VoxCPM Studio.exe','JVOX Studio配音系统.exe','uninstall.exe')) {continue}
+ $folder=[IO.Path]::GetDirectoryName($file)
+ if([IO.Path]::GetFileName($folder) -eq 'VoxCPM Studio') {$folder=Join-Path ([IO.Path]::GetDirectoryName($folder)) 'JVOX Studio配音系统'}
+ $title=if($entry -eq 'uninstall.exe') {'卸载 JVOX Studio配音系统'} else {'JVOX Studio配音系统'}
+ $next=Join-Path $folder ($title+'.lnk')
+ if((Test-Path -LiteralPath $next) -and $next -ne $file) {
+  $existing=$shell.CreateShortcut($next)
+  if([IO.Path]::GetDirectoryName([IO.Path]::GetFullPath($existing.TargetPath)) -ne $root) {continue}
+ }
+ New-Item -ItemType Directory -Path $folder -Force | Out-Null
+ $link=$shell.CreateShortcut($next)
+ $link.TargetPath=if($entry -eq 'uninstall.exe') {$target} else {Join-Path $root 'JVOX Studio配音系统.exe'}
+ $link.Arguments=$old.Arguments;$link.WorkingDirectory=$root;$link.IconLocation=Join-Path $root 'resources\app\app.ico';$link.Save()
+ if($next -ne $file) {Remove-Item -LiteralPath $file -Force}
+ $links=@($links | Where-Object {$_ -ne $file}) + $next
+}
+$state.shortcuts=@($links | Select-Object -Unique)
+$state.files=@(@($state.files) + 'JVOX Studio配音系统.exe' | Select-Object -Unique)
+$key=$null
+try {
+ if($state.registryKey -and $state.registryKey.StartsWith('Software\Microsoft\Windows\CurrentVersion\Uninstall\VoxCPMStudio',[StringComparison]::OrdinalIgnoreCase)) {
+  $key=[Microsoft.Win32.Registry]::CurrentUser.OpenSubKey($state.registryKey,$true)
+  if($key -and $key.GetValue('InstallLocation') -eq $root) {
+   $key.SetValue('DisplayName','JVOX Studio配音系统');$key.SetValue('Publisher','JVOX Studio配音系统')
+   $pkg=Get-Content -LiteralPath (Join-Path $root 'resources\app\package.json') -Raw -Encoding UTF8 | ConvertFrom-Json
+   $key.SetValue('DisplayVersion',$pkg.version);$key.SetValue('DisplayIcon',(Join-Path $root 'resources\app\app.ico'))
+  }
+ }
+} finally {if($key){$key.Dispose()}}
+$temporary=$marker+'.jvox-tmp'
+[IO.File]::WriteAllText($temporary,($state | ConvertTo-Json -Depth 20),[Text.UTF8Encoding]::new($false))
+Move-Item -LiteralPath $temporary -Destination $marker -Force
+'''
+    result = subprocess.run(["powershell.exe", "-NoProfile", "-NonInteractive", "-Command", script],
+        env={**os.environ, "JVOX_MIGRATION_ROOT": str(root)}, capture_output=True, timeout=30,
+        creationflags=getattr(subprocess, "CREATE_NO_WINDOW", 0))
+    if result.returncode:
+        raise RuntimeError(result.stderr.decode("utf-8", errors="replace"))
 
 
 def launch_standalone(session: Path):
@@ -327,6 +441,7 @@ def run(session: Path, recover=False):
     write_json(session / "status.json", {"status": "installing", "version": manifest["version"]})
     try:
         install(root, session, manifest)
+        prepare_brand_entry(root, session)
         emit("正在重启并检查本地服务…", 90)
         for name in ("healthy.json", "healthy.json.preparing"):
             (session / name).unlink(missing_ok=True)
@@ -359,6 +474,11 @@ def run(session: Path, recover=False):
         journal = read_json(session / "journal.json")
         journal["status"] = "complete"
         write_json(session / "journal.json", journal)
+        try:
+            migrate_brand_integration(root, session)
+        except Exception as error:
+            # 应用已通过健康检查；系统快捷方式失败不能反转已成功的应用事务。
+            (session / "brand-migration-warning.txt").write_text(str(error), encoding="utf-8")
         result("complete", "更新安装成功，文件、界面及本地服务检查通过。", manifest)
         emit("更新完成，本地服务已就绪。", 100)
     except BaseException as error:

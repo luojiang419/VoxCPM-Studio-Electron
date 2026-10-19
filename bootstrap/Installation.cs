@@ -20,7 +20,7 @@ namespace VoxBootstrap {
     }
     public sealed class IntegrationPaths {
         public string desktop = Environment.GetFolderPath(Environment.SpecialFolder.DesktopDirectory);
-        public string startMenu = Path.Combine(Environment.GetFolderPath(Environment.SpecialFolder.Programs), "VoxCPM Studio");
+        public string startMenu = Path.Combine(Environment.GetFolderPath(Environment.SpecialFolder.Programs), "JVOX Studio配音系统");
         public string registryKey = Installer.UninstallKey;
     }
     public sealed class InstallDrive { public string root; public long free; public bool ready; }
@@ -41,9 +41,9 @@ namespace VoxBootstrap {
             local = local ?? Environment.GetFolderPath(Environment.SpecialFolder.LocalApplicationData);
             profile = profile ?? Environment.GetFolderPath(Environment.SpecialFolder.UserProfile);
             string id = WindowsIdentity.GetCurrent().User.Value;
-            return new[] { Path.Combine(local, "VoxCPMStudio"), Path.Combine(local, "Apps", "VoxCPMStudio"),
-                Path.Combine(profile, "Apps", "VoxCPMStudio"), Path.Combine(profile, "VoxCPMStudio"),
-                Path.Combine(@"C:\VoxCPMStudio", id) };
+            return new[] { Path.Combine(local, "JVOXStudio"), Path.Combine(local, "Apps", "JVOXStudio"),
+                Path.Combine(profile, "Apps", "JVOXStudio"), Path.Combine(profile, "JVOXStudio"),
+                Path.Combine(@"C:\JVOXStudio", id) };
         }
         public static string RootOnDrive(InstallDrive drive, IEnumerable<InstallDrive> all, bool probeWrites = true) {
             string problem = DriveProblem(drive, all); if (problem != null) throw new IOException(problem);
@@ -55,7 +55,7 @@ namespace VoxBootstrap {
         public static string SelectAutomaticRoot(IEnumerable<InstallDrive> drives, IEnumerable<string> cFolders, Func<string, bool> writable) {
             var list = drives.ToArray();
             foreach (var drive in list.Where(d => !String.Equals(Path.GetPathRoot(d.root), @"C:\", StringComparison.OrdinalIgnoreCase) && d.ready && d.free >= RequiredSpace).OrderByDescending(d => d.free)) {
-                string candidate = Path.Combine(drive.root, "Program Files", "VoxCPMStudio");
+                string candidate = Path.Combine(drive.root, "Program Files", "JVOXStudio");
                 if (writable(candidate)) return Canonical(candidate);
             }
             var system = list.FirstOrDefault(d => String.Equals(Path.GetPathRoot(d.root), @"C:\", StringComparison.OrdinalIgnoreCase));
@@ -151,7 +151,7 @@ namespace VoxBootstrap {
                 Environment.GetFolderPath(Environment.SpecialFolder.MyDocuments), Environment.GetFolderPath(Environment.SpecialFolder.LocalApplicationData),
                 Environment.GetFolderPath(Environment.SpecialFolder.ApplicationData), Environment.GetFolderPath(Environment.SpecialFolder.ProgramFiles),
                 Environment.GetFolderPath(Environment.SpecialFolder.ProgramFilesX86), Path.GetTempPath() };
-            if (root.Length < 5 || forbidden.Where(p => !String.IsNullOrEmpty(p)).Any(p => SamePath(root, p))) throw new IOException("请选择专门的 VoxCPMStudio 文件夹，不能直接安装到磁盘根目录或系统/个人资料目录。");
+            if (root.Length < 5 || forbidden.Where(p => !String.IsNullOrEmpty(p)).Any(p => SamePath(root, p))) throw new IOException("请选择专门的 JVOXStudio 文件夹，不能直接安装到磁盘根目录或系统/个人资料目录。");
             string windows = Environment.GetFolderPath(Environment.SpecialFolder.Windows);
             if (root.StartsWith(Canonical(windows) + Path.DirectorySeparatorChar, StringComparison.OrdinalIgnoreCase)) throw new IOException("不能安装到 Windows 系统目录。");
             for (var dir = new DirectoryInfo(root); dir != null; dir = dir.Parent)
@@ -244,14 +244,14 @@ namespace VoxBootstrap {
                 string link = CreateShortcut(dir, target, root, title, args, Path.Combine(root, "voxcpm.ico"));
                 if (!shortcuts.Contains(link)) shortcuts.Add(link); state.shortcuts = shortcuts.ToArray(); SaveState(state);
             };
-            if (desktop) add(paths.desktop, Path.Combine(root, manifest.entry), "VoxCPM Studio", "--voxcpm-run");
+            if (desktop) add(paths.desktop, Path.Combine(root, manifest.entry), "JVOX Studio配音系统", "--voxcpm-run");
             if (startMenu) {
-                add(paths.startMenu, Path.Combine(root, manifest.entry), "VoxCPM Studio", "--voxcpm-run");
-                add(paths.startMenu, Path.Combine(root, "uninstall.exe"), "卸载 VoxCPM Studio", "--uninstall");
+                add(paths.startMenu, Path.Combine(root, manifest.entry), "JVOX Studio配音系统", "--voxcpm-run");
+                add(paths.startMenu, Path.Combine(root, "uninstall.exe"), "卸载 JVOX Studio配音系统", "--uninstall");
             }
             using (var key = Registry.CurrentUser.CreateSubKey(paths.registryKey)) {
-                key.SetValue("DisplayName", "VoxCPM Studio"); key.SetValue("DisplayVersion", manifest.appVersion ?? "2.0.2");
-                key.SetValue("Publisher", "VoxCPM Studio"); key.SetValue("InstallLocation", Canonical(root)); key.SetValue("InstallId", state.id);
+                key.SetValue("DisplayName", "JVOX Studio配音系统"); key.SetValue("DisplayVersion", manifest.appVersion ?? "2.0.2");
+                key.SetValue("Publisher", "JVOX Studio配音系统"); key.SetValue("InstallLocation", Canonical(root)); key.SetValue("InstallId", state.id);
                 key.SetValue("DisplayIcon", Path.Combine(root, "voxcpm.ico")); key.SetValue("UninstallString", "\"" + Path.Combine(root, "uninstall.exe") + "\" --uninstall");
                 key.SetValue("InstallDate", DateTime.Now.ToString("yyyyMMdd")); key.SetValue("NoModify", 1, RegistryValueKind.DWord); key.SetValue("NoRepair", 1, RegistryValueKind.DWord);
             }
@@ -314,7 +314,7 @@ namespace VoxBootstrap {
             throw new IOException("环境准备超时，已保留下载内容，请重新打开安装器继续。");
         }
         public static Process StartPreparation(string root, string report, string session) {
-            var start = new ProcessStartInfo(Path.Combine(root, "VoxCPM Studio.exe"), "--voxcpm-run --voxcpm-install") { WorkingDirectory = root, UseShellExecute = false, CreateNoWindow = true };
+            var start = new ProcessStartInfo(Brand.ExecutablePath(root), "--voxcpm-run --voxcpm-install") { WorkingDirectory = root, UseShellExecute = false, CreateNoWindow = true };
             start.EnvironmentVariables.Remove("ELECTRON_RUN_AS_NODE");
             foreach (string name in new[] { "VOXCPM_APP_ROOT", "VOXCPM_PYTHON_EXE", "VOXCPM_MODEL_DIR" }) start.EnvironmentVariables.Remove(name);
             start.EnvironmentVariables["VOXCPM_DATA_ROOT"] = Path.Combine(root, "data");
@@ -352,7 +352,7 @@ namespace VoxBootstrap {
                 foreach (string shortcut in state.shortcuts ?? new string[0]) {
                     if (Path.GetExtension(shortcut).Equals(".lnk", StringComparison.OrdinalIgnoreCase) && File.Exists(shortcut)) {
                         string target = ShortcutTarget(shortcut);
-                        if (!String.IsNullOrEmpty(target) && (SamePath(target, Path.Combine(root, "VoxCPM Studio.exe")) || SamePath(target, Path.Combine(root, "uninstall.exe")))) File.Delete(shortcut);
+                        if (!String.IsNullOrEmpty(target) && ((SamePath(target, Path.Combine(root, Brand.Entry)) || SamePath(target, Path.Combine(root, "VoxCPM Studio.exe"))) || SamePath(target, Path.Combine(root, "uninstall.exe")))) File.Delete(shortcut);
                     }
                 }
                 using (var key = Registry.CurrentUser.OpenSubKey(state.registryKey ?? UninstallKey)) {
@@ -383,18 +383,18 @@ namespace VoxBootstrap {
             int identity = Array.IndexOf(args, "--install-id"); if (identity < 0 || identity + 1 >= args.Length || owned.id != args[identity + 1]) throw new IOException("卸载安装标识不匹配。");
             int parent = Array.IndexOf(args, "--wait-pid");
             if (parent >= 0 && parent + 1 < args.Length) try { Process.GetProcessById(Int32.Parse(args[parent + 1])).WaitForExit(10000); } catch (ArgumentException) { }
-            using (var dialog = new Form { Text = "卸载 VoxCPM Studio", ClientSize = new System.Drawing.Size(500, 220), StartPosition = FormStartPosition.CenterScreen, FormBorderStyle = FormBorderStyle.FixedDialog, MaximizeBox = false, MinimizeBox = false, BackColor = System.Drawing.Color.White, Font = new System.Drawing.Font("Microsoft YaHei UI", 10) }) {
+            using (var dialog = new Form { Text = "卸载 JVOX Studio配音系统", ClientSize = new System.Drawing.Size(500, 220), StartPosition = FormStartPosition.CenterScreen, FormBorderStyle = FormBorderStyle.FixedDialog, MaximizeBox = false, MinimizeBox = false, BackColor = System.Drawing.Color.White, Font = new System.Drawing.Font("Microsoft YaHei UI", 10) }) {
                 dialog.Icon = System.Drawing.Icon.ExtractAssociatedIcon(Assembly.GetExecutingAssembly().Location);
                 var label = new Label { Text = "卸载应用、运行环境和下载的模型。\n默认保留配置、音色、作品与 LoRA。", Left = 26, Top = 24, Width = 450, Height = 60 };
                 var personal = new CheckBox { Text = "同时删除个人数据（不可恢复）", Left = 26, Top = 96, Width = 440, AutoSize = true };
                 var remove = new Button { Text = "卸载", Left = 360, Top = 160, Width = 110, Height = 34 };
                 remove.Click += (sender, e) => {
                     try {
-                        foreach (var process in Process.GetProcessesByName("VoxCPM Studio")) try {
-                            if (SamePath(process.MainModule.FileName, Path.Combine(targetRoot, "VoxCPM Studio.exe"))) throw new IOException("请先关闭正在运行的工作台，再进行卸载。");
+                        foreach (var process in Process.GetProcessesByName("JVOX Studio配音系统").Concat(Process.GetProcessesByName("VoxCPM Studio"))) try {
+                            if ((SamePath(process.MainModule.FileName, Path.Combine(targetRoot, Brand.Entry)) || SamePath(process.MainModule.FileName, Path.Combine(targetRoot, "VoxCPM Studio.exe")))) throw new IOException("请先关闭正在运行的工作台，再进行卸载。");
                         } catch (System.ComponentModel.Win32Exception) { } finally { process.Dispose(); }
                         Remove(targetRoot, owned.id, personal.Checked);
-                        MessageBox.Show(dialog, personal.Checked ? "卸载完成。" : "卸载完成。个人数据保留在：\n" + Path.Combine(targetRoot, "data"), "VoxCPM Studio"); dialog.Close();
+                        MessageBox.Show(dialog, personal.Checked ? "卸载完成。" : "卸载完成。个人数据保留在：\n" + Path.Combine(targetRoot, "data"), "JVOX Studio配音系统"); dialog.Close();
                     } catch (Exception error) { MessageBox.Show(dialog, error.Message, "卸载尚未完成", MessageBoxButtons.OK, MessageBoxIcon.Error); }
                 };
                 dialog.Controls.AddRange(new Control[] { label, personal, remove }); Application.Run(dialog);

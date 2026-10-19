@@ -76,7 +76,7 @@ def run(build, installed=None):
         # 同大小应用损坏加桌面EXE缺失，必须仍识别为原安装并修复。
         engine.stop_owned_processes(root,out)
         (root/'resources/app/main.js').write_text('broken',encoding='utf8')
-        (root/'VoxCPM Studio.exe').unlink()
+        (root/'JVOX Studio配音系统.exe').unlink()
         repaired=maintenance('repaired','complete')
         running,_=engine.owned_processes(root,engine.process_inventory())
         assert running, '修复后工作台未运行'

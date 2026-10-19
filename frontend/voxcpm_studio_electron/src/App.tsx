@@ -1,5 +1,6 @@
 import { startTransition, useEffect, useState, type ReactNode } from "react";
 import UpdatePanel from "./UpdatePanel";
+import BrandAnnouncementDialog from "./BrandAnnouncementDialog";
 import ProductionStudio from "./ProductionStudio";
 import WorkspacePlayer from "./WorkspacePlayer";
 import SaveVoiceDialog from "./SaveVoiceDialog";
@@ -188,7 +189,7 @@ const DEFAULT_SETTINGS: SettingsPayload = {
 
 const DEFAULT_SINGLE_FORM: SingleForm = {
   mode: "声音设计",
-  text: "欢迎来到 VoxCPM Studio Electron，本地原生工作台已经准备就绪。",
+  text: "欢迎来到 JVOX Studio配音系统，本地原生工作台已经准备就绪。",
   control: "",
   referenceAudio: "",
   promptText: "",
@@ -445,6 +446,9 @@ function App() {
   });
   const [systemPrefersDark, setSystemPrefersDark] = useState(true);
   const [bootstrap, setBootstrap] = useState<BootstrapState | null>(null);
+  const [brandAnnouncementOpen, setBrandAnnouncementOpen] = useState(() => {
+    try { return localStorage.getItem("jvox-brand-welcome-2026") !== "seen"; } catch { return true; }
+  });
   const [runtime, setRuntime] = useState<RuntimeSummary | null>(null);
   const [settings, setSettings] = useState<SettingsPayload>(DEFAULT_SETTINGS);
   const [loraItems, setLoraItems] = useState<LoraEntry[]>([]);
@@ -551,7 +555,7 @@ function App() {
       if (payload.type === "update-state") {
         const update = payload.update;
         setUpdateStatus(update.status);
-        if (update.status === "available") setUpdateNotice(`有可用更新：VoxCPM Studio ${update.latestVersion}`);
+        if (update.status === "available") setUpdateNotice(`有可用更新：JVOX Studio配音系统 ${update.latestVersion}`);
         else if (update.status === "downloaded") setUpdateNotice("更新已下载，可前往设置重启安装。");
         else if (update.status === "current") setUpdateNotice("");
         return;
@@ -1046,6 +1050,10 @@ function App() {
 
   return (
     <div className={`app-shell studio-shell ${["production", "voices", "history"].includes(page) ? "studio-creative-page" : ""}`}>
+      {brandAnnouncementOpen && bootstrap?.status === "ready" && <BrandAnnouncementDialog welcome
+        onToggleTheme={() => setThemeMode(effectiveTheme === "dark" ? "light" : "dark")}
+        onDismiss={() => setBrandAnnouncementOpen(false)}
+        onUpdate={() => { try { localStorage.setItem("jvox-brand-welcome-2026", "seen"); } catch { /* 无法保存时下次启动再次提醒。 */ } setBrandAnnouncementOpen(false); }} />}
       <RuntimePreparation onRun={handleStartService} backendStatus={bootstrap?.status || "booting"} backendDetail={bootstrap?.detail || ""} />
       <aside className="sidebar">
         <div className="sidebar-top">
@@ -1062,8 +1070,8 @@ function App() {
             <img src={brandIcon} alt="" style={{ width: 34, height: 34, objectFit: "contain" }} />
           </button>
           <div className="brand-copy">
-            <strong>VoxCPM</strong>
-            <span>STUDIO · 本地配音</span>
+            <strong>JVOX Studio</strong>
+            <span>配音系统</span>
           </div>
           </div>
           <div className="studio-nav-caption">创作空间</div>
@@ -1092,7 +1100,7 @@ function App() {
         <div className="studio-sidebar-foot">
           <ComponentManager onRun={handleStartService} backendRunning={Boolean(bootstrap?.backendRunning)} />
           <div><span className={`studio-service-dot ${bootstrap?.backendRunning ? "is-ready" : ""}`} /><strong>{bootstrap?.backendRunning ? "本地引擎已连接" : "本地引擎准备中"}</strong></div>
-          <p>{runtime?.cuda_available ? (runtime.gpu_names[0] || "CUDA GPU") : "VoxCPM 2 · 本地运行"}</p>
+          <p>{runtime?.cuda_available ? (runtime.gpu_names[0] || "CUDA GPU") : "JVOX · 本地运行"}</p>
           <span>声音，让创作发生。</span>
         </div>
       </aside>

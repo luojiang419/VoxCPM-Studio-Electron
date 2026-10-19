@@ -1,6 +1,6 @@
 param(
     [string]$PythonVersion = "3.12.10",
-    [string]$BundleName = "VoxCPM-Studio-Electron-Portable",
+    [string]$BundleName = "JVOX-Studio-Portable",
     [string]$OutputRoot = "",
     [string]$ModelDir = "",
     [string]$ModelRepoId = "openbmb/VoxCPM2",
@@ -30,13 +30,13 @@ $bundleRoot = Join-Path $OutputRoot $BundleName
 $electronProject = Join-Path $electronRoot "frontend\voxcpm_studio_electron"
 $electronBundleRoot = Join-Path $bundleRoot "electron_shell"
 $electronRuntime = Join-Path $electronProject "node_modules\electron\dist"
-$desktopExeName = "VoxCPM Studio.exe"
+$desktopExeName = "JVOX Studio配音系统.exe"
 $desktopExePath = Join-Path $bundleRoot $desktopExeName
 $resourcesRoot = Join-Path $bundleRoot "resources"
 $resourcesAppRoot = Join-Path $resourcesRoot "app"
-$desktopLauncherBat = Join-Path $bundleRoot "Launch VoxCPM Studio Desktop.bat"
-$electronAliasBat = Join-Path $bundleRoot "Launch VoxCPM Studio Electron.bat"
-$legacyDesktopBat = Join-Path $bundleRoot "Launch VoxCPM Studio Legacy WebView.bat"
+$desktopLauncherBat = Join-Path $bundleRoot "Launch JVOX Studio配音系统 Desktop.bat"
+$electronAliasBat = Join-Path $bundleRoot "Launch JVOX Studio配音系统 Electron.bat"
+$legacyDesktopBat = Join-Path $bundleRoot "Launch JVOX Studio配音系统 Legacy WebView.bat"
 $manifestPath = Join-Path $bundleRoot "runtime_manifest.json"
 $zipPath = Join-Path $OutputRoot "$BundleName.zip"
 $robocopyExe = Join-Path $env:WINDIR "System32\robocopy.exe"
@@ -190,7 +190,7 @@ New-Item -ItemType Directory -Force -Path $resourcesAppRoot | Out-Null
 Copy-Item -LiteralPath (Join-Path $electronProject "main.js") -Destination (Join-Path $resourcesAppRoot "main.js") -Force
 Copy-Item -LiteralPath (Join-Path $electronProject "preload.js") -Destination (Join-Path $resourcesAppRoot "preload.js") -Force
 Copy-Item -LiteralPath (Join-Path $electronProject "package.json") -Destination (Join-Path $resourcesAppRoot "package.json") -Force
-foreach ($updateFile in @("update-service.js", "update-window.js", "update-config.json", "updater.py", "standalone-updater.exe", "updater-runtime-config.json", "runtime-service.js", "runtime-config.json", "runtime-requirements.txt", "install-protocol.js", "component-service.js", "music-config.json", "app.ico", "app-icon.png")) {
+foreach ($updateFile in @("update-service.js", "update-window.js", "update-config.json", "updater.py", "standalone-updater.exe", "brand-uninstaller.exe", "updater-runtime-config.json", "runtime-service.js", "runtime-config.json", "runtime-requirements.txt", "install-protocol.js", "component-service.js", "music-config.json", "app.ico", "app-icon.png")) {
     Copy-Item -LiteralPath (Join-Path $electronProject $updateFile) -Destination (Join-Path $resourcesAppRoot $updateFile) -Force
 }
 Invoke-Robocopy -Source (Join-Path $electronProject "dist") -Destination (Join-Path $resourcesAppRoot "dist")
@@ -205,7 +205,7 @@ if ($copyCode -ge 8) {
     throw "robocopy failed while copying Electron shell files"
 }
 
-$existingDesktopLauncher = Join-Path $bundleRoot "Launch VoxCPM Studio Desktop.bat"
+$existingDesktopLauncher = Join-Path $bundleRoot "Launch JVOX Studio配音系统 Desktop.bat"
 if (Test-Path $existingDesktopLauncher) {
     Move-Item -LiteralPath $existingDesktopLauncher -Destination $legacyDesktopBat -Force
 }
@@ -221,7 +221,7 @@ set "VOXCPM_APP_ROOT=%~dp0app"
 set "VOXCPM_DATA_ROOT=%~dp0data"
 set "VOXCPM_PYTHON_EXE=%~dp0runtime\python\python.exe"
 if exist "%~dp0models" set "VOXCPM_MODEL_DIR=%~dp0models"
-start "" "%~dp0VoxCPM Studio.exe"
+start "" "%~dp0JVOX Studio配音系统.exe"
 endlocal
 "@
 
@@ -231,9 +231,9 @@ Set-Content -LiteralPath $electronAliasBat -Value $launcher -Encoding ASCII
 if (Test-Path $manifestPath) {
     $manifest = Get-Content -LiteralPath $manifestPath -Raw | ConvertFrom-Json
     $manifest | Add-Member -NotePropertyName "desktop_shell" -NotePropertyValue "electron" -Force
-    $manifest | Add-Member -NotePropertyName "desktop_exe" -NotePropertyValue ".\VoxCPM Studio.exe" -Force
-    $manifest | Add-Member -NotePropertyName "desktop_entry" -NotePropertyValue ".\Launch VoxCPM Studio Desktop.bat" -Force
-    $manifest | Add-Member -NotePropertyName "legacy_webview_entry" -NotePropertyValue ".\Launch VoxCPM Studio Legacy WebView.bat" -Force
+    $manifest | Add-Member -NotePropertyName "desktop_exe" -NotePropertyValue ".\JVOX Studio配音系统.exe" -Force
+    $manifest | Add-Member -NotePropertyName "desktop_entry" -NotePropertyValue ".\Launch JVOX Studio配音系统 Desktop.bat" -Force
+    $manifest | Add-Member -NotePropertyName "legacy_webview_entry" -NotePropertyValue ".\Launch JVOX Studio配音系统 Legacy WebView.bat" -Force
     $manifest | Add-Member -NotePropertyName "electron_shell_root" -NotePropertyValue ".\electron_shell" -Force
     $manifest | ConvertTo-Json -Depth 6 | Set-Content -LiteralPath $manifestPath -Encoding UTF8
 }

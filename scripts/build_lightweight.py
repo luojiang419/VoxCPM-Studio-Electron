@@ -13,7 +13,7 @@ ROOT = Path(__file__).resolve().parents[1]
 PROJECT = ROOT.parent
 FRONTEND = ROOT / "frontend/voxcpm_studio_electron"
 RUNTIME_FILES = ("runtime-service.js", "runtime-config.json", "runtime-requirements.txt", "install-protocol.js", "component-service.js", "music-config.json")
-SHELL_FILES = ("main.js", "preload.js", "package.json", "update-service.js", "update-window.js", "update-config.json", "updater.py", "standalone-updater.exe", "updater-runtime-config.json", *RUNTIME_FILES)
+SHELL_FILES = ("main.js", "preload.js", "package.json", "update-service.js", "update-window.js", "update-config.json", "updater.py", "standalone-updater.exe", "brand-uninstaller.exe", "updater-runtime-config.json", *RUNTIME_FILES)
 
 
 def build(output: Path, skip_build: bool = False, skip_zip: bool = False) -> Path:
@@ -31,14 +31,14 @@ def build(output: Path, skip_build: bool = False, skip_zip: bool = False) -> Pat
     if not (electron / "electron.exe").is_file():
         raise ValueError("请先在前端目录执行 npm ci（可配置 ELECTRON_MIRROR 国内镜像）")
     shutil.copytree(electron, output, ignore=lambda directory, names: [n for n in names if Path(directory).name == "locales" and n not in ("en-US.pak", "zh-CN.pak")])
-    (output / "electron.exe").rename(output / "VoxCPM Studio.exe")
+    (output / "electron.exe").rename(output / "JVOX Studio配音系统.exe")
     icon = ROOT / "assets/brand/voxcpm-app.ico"
     if not icon.is_file():
         raise ValueError("缺少品牌图标，请先执行 scripts/build_brand_icons.py")
     environment = dict(os.environ)
     environment["PATH"] = str(FRONTEND / "node_modules/7zip-bin/win/x64") + os.pathsep + environment.get("PATH", "")
     subprocess.run([str(FRONTEND / "node_modules/app-builder-bin/win/x64/app-builder.exe"), "rcedit", "--args",
-                    json.dumps([str(output / "VoxCPM Studio.exe"), "--set-icon", str(icon)])], env=environment, check=True)
+                    json.dumps([str(output / "JVOX Studio配音系统.exe"), "--set-icon", str(icon), "--set-file-version", json.loads((FRONTEND / "package.json").read_text("utf8"))["version"], "--set-product-version", json.loads((FRONTEND / "package.json").read_text("utf8"))["version"], "--set-version-string", "ProductName", "JVOX Studio配音系统", "--set-version-string", "FileDescription", "JVOX Studio配音系统"])], env=environment, check=True)
     app = output / "resources/app"
     app.mkdir(parents=True, exist_ok=True)
     for name in SHELL_FILES:
@@ -61,11 +61,11 @@ def build(output: Path, skip_build: bool = False, skip_zip: bool = False) -> Pat
     for name in ("setup_lipsync.py", "requirements-lipsync.txt"):
         if (ROOT / "scripts" / name).is_file():
             shutil.copy2(ROOT / "scripts" / name, scripts / name)
-    manifest = {"protocol": 1, "mode": "lightweight", "platform": "win32-x64", "version": json.loads((FRONTEND / "package.json").read_text())["version"]}
+    manifest = {"protocol": 1, "mode": "lightweight", "platform": "win32-x64", "version": json.loads((FRONTEND / "package.json").read_text("utf8"))["version"]}
     for name in ("lightweight.json", "runtime_manifest.json"):
         (output / name).write_text(json.dumps(manifest, indent=2) + "\n", encoding="utf-8")
     (output / "使用说明.txt").write_text(
-        "双击 VoxCPM Studio.exe，自动检查并补齐已选择的功能、模型和依赖，然后进入工作区。\n"
+        "双击 JVOX Studio配音系统.exe，自动检查并补齐已选择的功能、模型和依赖，然后进入工作区。\n"
         "首次需要联网并预留至少 25GB 可用空间；具体下载量取决于显卡和缓存。\n"
         "桌面、模型、Python 和依赖优先从魔搭补齐。补齐后可离线使用已安装功能。\n"
         "RTX 50 系自动选择 CUDA 12.8，需要 NVIDIA Windows 驱动 570.65 或更新。\n"
@@ -88,7 +88,7 @@ def build(output: Path, skip_build: bool = False, skip_zip: bool = False) -> Pat
 
 if __name__ == "__main__":
     parser = argparse.ArgumentParser(description=__doc__)
-    parser.add_argument("--output", type=Path, default=ROOT / "builds/VoxCPM-Studio-Lightweight-2.0.2")
+    parser.add_argument("--output", type=Path, default=ROOT / "builds/JVOX-Studio-Lightweight-2.0.2")
     parser.add_argument("--skip-build", action="store_true")
     parser.add_argument("--skip-zip", action="store_true")
     args = parser.parse_args()

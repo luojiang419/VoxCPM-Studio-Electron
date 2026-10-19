@@ -233,10 +233,10 @@ namespace VoxBootstrap {
             diskPanel=new DiskStrip(dark) { Name="local-disks", TabIndex=0 };
             rootDetector = detectRoot ?? (() => Installer.DefaultRoot(!preview));
             driveSurvey = survey ?? Installer.SurveyDrives;
-            Text = "VoxCPM Studio" + (preview ? " · 安装演示" : " 安装程序"); ClientSize = new Size(720, 830);
+            Text = "JVOX Studio配音系统" + (preview ? " · 安装演示" : " 安装程序"); ClientSize = new Size(720, 830);
             AutoScaleMode = AutoScaleMode.None; Font = new Font("Microsoft YaHei UI", 10); BackColor = Paper;
             StartPosition = FormStartPosition.CenterScreen; FormBorderStyle = FormBorderStyle.None; DoubleBuffered = true;
-            AccessibleName = "VoxCPM Studio 启动器"; MaximizeBox = false;
+            AccessibleName = "JVOX Studio配音系统 启动器"; MaximizeBox = false;
             run.Text = "安装并运行  →"; run.AccessibleName = "安装并准备工作台"; run.TabIndex = 3;
             pause.Text = "暂停"; pause.AccessibleName = "暂停准备"; pause.Visible = false; pause.TabIndex = 1;
             close.Text = "×"; close.Name="close"; close.Glyph=ButtonGlyph.Close; close.AccessibleName = "关闭启动器"; close.TabIndex = 3;
@@ -262,9 +262,9 @@ namespace VoxBootstrap {
             Controls.AddRange(new Control[] { installPath, desktopShortcut, startMenuShortcut });
             diskPanel.BackColor = Paper; Controls.Add(diskPanel);
             browse.Click += (sender, args) => {
-                using (var picker = new FolderBrowserDialog { Description = "选择安装位置，将在其中创建专用 VoxCPMStudio 文件夹", ShowNewFolderButton = true }) {
+                using (var picker = new FolderBrowserDialog { Description = "选择安装位置，将在其中创建专用 JVOXStudio 文件夹", ShowNewFolderButton = true }) {
                     if (Directory.Exists(installPath.Text)) picker.SelectedPath = installPath.Text;
-                    if (picker.ShowDialog(this) == DialogResult.OK) installPath.Text = Path.GetFileName(picker.SelectedPath).Equals("VoxCPMStudio", StringComparison.OrdinalIgnoreCase) ? picker.SelectedPath : Path.Combine(picker.SelectedPath, "VoxCPMStudio");
+                    if (picker.ShowDialog(this) == DialogResult.OK) installPath.Text = Path.GetFileName(picker.SelectedPath).Equals("JVOXStudio", StringComparison.OrdinalIgnoreCase) ? picker.SelectedPath : Path.Combine(picker.SelectedPath, "JVOXStudio");
                 }
             };
             try {
@@ -328,7 +328,7 @@ namespace VoxBootstrap {
                 string detail = current ? "继续安装 · " + space : problem == null ? space : !drive.ready ? "暂不可用" : drive.root.StartsWith("C:", StringComparison.OrdinalIgnoreCase) && drives.Length > 1 ? "系统盘 · 优先其他分区" : "空间不足 · " + space;
                 string resumableRoot = current ? installPath.Text : null;
                 var card = new DiskCard(drive, diskIcon, dark, detail) { Size = new Size(width,132), Margin = new Padding(0,0,drive == drives.Last() ? 0 : 12,0), Enabled = current || problem == null };
-                string folderHint = drive.root.StartsWith("C:",StringComparison.OrdinalIgnoreCase) ? "点击选择，应用将安装到无需提权的用户目录" : "点击选择，应用将安装到 Program Files\\VoxCPMStudio";
+                string folderHint = drive.root.StartsWith("C:",StringComparison.OrdinalIgnoreCase) ? "点击选择，应用将安装到无需提权的用户目录" : "点击选择，应用将安装到 Program Files\\JVOXStudio";
                 driveTips.SetToolTip(card, drive.root + "\n" + space + "\n" + (current ? "继续当前安装" : problem ?? folderHint));
                 card.Click += (sender, args) => {
                     try {
@@ -389,7 +389,7 @@ namespace VoxBootstrap {
             using (var shape = Round(new RectangleF(0.5f, .5f, 719, 829), 22)) using (var border = new Pen(StudioTheme.Border(dark))) g.DrawPath(border, shape);
             if (brandMark != null) g.DrawImage(brandMark, new Rectangle(36, 28, 50, 50));
             else TextAt(g, "V", 28, Accent, 48, 36, 32, true);
-            TextAt(g, "VOXCPM", 14, Ink, 92, 35, 160, true); TextAt(g, "STUDIO", 10, Muted, 93, 57, 140);
+            TextAt(g, "JVOX", 14, Ink, 92, 35, 160, true); TextAt(g, "Studio配音系统", 10, Muted, 93, 57, 140);
             TextAt(g, "本地 AI 配音工作台", 11, Muted, 438, 43, 140);
             TextAt(g, "好声音，从这里开始。", 31, Ink, 40, 133, 420);
             TextAt(g, "选择安装位置，剩下的交给我们。", 14, Muted, 43, 183, 400);
@@ -459,7 +459,7 @@ namespace VoxBootstrap {
         }
         void StartDemo() { if (view == "ready") fraction = 0; demoStart = fraction; installPhase = fraction > .55 ? 1 : 0; SetPreview("downloading", fraction); }
         static void OpenWorkspace(string root) {
-            var start = new ProcessStartInfo(Path.Combine(root, "VoxCPM Studio.exe"), "--voxcpm-run --voxcpm-show") { WorkingDirectory = root, UseShellExecute = false };
+            var start = new ProcessStartInfo(Brand.ExecutablePath(root), "--voxcpm-run --voxcpm-show") { WorkingDirectory = root, UseShellExecute = false };
             start.EnvironmentVariables.Remove("ELECTRON_RUN_AS_NODE"); start.EnvironmentVariables["VOXCPM_DATA_ROOT"] = Path.Combine(root, "data"); Process.Start(start);
         }
         async Task Start() {
@@ -551,7 +551,7 @@ namespace VoxBootstrap {
                 string identity;
                 using (var hash = SHA256.Create()) identity = BitConverter.ToString(hash.ComputeHash(System.Text.Encoding.UTF8.GetBytes(AppDomain.CurrentDomain.BaseDirectory.ToUpperInvariant()))).Replace("-", "");
                 using (var mutex = new Mutex(false, "Local\\VoxCPM-Bootstrap-" + identity)) {
-                    if (!mutex.WaitOne(0)) { MessageBox.Show("启动器已在运行，请查看已有窗口。", "VoxCPM Studio"); return; }
+                    if (!mutex.WaitOne(0)) { MessageBox.Show("启动器已在运行，请查看已有窗口。", "JVOX Studio配音系统"); return; }
                     bool demo = args.Contains("--demo");
 #if DEMO
                     demo = true;
@@ -562,7 +562,7 @@ namespace VoxBootstrap {
 #endif
                         )); } finally { mutex.ReleaseMutex(); }
                 }
-            } catch (Exception error) { MessageBox.Show(error.Message, "VoxCPM Studio 启动未完成", MessageBoxButtons.OK, MessageBoxIcon.Error); Environment.ExitCode = 1; }
+            } catch (Exception error) { MessageBox.Show(error.Message, "JVOX Studio配音系统 启动未完成", MessageBoxButtons.OK, MessageBoxIcon.Error); Environment.ExitCode = 1; }
         }
     }
 }

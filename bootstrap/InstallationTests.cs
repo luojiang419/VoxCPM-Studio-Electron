@@ -23,7 +23,7 @@ public static class InstallationTests {
         return control.GetType().GetMethod(method, BindingFlags.Instance | BindingFlags.NonPublic).Invoke(control,args);
     }
     static void Put(string file, string text) { Directory.CreateDirectory(Path.GetDirectoryName(file)); File.WriteAllText(file, text); }
-    static Manifest Manifest() { return new Manifest { appVersion = "2.0.2", entry = "VoxCPM Studio.exe", files = new[] { new Asset { name = "VoxCPM Studio.exe" }, new Asset { name = "resources/app/main.js" } } }; }
+    static Manifest Manifest() { return new Manifest { appVersion = "2.0.2", entry = "JVOX Studio配音系统.exe", files = new[] { new Asset { name = "JVOX Studio配音系统.exe" }, new Asset { name = "resources/app/main.js" } } }; }
     static string Key() { string key = Installer.UninstallKey + ".Test." + Guid.NewGuid().ToString("N"); Keys.Add(key); return key; }
     static InstallState Begin(string root, string key) { var state = Installer.Begin(root, Manifest(), false, key); state.registryKey = key; Installer.SaveState(state); return state; }
     static string Report(string root, string session, bool ready = true) {
@@ -155,7 +155,7 @@ public static class InstallationTests {
             });
             test("默认浅色，主题按钮同步全部控件并保留安装进度、目录、开关和滚动位置", () => {
                 var drives=new[] { "C","D","E","F","G","H" }.Select(letter=>new InstallDrive { root=letter+@":\",ready=true,free=Installer.RequiredSpace*2 }).ToArray();
-                using(var form=new Launcher(Manifest(),true,null,()=>@"D:\Program Files\VoxCPMStudio",()=>drives)) {
+                using(var form=new Launcher(Manifest(),true,null,()=>@"D:\Program Files\JVOXStudio",()=>drives)) {
                     form.ShowInTaskbar=false; form.Opacity=0; form.Show(); Application.DoEvents();
                     Check(!form.IsDark && form.BackColor==Color.FromArgb(251,250,247),"默认没有使用浅色");
                     var theme=(SoftButton)form.Controls["theme"]; var panel=(DiskStrip)form.Controls["local-disks"];
@@ -177,33 +177,33 @@ public static class InstallationTests {
                     new InstallDrive { root = @"D:\", ready = true, free = Installer.RequiredSpace * 2 },
                     new InstallDrive { root = @"E:\", ready = true, free = Installer.RequiredSpace * 3 }
                 };
-                Check(Installer.SelectAutomaticRoot(drives, @"C:\Users\test\AppData\Local\Programs\VoxCPMStudio", p => true) == @"E:\Program Files\VoxCPMStudio", "没有选择空间最大的非 C 分区");
-                Check(Installer.SelectAutomaticRoot(drives, @"C:\Users\test\AppData\Local\Programs\VoxCPMStudio", p => p.StartsWith(@"D:\")) == @"D:\Program Files\VoxCPMStudio", "未跳过不可写分区");
+                Check(Installer.SelectAutomaticRoot(drives, @"C:\Users\test\AppData\Local\Programs\JVOXStudio", p => true) == @"E:\Program Files\JVOXStudio", "没有选择空间最大的非 C 分区");
+                Check(Installer.SelectAutomaticRoot(drives, @"C:\Users\test\AppData\Local\Programs\JVOXStudio", p => p.StartsWith(@"D:\")) == @"D:\Program Files\JVOXStudio", "未跳过不可写分区");
                 var attempted = new List<string>();
                 Reject(() => Installer.SelectAutomaticRoot(drives, @"C:\test", p => { attempted.Add(p); return false; }), "所有目录不可写却通过");
-                Check(attempted.SequenceEqual(new[] { @"E:\Program Files\VoxCPMStudio", @"D:\Program Files\VoxCPMStudio", @"C:\test" }), "默认目录不可写时仍回退根目录或其他目录");
-                Check(Installer.RootOnDrive(drives[2], drives, false) == @"E:\Program Files\VoxCPMStudio", "磁盘卡片与自动选址目录不一致");
+                Check(attempted.SequenceEqual(new[] { @"E:\Program Files\JVOXStudio", @"D:\Program Files\JVOXStudio", @"C:\test" }), "默认目录不可写时仍回退根目录或其他目录");
+                Check(Installer.RootOnDrive(drives[2], drives, false) == @"E:\Program Files\JVOXStudio", "磁盘卡片与自动选址目录不一致");
             });
             test("其他分区不可用时回退可写 C 盘，手动选择也允许 C 盘", () => {
                 var drives = new[] {
                     new InstallDrive { root = @"C:\", ready = true, free = Installer.RequiredSpace * 8 },
                     new InstallDrive { root = @"D:\", ready = true, free = Installer.RequiredSpace - 1 }
                 };
-                Check(Installer.SelectAutomaticRoot(drives, @"C:\用户\VoxCPMStudio", p => true) == @"C:\用户\VoxCPMStudio", "未回退可用的 C 盘");
+                Check(Installer.SelectAutomaticRoot(drives, @"C:\用户\JVOXStudio", p => true) == @"C:\用户\JVOXStudio", "未回退可用的 C 盘");
                 drives[1].ready = false;
-                Check(Installer.SelectAutomaticRoot(drives, @"C:\用户\VoxCPMStudio", p => true) == @"C:\用户\VoxCPMStudio", "不可用分区阻止 C 盘安装");
-                Installer.ValidateDestinationCapacity(@"C:\VoxCPMStudio", drives);
+                Check(Installer.SelectAutomaticRoot(drives, @"C:\用户\JVOXStudio", p => true) == @"C:\用户\JVOXStudio", "不可用分区阻止 C 盘安装");
+                Installer.ValidateDestinationCapacity(@"C:\JVOXStudio", drives);
                 Check(Installer.DriveProblem(drives[0], drives) == null, "C 盘卡片仍被禁用");
                 // 避免命中本机真实安装记录的续装容量豁免。
                 Reject(() => Installer.ValidateDestinationCapacity(@"D:\VoxCPM-Capacity-Test-" + Guid.NewGuid().ToString("N"), drives), "不可用分区通过");
             });
             test("C 盘多个候选逐个检查，拒绝跨盘路径并兼容中文", () => {
                 var drives = new[] { new InstallDrive { root = @"C:\", ready = true, free = Installer.RequiredSpace * 2 } };
-                string[] candidates = { @"D:\错盘", @"C:\Users\中文用户\AppData\Local\受限", @"C:\Users\中文用户\Apps\VoxCPMStudio" };
+                string[] candidates = { @"D:\错盘", @"C:\Users\中文用户\AppData\Local\受限", @"C:\Users\中文用户\Apps\JVOXStudio" };
                 var attempted = new List<string>();
                 string chosen = Installer.SelectAutomaticRoot(drives, candidates, folder => { attempted.Add(folder); return folder == candidates[2]; });
                 Check(chosen == candidates[2] && attempted.SequenceEqual(candidates.Skip(1)), "候选避让或中文路径选择失败");
-                Check(Installer.SystemCandidates(@"C:\Users\中文用户\AppData\Local", @"C:\Users\中文用户")[0] == @"C:\Users\中文用户\AppData\Local\VoxCPMStudio", "C 盘仍默认 Programs 或未使用当前用户目录");
+                Check(Installer.SystemCandidates(@"C:\Users\中文用户\AppData\Local", @"C:\Users\中文用户")[0] == @"C:\Users\中文用户\AppData\Local\JVOXStudio", "C 盘仍默认 Programs 或未使用当前用户目录");
             });
             test("实际 EXE 创建/重命名检查和卸载器锁定检查，保留被占用文件", () => {
                 string root = Path.Combine(fixtures, "中文权限检查");
@@ -226,7 +226,7 @@ public static class InstallationTests {
                 Check(File.ReadAllText(target) == "new installer bytes" && !Directory.GetFiles(root, ".uninstall-*.exe").Any(), "失败破坏旧卸载器或残留临时文件");
             });
             test("仅 C 盘时使用可写用户目录且严格检查容量阈值", () => {
-                string root = @"C:\Users\test\AppData\Local\Programs\VoxCPMStudio";
+                string root = @"C:\Users\test\AppData\Local\Programs\JVOXStudio";
                 var drives = new[] { new InstallDrive { root = @"C:\", ready = true, free = Installer.RequiredSpace } };
                 Check(Installer.SelectAutomaticRoot(drives, root, p => p == root) == root, "仅 C 盘选择错误");
                 Installer.ValidateDestinationCapacity(root, drives);
@@ -237,13 +237,13 @@ public static class InstallationTests {
                 int attempts = 0;
                 using (var form = new Launcher(Manifest(), false, false, () => {
                     if (++attempts == 1) throw new IOException("其他分区空间均不足。\n至少需要 25 GiB；D盘 1 GiB。请释放空间后重新检测。");
-                    return @"G:\Program Files\VoxCPMStudio";
+                    return @"G:\Program Files\JVOXStudio";
                 })) {
                     form.ShowInTaskbar = false; form.Opacity = 0; form.Show(); Application.DoEvents();
                     var run = (SoftButton)form.Controls["install"]; var detect = (SoftButton)form.Controls["detect"];
                     Check(!run.Enabled && detect.Enabled && form.Controls["destination"].Text == "", "错误状态未阻止安装或不能重新检测");
                     Check(form.AccessibleDescription.Contains("空间均不足"), "没有显示不足原因");
-                    detect.PerformClick(); Check(attempts == 2 && run.Enabled && form.Controls["destination"].Text == @"G:\Program Files\VoxCPMStudio", "重新检测未恢复");
+                    detect.PerformClick(); Check(attempts == 2 && run.Enabled && form.Controls["destination"].Text == @"G:\Program Files\JVOXStudio", "重新检测未恢复");
                     form.Controls["destination"].Text = ""; Check(!run.Enabled, "空路径允许安装"); form.Close();
                 }
             });
@@ -254,20 +254,20 @@ public static class InstallationTests {
                     new InstallDrive { root = @"E:\", ready = true, free = Installer.RequiredSpace * 3 },
                     new InstallDrive { root = @"G:\", ready = true, free = 100 }
                 };
-                using (var form = new Launcher(Manifest(), true, false, () => @"D:\Program Files\VoxCPMStudio", () => drives)) {
+                using (var form = new Launcher(Manifest(), true, false, () => @"D:\Program Files\JVOXStudio", () => drives)) {
                     form.ShowInTaskbar = false; form.Opacity = 0; form.Show(); Application.DoEvents();
                     var panel = (DiskStrip)form.Controls["local-disks"];
                     var d = (DiskCard)panel.Controls["drive-D"]; var e = (DiskCard)panel.Controls["drive-E"];
                     var c = (DiskCard)panel.Controls["drive-C"]; var g = (DiskCard)panel.Controls["drive-G"];
                     Check(c.Enabled && !g.Enabled && d.Selected, "不可选磁盘状态错误");
                     Check(!panel.HasOverflow && !panel.VerticalScroll.Visible, "四张卡片产生了多余滚动条");
-                    e.Choose(); Check(form.Controls["destination"].Text == @"E:\Program Files\VoxCPMStudio" && e.Selected && !d.Selected, "点击卡片未使用专用目录或选中状态未切换");
+                    e.Choose(); Check(form.Controls["destination"].Text == @"E:\Program Files\JVOXStudio" && e.Selected && !d.Selected, "点击卡片未使用专用目录或选中状态未切换");
                     Check(e.IsAnimating, "选择未触发动画");
                     e.AdvanceAnimation(.25); double intermediate = e.IconScale;
                     Check(intermediate > 1 && intermediate < 1.17, "图标没有平滑放大");
                     e.AdvanceAnimation(1); Check(Math.Abs(e.IconScale-1.17)<.0001 && !e.IsAnimating, "缩放动画没有正确结束");
                     Check((e.AccessibilityObject.State & AccessibleStates.Checked) != 0, "辅助功能没有选中状态");
-                    g.Choose(); Check(form.Controls["destination"].Text == @"E:\Program Files\VoxCPMStudio", "禁用分区仍可被选择");
+                    g.Choose(); Check(form.Controls["destination"].Text == @"E:\Program Files\JVOXStudio", "禁用分区仍可被选择");
                     c.Choose(); Check(Path.GetPathRoot(form.Controls["destination"].Text) == @"C:\" && c.Selected, "可用 C 盘未选择用户目录");
                     d.Choose(); e.AdvanceAnimation(1); Check(e.IconScale == 1, "切换后旧图标未恢复");
                     form.Close();
@@ -278,7 +278,7 @@ public static class InstallationTests {
                 double previous = 0;
                 for (int i=1;i<=100;i++) { double value = BezierMotion.Ease(i/100.0); Check(value >= previous && value <= 1, "缓动越界或回跳"); previous=value; }
                 var drives = new[] { "C", "D", "E", "F", "G", "H" }.Select(letter => new InstallDrive { root=letter+@":\", ready=true, free=Installer.RequiredSpace*2 }).ToArray();
-                using (var form = new Launcher(Manifest(), true, false, () => @"D:\Program Files\VoxCPMStudio", () => drives)) {
+                using (var form = new Launcher(Manifest(), true, false, () => @"D:\Program Files\JVOXStudio", () => drives)) {
                     form.ShowInTaskbar=false; form.Opacity=0; form.Show(); Application.DoEvents();
                     var panel=(DiskStrip)form.Controls["local-disks"];
                     Check(panel.Controls.Count==6 && panel.HasOverflow && !panel.VerticalScroll.Visible && !panel.HorizontalScroll.Visible, "出现了原生横/纵滚动条");
@@ -342,7 +342,7 @@ public static class InstallationTests {
             });
             test("必须取得正确会话的就绪报告才能创建快捷方式和注册", () => {
                 string root = Path.Combine(fixtures, "not-ready"), key = Key(); Begin(root, key);
-                Put(Path.Combine(root, "VoxCPM Studio.exe"), "app"); Put(Path.Combine(root, "uninstall.exe"), "uninstaller");
+                Put(Path.Combine(root, "JVOX Studio配音系统.exe"), "app"); Put(Path.Combine(root, "uninstall.exe"), "uninstaller");
                 var paths = new IntegrationPaths { desktop = Path.Combine(fixtures, "desktop-not-ready"), startMenu = Path.Combine(fixtures, "menu-not-ready"), registryKey = key };
                 Reject(() => Installer.Complete(root, Manifest(), true, true, paths), "没有就绪报告却登记成功");
                 string session = Guid.NewGuid().ToString("N"), report = Report(root, session);
@@ -352,16 +352,16 @@ public static class InstallationTests {
             });
             test("真实快捷方式/注册、保护同名快捷方式、卸载保留个人数据", () => {
                 string root = Path.Combine(fixtures, "complete"), key = Key(); var state = Begin(root, key);
-                Put(Path.Combine(root, "VoxCPM Studio.exe"), "app"); Put(Path.Combine(root, "uninstall.exe"), "uninstaller");
+                Put(Path.Combine(root, "JVOX Studio配音系统.exe"), "app"); Put(Path.Combine(root, "uninstall.exe"), "uninstaller");
                 Put(Path.Combine(root, "resources/app/main.js"), "app"); Put(Path.Combine(root, "runtime/python.exe"), "runtime"); Put(Path.Combine(root, "models/model.bin"), "model");
                 Put(Path.Combine(root, "data/voices/voice.wav"), "personal"); Put(Path.Combine(root, "data/cache/download.part"), "cache");
                 var paths = new IntegrationPaths { desktop = Path.Combine(fixtures, "desktop"), startMenu = Path.Combine(fixtures, "menu"), registryKey = key }; Directory.CreateDirectory(paths.desktop);
-                string foreign = Path.Combine(paths.desktop, "VoxCPM Studio.lnk"), foreignTarget = Path.Combine(fixtures, "other.exe"); Put(foreignTarget, "other"); ForeignShortcut(foreign, foreignTarget);
+                string foreign = Path.Combine(paths.desktop, "JVOX Studio配音系统.lnk"), foreignTarget = Path.Combine(fixtures, "other.exe"); Put(foreignTarget, "other"); ForeignShortcut(foreign, foreignTarget);
                 string session = Guid.NewGuid().ToString("N"), report = Report(root, session);
                 Installer.Complete(root, Manifest(), true, true, paths, report, session); state = Installer.ReadState(root);
                 Check(state.state == "complete" && state.shortcuts.Length == 3, "安装集成未完成");
                 Check(Installer.ShortcutTarget(foreign) == foreignTarget, "覆盖了用户原有同名快捷方式");
-                Check(state.shortcuts.Any(p => Path.GetFileName(p) == "VoxCPM Studio (2).lnk"), "没有避让同名快捷方式");
+                Check(state.shortcuts.Any(p => Path.GetFileName(p) == "JVOX Studio配音系统 (2).lnk"), "没有避让同名快捷方式");
                 using (var entry = Registry.CurrentUser.OpenSubKey(key)) { Check(Convert.ToString(entry.GetValue("InstallLocation")) == root, "注册位置错误"); Check(Convert.ToString(entry.GetValue("UninstallString")).Contains("uninstall.exe"), "卸载入口缺失"); }
                 Installer.Remove(root, state.id, false);
                 Check(File.Exists(Path.Combine(root, "data/voices/voice.wav")), "误删个人数据"); Check(!Directory.Exists(Path.Combine(root, "models")) && !Directory.Exists(Path.Combine(root, "runtime")), "未清理依赖和模型");
@@ -380,7 +380,7 @@ public static class InstallationTests {
             });
             test("卸载遇到占用文件时保留登记和卸载程序以便重试", () => {
                 string root = Path.Combine(fixtures, "busy"), key = Key(); var state = Begin(root, key);
-                Put(Path.Combine(root, "VoxCPM Studio.exe"), "app"); Put(Path.Combine(root, "uninstall.exe"), "uninstaller"); Put(Path.Combine(root, "runtime/held.dll"), "locked");
+                Put(Path.Combine(root, "JVOX Studio配音系统.exe"), "app"); Put(Path.Combine(root, "uninstall.exe"), "uninstaller"); Put(Path.Combine(root, "runtime/held.dll"), "locked");
                 var paths = new IntegrationPaths { desktop = Path.Combine(fixtures, "busy-desktop"), startMenu = Path.Combine(fixtures, "busy-menu"), registryKey = key };
                 string session = Guid.NewGuid().ToString("N"), report = Report(root, session); Installer.Complete(root, Manifest(), true, false, paths, report, session);
                 using (var hold = new FileStream(Path.Combine(root, "runtime/held.dll"), FileMode.Open, FileAccess.ReadWrite, FileShare.None)) {

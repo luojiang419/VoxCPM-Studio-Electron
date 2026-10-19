@@ -2367,14 +2367,14 @@ def build_interface(studio: VoxCPMStudio) -> gr.Blocks:
             gr.update(value="收起说明" if next_visible else "项目说明"),
         )
 
-    with gr.Blocks(theme=app_theme(), css=CUSTOM_CSS, title="VoxCPM Studio Console") as app:
+    with gr.Blocks(theme=app_theme(), css=CUSTOM_CSS, title="JVOX Studio配音系统") as app:
         with gr.Row(elem_classes=["studio-shell"]):
             with gr.Column(scale=1, min_width=236, elem_classes=["sidebar-panel", "sidebar-column"]):
                 gr.HTML(
                     '<div class="logo-wrap">'
                     '<img src="/gradio_api/file=assets/voxcpm_logo.png" alt="VoxCPM logo">'
                     '<div class="logo-copy">'
-                    "<h1>VoxCPM Studio</h1>"
+                    "<h1>JVOX Studio配音系统</h1>"
                     "<p>统一管理推理、批量任务与 LoRA 微调</p>"
                     "</div>"
                     "</div>"
@@ -2434,7 +2434,7 @@ def build_interface(studio: VoxCPMStudio) -> gr.Blocks:
 
                     gr.HTML(tip_html("目标文本", "这里填写要最终合成出来的内容。方言生成时，请直接填写方言文本而不是普通话原文。"))
                     workspace_text = gr.Textbox(
-                        value="欢迎来到 VoxCPM Studio，本地控制台已经准备就绪。",
+                        value="欢迎来到 JVOX Studio配音系统，本地控制台已经准备就绪。",
                         lines=4,
                         show_label=False,
                     )

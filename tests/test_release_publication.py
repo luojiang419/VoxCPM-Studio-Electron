@@ -67,7 +67,7 @@ class PublicationTests(unittest.TestCase):
 
     def test_unified_readme_describes_install_check_and_repair(self):
         readme = self.run_publication(True)["readme"]
-        for text in ("安装修复一体版", "首次运行", "正常提示", "只有需要修复", "模型选择与安装修复"):
+        for text in ("JVOX Studio配音系统安装器", "首次运行", "正常提示", "只有需要修复", "模型选择与安装修复"):
             self.assertIn(text, readme)
         self.assertNotIn("点击“开始修复并升级”", readme)
 

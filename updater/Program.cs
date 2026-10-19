@@ -69,7 +69,7 @@ namespace VoxStandaloneUpdater {
             maintenance = settings != null && settings.ContainsKey("maintenance") && (bool)settings["maintenance"];
             promptMode = !repairMode && settings != null && settings.ContainsKey("mode") && Convert.ToString(settings["mode"]) == "prompt";
             dark = forceDark ?? (settings != null && settings.ContainsKey("theme") && Convert.ToString(settings["theme"]) == "dark");
-            Text = maintenance ? "VoxCPM Studio · 安装与修复" : repairMode ? "VoxCPM Studio · 更新修复器" : "VoxCPM Studio · 独立更新器";
+            Text = maintenance ? "JVOX Studio配音系统 · 安装与修复" : repairMode ? "JVOX Studio配音系统 · 更新修复器" : "JVOX Studio配音系统 · 独立更新器";
             ClientSize = new Size(720, 580);
             AutoScaleMode = AutoScaleMode.None;
             FormBorderStyle = FormBorderStyle.None;
@@ -89,7 +89,7 @@ namespace VoxStandaloneUpdater {
             logs.Click += delegate { if (promptMode) { ChooseUpdate("later"); Close(); } else Process.Start(new ProcessStartInfo("explorer.exe", Quote(session)) { UseShellExecute = true }); };
             close.Text = "正在更新，请稍候"; close.Enabled = false;
             close.Click += delegate { if (promptMode) ChooseUpdate("now"); else if(maintenance && finished && ResultCode==0) {
-                var start=new ProcessStartInfo(Path.Combine(Convert.ToString(settings["repairRoot"]),"VoxCPM Studio.exe"),"--voxcpm-run --voxcpm-show") {UseShellExecute=false,WorkingDirectory=Convert.ToString(settings["repairRoot"])};
+                var start=new ProcessStartInfo(Brand.ExecutablePath(Convert.ToString(settings["repairRoot"])),"--voxcpm-run --voxcpm-show") {UseShellExecute=false,WorkingDirectory=Convert.ToString(settings["repairRoot"])};
                 start.EnvironmentVariables.Remove("ELECTRON_RUN_AS_NODE");
                 Process.Start(start); Close();
             } else if (repairMode && (!repairStarted || (finished && ResultCode != 0))) BeginRepair(); else Close(); };
@@ -106,7 +106,7 @@ namespace VoxStandaloneUpdater {
                 repairRoot.BorderStyle = BorderStyle.None; repairRoot.AccessibleName = "原软件安装目录";
                 repairRoot.Text = settings != null && settings.ContainsKey("repairRoot") ? Convert.ToString(settings["repairRoot"]) : "";
                 browseRoot.Text = "选择目录"; browseRoot.AccessibleName = "选择原软件安装目录";
-                browseRoot.Click += delegate { using(var picker=new FolderBrowserDialog { Description="请选择包含 VoxCPM Studio.exe 的原安装目录，不要新建目录",ShowNewFolderButton=false }) {
+                browseRoot.Click += delegate { using(var picker=new FolderBrowserDialog { Description="请选择包含 JVOX Studio配音系统.exe 的原安装目录，不要新建目录",ShowNewFolderButton=false }) {
                     if(Directory.Exists(repairRoot.Text)) picker.SelectedPath=repairRoot.Text;
                     if(picker.ShowDialog(this)==DialogResult.OK) repairRoot.Text=picker.SelectedPath;
                 } };
@@ -122,7 +122,7 @@ namespace VoxStandaloneUpdater {
                 view = "prompt"; close.Text = "现在更新"; logs.Text = "下次启动更新";
                 close.AccessibleName = "现在更新"; logs.AccessibleName = "下次启动更新";
                 close.Enabled = windowClose.Enabled = true;
-                message.Text = "VoxCPM Studio " + Convert.ToString(settings["version"]) + " · " + (Convert.ToDouble(settings["size"]) / 1048576).ToString("0.0") + " MB";
+                message.Text = "JVOX Studio配音系统 " + Convert.ToString(settings["version"]) + " · " + (Convert.ToDouble(settings["size"]) / 1048576).ToString("0.0") + " MB";
                 detail.Visible = false;
                 tips.SetToolTip(message, "发布序号 " + (settings.ContainsKey("releaseId") ? Convert.ToString(settings["releaseId"]) : ""));
             }
@@ -209,7 +209,7 @@ namespace VoxStandaloneUpdater {
             Color ink=StudioTheme.Ink(dark), muted=StudioTheme.Muted(dark), accent=StudioTheme.Accent(dark), paper=StudioTheme.Paper(dark);
             using (var shape=StudioTheme.Round(new RectangleF(.5f,.5f,719,579),22)) using(var pen=new Pen(StudioTheme.Border(dark))) g.DrawPath(pen,shape);
             if (brandMark != null) g.DrawImage(brandMark,new Rectangle(36,28,50,50));
-            TextAt(g,"VOXCPM",14,ink,new RectangleF(92,35,160,22),true); TextAt(g,"STUDIO",10,muted,new RectangleF(93,57,140,20));
+            TextAt(g,"JVOX",14,ink,new RectangleF(92,35,160,22),true); TextAt(g,"Studio配音系统",10,muted,new RectangleF(93,57,140,20));
             TextAt(g,maintenance?"安装与修复":repairMode?"更新修复器":"独立更新器",11,muted,new RectangleF(470,43,112,20));
             TextAt(g,view=="prompt"?"发现新版本。":healthy?"一切正常，开始创作吧。":maintenance && !finished?"检查一下，安心创作。":view=="error"?(repairMode?"修复需要处理。":"更新暂未完成。"):finished?(repairMode?"修复完成，安心创作。":"更新完成，继续创作。"):repairMode?"修好更新，安心创作。":"更新交给我们。",31,ink,new RectangleF(40,133,420,48));
             TextAt(g,view=="prompt"?"现在更新，或留到下次启动再决定。":healthy?"无需再次安装，你的创作空间已准备好。":maintenance?"检查安装完整性，有问题自动修复。":view=="error"?(promptMode?"工作台保持运行，可以重试或下次启动更新。":"请保留原目录，查看日志了解原因。"):repairMode?"修复旧版更新通道，保留模型与作品。":"独立完成更新，准备好后自动回到工作台。",14,muted,new RectangleF(43,184,390,42));
@@ -394,13 +394,13 @@ namespace VoxStandaloneUpdater {
             close.Enabled = true; close.Text = "关闭";
             windowClose.Enabled = true; tips.SetToolTip(windowClose,"关闭更新器");
             if (code == 0) {
-                Text = repairMode ? "VoxCPM Studio · 修复完成" : "VoxCPM Studio · 更新完成";
+                Text = repairMode ? "JVOX Studio配音系统 · 修复完成" : "JVOX Studio配音系统 · 更新完成";
                 message.Text = repairMode ? "修复完成，更新通道已验证。" : "更新完成，新版软件已启动。"; progressValue = 100;
                 detail.Text = repairMode ? "后续请在软件内检查更新，无需重复运行修复器。" : "所有检查已通过，可以继续创作。"; view = "complete"; Invalidate();
                 if(maintenance) {
                     var result=Read(Path.Combine(session,"status.json"));
                     healthy=result.ContainsKey("status") && Convert.ToString(result["status"])=="healthy";
-                    Text=healthy?"VoxCPM Studio · 一切正常":"VoxCPM Studio · 修复完成";
+                    Text=healthy?"JVOX Studio配音系统 · 一切正常":"JVOX Studio配音系统 · 修复完成";
                     message.Text=healthy?"一切正常，无需再次安装。":"问题已修复，开始创作吧。";
                     detail.Text=healthy?"开始创作吧！已有作品、模型和设置保持完好。":"修复后检查已通过，作品、模型与设置已保留。";
                     close.Text="开始创作  →"; AccessibleDescription=Convert.ToString(result["message"]); Invalidate();
@@ -421,8 +421,8 @@ namespace VoxStandaloneUpdater {
                 Write(statusFile, state);
                 if (settings != null && settings.ContainsKey("resultPath")) Write(Convert.ToString(settings["resultPath"]), state);
             } catch { }
-            Text = "VoxCPM Studio · 更新未完成";
-            if(repairMode) { Text="VoxCPM Studio · 修复需要处理"; close.Text="重新检测并修复"; }
+            Text = "JVOX Studio配音系统 · 更新未完成";
+            if(repairMode) { Text="JVOX Studio配音系统 · 修复需要处理"; close.Text="重新检测并修复"; }
             message.Text = "更新未完成：" + reason;
             detail.Text = Convert.ToString(state["status"]) == "rolled-back" ? "已恢复原版本，请查看日志后重试。" : "请保留原目录，按日志提示处理后重试。";
             view = "error"; tips.SetToolTip(message,reason); AccessibleDescription=reason+" 日志："+Path.Combine(session,"updater.log"); Invalidate();

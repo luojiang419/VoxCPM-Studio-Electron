@@ -3,7 +3,19 @@ using System.Drawing;
 using System.Drawing.Drawing2D;
 using System.Windows.Forms;
 
+[assembly: System.Reflection.AssemblyTitle("JVOX Studio配音系统")]
+[assembly: System.Reflection.AssemblyProduct("JVOX Studio配音系统")]
+[assembly: System.Reflection.AssemblyFileVersion("2.0.3.0")]
+
 namespace VoxBootstrap {
+    public static class Brand {
+        public const string Name = "JVOX Studio配音系统";
+        public const string Entry = "JVOX Studio配音系统.exe";
+        public static string ExecutablePath(string root) {
+            string current = System.IO.Path.Combine(root, Entry);
+            return System.IO.File.Exists(current) ? current : System.IO.Path.Combine(root, "VoxCPM Studio.exe");
+        }
+    }
     // 安装器与独立更新器共用的原生视觉组件，不依赖安装或更新业务。
     public static class StudioTheme {
         public static Color Paper(bool dark) { return dark ? Color.FromArgb(29,31,29) : Color.FromArgb(251,250,247); }

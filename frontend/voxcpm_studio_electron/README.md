@@ -1,6 +1,6 @@
-# VoxCPM Studio Electron
+# JVOX Studio配音系统
 
-这是 VoxCPM Studio 的 Electron 原生桌面前端工程。
+这是 JVOX Studio配音系统 的 Electron 原生桌面前端工程。
 
 ## 依赖关系
 

@@ -75,7 +75,7 @@ test("真实 HTTP 检查、断点续传、哈希失败与并发保护", async (t
   assert.equal(rangeSeen, true);
   assert.deepEqual(fs.readFileSync(path.join(service.session, "package.zip")), bytes);
   assert.deepEqual(fs.readFileSync(path.join(service.session, "updater.py")), updater, "首次升级必须使用签名新版更新器，不能沿用旧脚本");
-  assert.deepEqual(fs.readFileSync(path.join(service.session, "VoxCPM Updater.exe")), native, "独立EXE必须从签名包校验后放到会话目录");
+  assert.deepEqual(fs.readFileSync(path.join(service.session, "JVOX Updater.exe")), native, "独立EXE必须从签名包校验后放到会话目录");
   assert.equal(JSON.parse(fs.readFileSync(path.join(service.session, "session.json"))).theme, "dark");
   assert.equal((await service.check()).status, "downloaded", "检查不能丢弃已准备更新");
   service.state.status = "installing";

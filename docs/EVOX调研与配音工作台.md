@@ -39,7 +39,7 @@
 
 主工程运行源码为 `src/voxcpm/studio_api.py` 与 `studio_workspace.py`。由于 Git 仓库边界位于 `Electron版本`，桌面功能对应后端文件同时维护在 `Electron版本/backend/voxcpm/`；便携打包和热更新构建优先采用该覆盖层，防止只提交前端导致其他机器缺少新接口。
 
-运行开发版本时，应将覆盖层同步到父工程 `src/voxcpm/`，使用现有便携 Python 及本地模型目录。普通用户继续运行根目录 `VoxCPM Studio.exe`。
+运行开发版本时，应将覆盖层同步到父工程 `src/voxcpm/`，使用现有便携 Python 及本地模型目录。普通用户继续运行根目录 `JVOX Studio配音系统.exe`。
 
 ```powershell
 # 在 Electron版本 目录恢复已跟踪的桌面后端

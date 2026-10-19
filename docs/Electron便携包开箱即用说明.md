@@ -58,18 +58,18 @@ VoxCPM-Studio-Electron-Portable-2.0
 推荐直接使用下面这个入口：
 
 ```text
-VoxCPM Studio.exe
+JVOX Studio配音系统.exe
 ```
 
 它位于便携包根目录。
 
 另外也保留了这些辅助入口：
 
-1. `Launch VoxCPM Studio Desktop.bat`
+1. `Launch JVOX Studio配音系统 Desktop.bat`
    作用：显式设置包内 Python、FFmpeg、模型目录，再启动桌面程序
-2. `Launch VoxCPM Studio Electron.bat`
+2. `Launch JVOX Studio配音系统.bat`
    作用：和上面相同，是桌面入口别名
-3. `Launch VoxCPM Studio Legacy WebView.bat`
+3. `Launch JVOX Studio配音系统 Legacy WebView.bat`
    作用：旧桌面壳回退入口
 
 ## 首次使用建议
@@ -78,7 +78,7 @@ VoxCPM Studio.exe
 
 1. 解压整个目录，不要只拷贝其中几个文件
 2. 保持 `app/`、`runtime/`、`models/`、`ffmpeg/`、`resources/`、`data/` 在同一个根目录下
-3. 直接启动 `VoxCPM Studio.exe`
+3. 直接启动 `JVOX Studio配音系统.exe`
 4. 进入“运行控制”页，观察本地服务状态
 
 ## data 目录是什么

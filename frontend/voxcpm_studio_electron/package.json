@@ -1,7 +1,7 @@
 {
   "name": "voxcpm-studio-electron",
-  "version": "2.0.2",
-  "description": "Electron native desktop shell for VoxCPM Studio.",
+  "version": "2.0.3",
+  "description": "JVOX Studio配音系统，本地配音、声音克隆、视频与音乐创作工作台。",
   "main": "main.js",
   "private": true,
   "scripts": {
@@ -30,7 +30,7 @@
   },
   "build": {
     "appId": "com.openbmb.voxcpm.studio.electron",
-    "productName": "VoxCPM Studio Electron",
+    "productName": "JVOX Studio配音系统",
     "directories": {
       "output": "release"
     },
@@ -52,7 +52,8 @@
       "music-config.json",
       "app.ico",
       "app-icon.png",
-      "package.json"
+      "package.json",
+      "brand-uninstaller.exe"
     ],
     "win": {
       "target": [

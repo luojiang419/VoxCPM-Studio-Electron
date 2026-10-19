@@ -41,7 +41,7 @@ export default function RuntimePreparation({ onRun, backendStatus, backendDetail
     {!open && ["preparing", "booting"].includes(backendStatus) && <div className="runtime-startup-status" role="status"><span />正在连接本地服务，您可以先浏览工作区</div>}
     {!open && ["stopped", "error"].includes(backendStatus) && <button type="button" className="runtime-run-button primary-button" onClick={onRun}>运行</button>}
     <dialog ref={dialog} className="runtime-dialog runtime-startup-dialog" aria-labelledby="runtime-title" onCancel={event => { if (working) event.preventDefault(); else setOpen(false); }}>
-      <div className="runtime-dialog-kicker">VOXCPM STUDIO · {preparing ? "资源准备" : "音频启动"}</div>
+      <div className="runtime-dialog-kicker">JVOX Studio配音系统 · {preparing ? "资源准备" : "音频启动"}</div>
       <h2 id="runtime-title">{title}</h2>
       <p className="runtime-intro">{failed ? "启动未完成，请查看下方说明。可重新启动，或通过功能与模型管理完整准备资源。" : preparing ? "正在准备所选资源；已完成的文件会直接复用。" : "正在连接本地服务。模型将在使用时单独校验和加载。"}</p>
       <ol className="runtime-stages">{stages.map((label, i) => <li key={label} className={i === index ? "current" : i < index ? "done" : ""}><span>{i < index ? "✓" : i + 1}</span>{label}</li>)}</ol>

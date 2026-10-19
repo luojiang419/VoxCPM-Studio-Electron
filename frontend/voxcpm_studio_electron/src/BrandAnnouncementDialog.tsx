@@ -1,7 +1,7 @@
 import { useEffect, useRef } from "react";
 import "./brand-announcement.css";
 
-type Props = { onUpdate: () => void; onDismiss: () => void; onToggleTheme?: () => void };
+type Props = { onUpdate: () => void; onDismiss: () => void; onToggleTheme?: () => void; welcome?: boolean };
 
 function FeatureIcon({ kind }: { kind: "spark" | "wave" | "shield" }) {
   return <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.5" aria-hidden="true">
@@ -11,7 +11,7 @@ function FeatureIcon({ kind }: { kind: "spark" | "wave" | "shield" }) {
   </svg>;
 }
 
-export default function BrandAnnouncementDialog({ onUpdate, onDismiss, onToggleTheme }: Props) {
+export default function BrandAnnouncementDialog({ onUpdate, onDismiss, onToggleTheme, welcome = false }: Props) {
   const dialog = useRef<HTMLDialogElement>(null);
   const primary = useRef<HTMLButtonElement>(null);
   useEffect(() => {
@@ -57,8 +57,8 @@ export default function BrandAnnouncementDialog({ onUpdate, onDismiss, onToggleT
       </section>
 
       <footer className="jvox-announcement-footer">
-        <div className="jvox-footer-note"><span className="jvox-ready-dot" /> 一次更新，迎接全新 JVOX</div>
-        <div className="jvox-announcement-actions"><button className="jvox-later" type="button" onClick={onDismiss}>稍后提醒</button><button ref={primary} className="jvox-update" type="button" onClick={onUpdate}>立即更新，开启新声 <span aria-hidden="true">↗</span></button></div>
+        <div className="jvox-footer-note"><span className="jvox-ready-dot" /> {welcome ? "全新 JVOX 已就绪，欢迎回来" : "一次更新，迎接全新 JVOX"}</div>
+        <div className="jvox-announcement-actions"><button className="jvox-later" type="button" onClick={onDismiss}>稍后提醒</button><button ref={primary} className="jvox-update" type="button" onClick={onUpdate}>{welcome ? "开启新声，开始创作" : "立即更新，开启新声"} <span aria-hidden="true">↗</span></button></div>
       </footer>
     </div>
   </dialog>;

@@ -93,7 +93,7 @@ function atomicJson(file, value) {
 }
 
 async function prepareUpdater(session, manifest, python) {
-  for (const [relative, name] of [["resources/app/updater.py", "updater.py"], ["resources/app/standalone-updater.exe", "VoxCPM Updater.exe"]]) {
+  for (const [relative, name] of [["resources/app/updater.py", "updater.py"], ["resources/app/standalone-updater.exe", "JVOX Updater.exe"]]) {
     const record = manifest.files?.find((file) => file.path === relative);
     if (!record || !Number.isSafeInteger(record.size) || record.size <= 0 || record.size > 2 * 1024 * 1024 ||
         !/^[0-9a-f]{64}$/.test(record.sha256)) throw new Error("签名清单缺少有效更新器，请联系发布者");
@@ -203,7 +203,7 @@ class UpdateService {
     try {
       await promisify(execFile)(this.python, ["-B", "-c", "from cryptography.hazmat.primitives.asymmetric.ed25519 import Ed25519PublicKey; import zipfile"], { windowsHide: true, timeout: 30000 });
     } catch (error) {
-      throw new Error(`更新运行环境不可用，请运行 VoxCPM 更新修复器补齐更新通道。${error.message}`);
+      throw new Error(`更新运行环境不可用，请运行 JVOX Studio配音系统安装器补齐更新通道。${error.message}`);
     }
     this.state.updaterRuntime = dedicated ? "dedicated" : "audio";
     return this.python;
@@ -244,7 +244,7 @@ class UpdateService {
     const folder = path.join(this.cache, "prompt-" + crypto.randomUUID());
     fs.mkdirSync(folder, { recursive: true });
     // 选择窗口使用随应用发布的本地原生程序；不为弹窗下载包或准备 Python。
-    const executable = path.join(folder, "VoxCPM Updater.exe");
+    const executable = path.join(folder, "JVOX Updater.exe");
     fs.copyFileSync(path.join(this.appDir, "standalone-updater.exe"), executable);
     atomicJson(path.join(folder, "session.json"), { mode: "prompt", session: folder, parentPid: process.pid,
       theme: this.getTheme(), version: this.manifest.version, releaseId: this.manifest.releaseId,
@@ -345,7 +345,7 @@ class UpdateService {
       atomicJson(path.join(session, "session.json"), { root: this.root, publicKey: this.config.publicKey,
         currentVersion: this.currentVersion, currentReleaseId: this.state.currentReleaseId,
         parentPid: process.pid, session, pythonExecutable: this.python, theme: this.getTheme(), resultPath: path.join(this.cache, "last-result.json"),
-        executable: path.join(this.root, "VoxCPM Studio.exe") });
+        executable: path.join(this.root, fs.existsSync(path.join(this.root, "JVOX Studio配音系统.exe")) ? "JVOX Studio配音系统.exe" : "VoxCPM Studio.exe") });
       this.session = session;
       return this.setState({ status: "downloaded", progress: 100, message: "更新包已校验，准备重启安装" });
     } catch (error) {
@@ -365,7 +365,7 @@ class UpdateService {
     atomicJson(path.join(session, "session.json"), settings);
     const target = JSON.parse(JSON.parse(fs.readFileSync(path.join(session, "envelope.json"), "utf8")).payload);
     for (const name of ["ready.json", "host-ready.json", "cancel.json", "status.json"]) fs.rmSync(path.join(session, name), { force: true });
-    const child = spawn(path.join(session, "VoxCPM Updater.exe"), ["--session", session], {
+    const child = spawn(path.join(session, "JVOX Updater.exe"), ["--session", session], {
       detached: true, stdio: "ignore", windowsHide: false, cwd: session,
       env: Object.fromEntries(Object.entries(process.env).filter(([key]) => key !== "ELECTRON_RUN_AS_NODE")),
     });

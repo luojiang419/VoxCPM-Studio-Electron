@@ -6,6 +6,8 @@ frontend/voxcpm_studio_electron/release/
 frontend/voxcpm_studio_electron/electron-v*.zip
 frontend/voxcpm_studio_electron/standalone-updater.exe
 frontend/voxcpm_studio_electron/standalone-updater.build.json
+frontend/voxcpm_studio_electron/brand-uninstaller.exe
+frontend/voxcpm_studio_electron/brand-uninstaller.build.json
 
 *.log
 Thumbs.db

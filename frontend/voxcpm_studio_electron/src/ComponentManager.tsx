@@ -23,7 +23,7 @@ export default function ComponentManager({ onRun, backendRunning }: { onRun: () 
   return <>
     <button type="button" className="ghost-button" onClick={() => invoke(async () => { await refresh(); dialog.current?.showModal(); })}>功能与模型管理</button>
     <dialog ref={dialog} className="runtime-dialog" aria-label="功能与模型管理">
-      <div className="runtime-dialog-kicker">VOXCPM STUDIO · 组件选择</div>
+      <div className="runtime-dialog-kicker">JVOX Studio配音系统 · 组件选择</div>
       <h2>选择功能与音乐模型</h2>
       <p className="runtime-intro">正常启动直接进入工作区，使用模型时单独校验。此处可主动完整准备所选功能；已移除的模型在更新时保持移除。</p>
       {options.map(option => <div className="component-option" key={option.id}>

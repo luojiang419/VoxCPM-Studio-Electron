@@ -49,7 +49,7 @@ def keys():
 
 def sources():
     for name in ("main.js", "preload.js", "package.json", "update-service.js", "update-window.js", "update-config.json", "updater.py",
-                 "standalone-updater.exe", "updater-runtime-config.json",
+                 "standalone-updater.exe", "brand-uninstaller.exe", "updater-runtime-config.json",
                  "runtime-service.js", "runtime-config.json", "runtime-requirements.txt", "install-protocol.js", "component-service.js", "music-config.json", "app.ico", "app-icon.png"):
         yield FRONTEND / name, "resources/app/" + name
     for file in sorted((FRONTEND / "dist").rglob("*")):
@@ -86,7 +86,7 @@ def build(notes, min_version):
     if (output / "manifest.json").exists():
         raise ValueError(f"版本已构建，禁止覆盖不可变产物：{output}；请使用已有目录发布或修改正式版本")
     output.mkdir(parents=True, exist_ok=True)
-    package = output / f"VoxCPM-Studio-{version}.zip"
+    package = output / f"JVOX-Studio-{version}.zip"
     records = []
     with zipfile.ZipFile(package, "w", compression=zipfile.ZIP_DEFLATED, compresslevel=6) as archive:
         for file, relative in sources():
@@ -94,7 +94,7 @@ def build(notes, min_version):
             archive.write(file, relative)
             records.append({"path": relative, "size": file.stat().st_size, "sha256": sha256(file)})
     release_path = f"releases/{version}/{release_id}/{package.name}"
-    manifest = {"protocol": 1, "product": "voxcpm-studio", "platform": "win32-x64", "version": version, "releaseId": release_id,
+    manifest = {"protocol": 1, "product": "voxcpm-studio", "displayName": "JVOX Studio配音系统", "platform": "win32-x64", "version": version, "releaseId": release_id,
                 "minVersion": min_version, "publishedAt": datetime.now(timezone.utc).isoformat(), "notes": notes,
                 "package": {"name": package.name, "url": file_url(config["repository"], release_path),
                             "size": package.stat().st_size, "sha256": sha256(package)}, "files": records}
@@ -131,7 +131,7 @@ def publish(output):
     except HTTPError as error:
         if getattr(error.response, "status_code", None) != 404:
             raise
-        api.create_model(repo, visibility=5, license="Apache License 2.0", chinese_name="VoxCPM Studio 桌面更新")
+        api.create_model(repo, visibility=5, license="Apache License 2.0", chinese_name="JVOX Studio配音系统 桌面更新")
     remote_path = f"releases/{manifest['version']}/" + (f"{manifest['releaseId']}/" if manifest.get('releaseId') else "") + package.name
     existing = {item["Path"] for item in api.get_model_files(repo, recursive=True) if item["Type"] == "blob"}
     if remote_path in existing:
@@ -139,7 +139,7 @@ def publish(output):
             raise ValueError("远端已有同名不同内容版本，禁止覆盖")
     else:
         api.upload_file(path_or_fileobj=str(package), path_in_repo=remote_path, repo_id=repo,
-                        commit_message=f"release: VoxCPM Studio {manifest['version']}")
+                        commit_message=f"release: JVOX Studio配音系统 {manifest['version']}")
     remote = read_remote(file_url(repo, remote_path))
     if len(remote) != manifest["package"]["size"] or hashlib.sha256(remote).hexdigest() != manifest["package"]["sha256"]:
         raise ValueError("魔搭匿名包回读校验失败，未激活更新")
@@ -159,8 +159,8 @@ def publish(output):
     (activation / "public/latest.json").write_bytes((output / "envelope.json").read_bytes())
     (activation / "configuration.json").write_text('{"framework":"pytorch","task":"text-to-speech","pipeline":{"type":"text-to-speech"}}', "utf-8")
     (activation / "README.md").write_text(
-        "---\nlicense: apache-2.0\ntasks:\n- text-to-speech\n---\n# VoxCPM Studio 桌面更新\n\n"
-        "此仓库仅存放 VoxCPM Studio 桌面更新，不包含模型权重或用户数据。\n\n"
+        "---\nlicense: apache-2.0\ntasks:\n- text-to-speech\n---\n# JVOX Studio配音系统 桌面更新\n\n"
+        "此仓库仅存放 JVOX Studio配音系统 桌面更新，不包含模型权重或用户数据。\n\n"
         "客户端通过 public/latest.json 验证 Ed25519 签名，下载后校验 SHA-256。\n"
         "已有旧版首次接入请参阅源码仓库 docs/自动更新说明.md。\n", "utf-8")
     repairer_report = output / "repairer-publication.json"
@@ -176,7 +176,7 @@ def publish(output):
                 f"{manifest['notes']}\n\n"
                 "旧客户端首次升级仍使用已有检查更新和下载入口。安装本版后，启动发现新版会直接打开独立更新器，"
                 "选择“现在更新”自动下载、校验、安装并重启；选择“下次启动更新”本次继续使用，下次启动再提醒。确认前不下载或关闭工作台。\n\n"
-                f"## 安装、检查与修复\n\n[下载 VoxCPM 安装修复一体版 EXE]({repair['repairUrl']})"
+                f"## 安装、检查与修复\n\n[下载 JVOX Studio配音系统安装器 EXE]({repair['repairUrl']})"
                 f"（约 {repair['size'] / 1024 ** 2:.1f} MB），新老用户使用同一个文件。\n\n"
                 "1. 首次运行选择独立安装目录和功能，自动补齐运行依赖及模型，无需预先安装 Python。\n"
                 "2. 已安装时自动识别原目录并检查；正常提示“一切正常，无需再次安装，开始创作吧”，保留运行中的工作台。\n"
@@ -194,7 +194,7 @@ def publish(output):
                 "已安装用户可在软件内检查更新，通过原生独立更新器安装。更新运行环境独立于音频 Python，缺失或损坏时自动补齐。\n\n"
                 f"## 老用户一键修复\n\n[下载独立更新修复器 EXE]({repair['repairUrl']})（约 {repair['size'] / 1024 ** 2:.1f} MB），可直接转发给老用户。\n\n"
                 "1. 保存作品并停止生成/训练任务，双击修复器，无需解压或安装 Python。\n"
-                "2. 确认自动找到的原安装目录；找不到时选择包含 VoxCPM Studio.exe 的原目录。\n"
+                "2. 确认自动找到的原安装目录；找不到时选择包含 JVOX Studio配音系统.exe 的原目录。\n"
                 "3. 点击“开始修复并升级”，等待修复成功并自动打开软件。\n\n"
                 + ("修复器会先自动关闭本目录工作台及旧更新器，隐藏进程无法正常退出时强制结束，未保存内容和进行中的任务可能丢失。"
                    "权限不足时显示具体进程和路径，可右键以管理员身份运行；不结束其他安装目录的进程。\n\n" if repair.get("autoTerminateOwnedProcesses") else "请先关闭原软件和旧更新窗口。\n\n") +
@@ -215,14 +215,14 @@ def publish(output):
                    if any(item['path'] == 'resources/app/standalone-updater.exe' for item in manifest['files']) else "") +
                 f"## 更新失败的补救\n\n[下载一次性更新修复包]({repair['repairUrl']})（约 {repair['size'] / 1024 ** 2:.1f} MB）。\n\n"
                 "1. 完整解压修复包，关闭原软件和独立更新窗口。\n"
-                "2. 双击“修复更新.cmd”；默认目录自动识别，找不到时选择包含 VoxCPM Studio.exe 的原安装目录。\n"
+                "2. 双击“修复更新.cmd”；默认目录自动识别，找不到时选择包含 JVOX Studio配音系统.exe 的原安装目录。\n"
                 "3. 等待修复成功与自动重启，在设置里核对当前发布序号，再检查更新。\n\n"
                 "修复在原目录进行，保留模型、配置、音色和作品；上次更新中断时先使用事务备份恢复。"
                 "请不要卸载、删除原目录或手动清理 pending.json / backup。\n\n"
                 "若修复仍失败，保留窗口所列的 updater.log 与会话目录，并提供错误内容给维护者定位；"
                 "运行环境缺失、权限限制或安全软件拦截需要按日志处理，不通过修改版本标记掩盖失败。\n\n"
                 f"修复包 SHA256：`{repair['sha256']}`。\n")
-    api.upload_folder(repo_id=repo, folder_path=str(activation), commit_message=f"activate: VoxCPM Studio {manifest['version']}")
+    api.upload_folder(repo_id=repo, folder_path=str(activation), commit_message=f"activate: JVOX Studio配音系统 {manifest['version']}")
     if json.loads(read_remote(latest_url)) != envelope:
         raise ValueError("魔搭最新入口匿名回读不一致")
     report = {"repository": repo, "version": manifest["version"], "releaseId": manifest.get("releaseId"), "sha256": manifest["package"]["sha256"],

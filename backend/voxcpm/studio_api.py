@@ -270,7 +270,7 @@ def create_api_app(studio: Optional[Any] = None, model_dir: Optional[str] = None
     lipsync = LipSyncService(Path(explicit_root or runtime_root or fallback_root), studio_service)
     music = MusicService(Path(explicit_root or runtime_root or fallback_root), studio_service)
     prompt_queue = StudioTaskQueue()
-    app = FastAPI(title="VoxCPM Studio Local API", version="0.1.0")
+    app = FastAPI(title="JVOX Studio配音系统 Local API", version="0.1.0")
     app.state.studio = studio_service
     app.state.task_queue = task_queue
     app.state.workspace = workspace

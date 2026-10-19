@@ -12,6 +12,7 @@ using System.Web.Script.Serialization;
 using System.Windows.Forms;
 using Microsoft.Win32;
 using VoxStandaloneUpdater;
+using VoxBootstrap;
 
 namespace VoxLegacyRepair {
     public static class Program {
@@ -24,8 +25,8 @@ namespace VoxLegacyRepair {
             using(var mutex=new Mutex(false,"Local\\VoxCPMStudioLegacyRepair")) {
                 try {
                     try { owns=mutex.WaitOne(0); } catch(AbandonedMutexException) { owns=true; }
-                    if(!owns) { MessageBox.Show("修复器已经在运行，请查看已有窗口。","VoxCPM 更新修复器"); return; }
-                    if(!Environment.Is64BitOperatingSystem) throw new IOException("此修复器适用于64位Windows版VoxCPM Studio");
+                    if(!owns) { MessageBox.Show("修复器已经在运行，请查看已有窗口。","JVOX Studio配音系统更新修复器"); return; }
+                    if(!Environment.Is64BitOperatingSystem) throw new IOException("此修复器适用于64位Windows版JVOX Studio配音系统");
                     for(int i=0;i<args.Length;i++) {
                         if(args[i]=="--root" && i+1<args.Length) specified=args[++i];
                         else if(args[i]=="--report" && i+1<args.Length) report=args[++i];
@@ -47,7 +48,7 @@ namespace VoxLegacyRepair {
                     File.WriteAllText(Path.Combine(work,"session.json"),Json.Serialize(settings),new UTF8Encoding(false));
                     using(var form=new UpdateForm(work,false,null,true)) { if(Application.MessageLoop) form.ShowDialog(); else Application.Run(form); Environment.ExitCode=form.ResultCode; }
                 } catch(Exception error) {
-                    if(!exit) MessageBox.Show(error.Message,"VoxCPM 修复器未能启动",MessageBoxButtons.OK,MessageBoxIcon.Error);
+                    if(!exit) MessageBox.Show(error.Message,"JVOX Studio配音系统修复器未能启动",MessageBoxButtons.OK,MessageBoxIcon.Error);
                     else if(report!=null) { Directory.CreateDirectory(Path.GetDirectoryName(Path.GetFullPath(report))); File.WriteAllText(report,Json.Serialize(new {status="error",message=error.Message}),new UTF8Encoding(false)); }
                     Environment.ExitCode=1;
                 } finally { if(owns) mutex.ReleaseMutex(); }
@@ -55,7 +56,7 @@ namespace VoxLegacyRepair {
         }
 
         public static bool IsInstall(string root) {
-            return !String.IsNullOrWhiteSpace(root) && File.Exists(Path.Combine(root,"VoxCPM Studio.exe")) &&
+            return !String.IsNullOrWhiteSpace(root) && File.Exists(Brand.ExecutablePath(root)) &&
                 (File.Exists(Path.Combine(root,"runtime_manifest.json")) || File.Exists(Path.Combine(root,".voxcpm-install.json")));
         }
 
@@ -65,8 +66,8 @@ namespace VoxLegacyRepair {
             if(IsInstall(adjacent)) return Path.GetFullPath(adjacent);
             var candidates=new List<string>();
             string local=Environment.GetFolderPath(Environment.SpecialFolder.LocalApplicationData), profile=Environment.GetFolderPath(Environment.SpecialFolder.UserProfile);
-            candidates.AddRange(new[] {Path.Combine(local,"VoxCPMStudio"),Path.Combine(local,"Apps","VoxCPMStudio"),Path.Combine(profile,"Apps","VoxCPMStudio"),Path.Combine(profile,"VoxCPMStudio")});
-            foreach(var drive in DriveInfo.GetDrives()) try { if(drive.DriveType==DriveType.Fixed && drive.IsReady) candidates.Add(Path.Combine(drive.RootDirectory.FullName,"Program Files","VoxCPMStudio")); } catch(IOException) { }
+            candidates.AddRange(new[] {Path.Combine(local,"JVOXStudio"),Path.Combine(local,"Apps","JVOXStudio"),Path.Combine(profile,"Apps","JVOXStudio"),Path.Combine(profile,"JVOXStudio"),Path.Combine(local,"VoxCPMStudio"),Path.Combine(local,"Apps","VoxCPMStudio"),Path.Combine(profile,"Apps","VoxCPMStudio"),Path.Combine(profile,"VoxCPMStudio")});
+            foreach(var drive in DriveInfo.GetDrives()) try { if(drive.DriveType==DriveType.Fixed && drive.IsReady) { candidates.Add(Path.Combine(drive.RootDirectory.FullName,"Program Files","JVOXStudio")); candidates.Add(Path.Combine(drive.RootDirectory.FullName,"Program Files","VoxCPMStudio")); } } catch(IOException) { }
             var found=candidates.Where(IsInstall).Select(Path.GetFullPath).Distinct(StringComparer.OrdinalIgnoreCase).ToArray();
             return found.Length==1?found[0]:null;
         }

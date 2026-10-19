@@ -12,6 +12,10 @@ const net = require("net");
 const os = require("os");
 const path = require("path");
 const { spawn, spawnSync } = require("child_process");
+// 保留历史 userData 路径，再设置产品显示名，避免更名丢失设置与本地存储。
+const existingUserData = app.getPath("userData");
+app.setName("JVOX Studio配音系统");
+app.setPath("userData", existingUserData);
 
 const WINDOW_BOUNDS = {
   width: 1560,
@@ -45,7 +49,7 @@ let rendererReadyResolve;
 const rendererReady = new Promise((resolve) => { rendererReadyResolve = resolve; });
 let bootstrapState = {
   status: "booting",
-  statusText: "正在准备 Electron 桌面壳。",
+  statusText: "正在准备 JVOX Studio配音系统。",
   detail: "即将启动本地 Python API 服务。",
   backendBaseUrl: "",
   backendLogPath: "",
@@ -88,7 +92,7 @@ function findUp(startDir, matcher) {
 function resolveProjectRoot() {
   const bundledRoot = findUp(__dirname, (candidate) =>
     fs.existsSync(path.join(candidate, "runtime_manifest.json")) ||
-    fs.existsSync(path.join(candidate, "VoxCPM Studio.exe")),
+    fs.existsSync(path.join(candidate, "JVOX Studio配音系统.exe")) || fs.existsSync(path.join(candidate, "VoxCPM Studio.exe")),
   );
   if (bundledRoot) {
     return bundledRoot;
@@ -785,7 +789,7 @@ async function startBackend({ prepare = false } = {}) {
   setBootstrapState({
     status: "ready",
     statusText: "控制台已就绪",
-    detail: "Electron 原生界面已经连接到本地 VoxCPM API。",
+    detail: "工作台已连接到本地语音服务。",
     backendBaseUrl: serviceUrl,
     backendLogPath,
     backendPid: backendProcess ? backendProcess.pid : null,
@@ -977,7 +981,7 @@ app.whenReady().then(async () => {
     catch (reportError) { reportFailed = true; console.error("无法写入安装失败报告：", reportError); }
     setBootstrapState({
       status: "error",
-      statusText: "桌面壳启动失败",
+      statusText: "工作台启动失败",
       detail: String(error),
     });
     sendRuntimeEvent("error", summarizeBootstrapState());

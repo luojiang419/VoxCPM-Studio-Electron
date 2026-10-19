@@ -22,7 +22,7 @@ def build(payload: Path, output: Path, release_id: str, payload_url: str | None 
         raise ValueError(f"启动器输出目录已存在：{output}")
     output.mkdir(parents=True)
     prefix = f"bootstrap/2.0.2/{release_id}"
-    manifest = {"protocol": 1, "componentProtocol": 2, "releaseId": release_id, "entry": "VoxCPM Studio.exe",
+    manifest = {"protocol": 1, "componentProtocol": 2, "releaseId": release_id, "entry": "JVOX Studio配音系统.exe",
                 "package": {"name": payload.name, "size": payload.stat().st_size, "sha256": sha256(payload),
                             "urls": [payload_url or file_url(DEFAULT_REPO, prefix + "/" + payload.name)]}, "files": []}
     with zipfile.ZipFile(payload) as archive:
@@ -48,7 +48,7 @@ def build(payload: Path, output: Path, release_id: str, payload_url: str | None 
              'files': [{key: a[key] for key in ('name', 'size', 'sha256')} for a in m['files']]} for m in music['models']]
     source_manifest = output.parent / (output.name + "-manifest.json")
     source_manifest.write_text(json.dumps(manifest, ensure_ascii=False, separators=(",", ":")), encoding="utf-8")
-    executable = output / ("VoxCPM安装器-界面演示.exe" if demo else "VoxCPM安装器.exe")
+    executable = output / ("JVOX Studio配音系统安装器-界面演示.exe" if demo else "JVOX Studio配音系统安装器.exe")
     compiler = Path("C:/Windows/Microsoft.NET/Framework64/v4.0.30319/csc.exe")
     subprocess.run([str(compiler), "/nologo", "/target:winexe", "/platform:anycpu", "/optimize+", *(["/define:DEMO"] if demo else []), "/out:" + str(executable),
                     "/win32icon:" + str(ROOT / "assets/brand/voxcpm-installer.ico"),
@@ -59,10 +59,10 @@ def build(payload: Path, output: Path, release_id: str, payload_url: str | None 
                     "/reference:System.Drawing.dll", "/reference:Accessibility.dll", "/reference:System.Web.Extensions.dll", "/reference:System.IO.Compression.dll",
                     "/reference:System.IO.Compression.FileSystem.dll", str(ROOT / "bootstrap/Program.cs"), str(ROOT / "bootstrap/SharedTheme.cs"), str(ROOT / "bootstrap/Installation.cs"), str(ROOT / "bootstrap/Components.cs"), str(ROOT / "bootstrap/DiskCard.cs")], check=True)
     (output / "使用说明.txt").write_text("界面演示：点击运行可观看准备进度，并可暂停、继续和重新演示。\n此版本不会下载、安装或打开工作台。\n" if demo else
-        "双击 VoxCPM安装器.exe，选择独立安装目录并点击安装并运行。\n"
+        "双击 JVOX Studio配音系统安装器.exe，选择独立安装目录并点击安装并运行。\n"
         "安装器会从魔搭补齐应用、依赖和模型，服务就绪后创建快捷方式并登记 Windows 卸载入口。\n"
         "不需要预先安装 Python；Windows 10/11 自带的 .NET Framework 可运行启动器。\n"
-        "默认安装到非 C 盘的 Program Files\\VoxCPMStudio，至少需要 25 GiB 可用空间和读写权限；也可手动更改。\n"
+        "默认安装到非 C 盘的 Program Files\\JVOXStudio，至少需要 25 GiB 可用空间和读写权限；也可手动更改。\n"
         "C 盘自动检测多个当前用户专用目录的 EXE 写入权限，无需管理员权限；其他分区不可用时也可回退到 C 盘。\n"
         "采用当前用户安装，无需管理员权限。\n"
         "可在 Windows 设置的应用列表或开始菜单卸载；默认保留个人数据，可勾选删除。\n"

@@ -13,7 +13,7 @@ from release_update import build as snapshot_build, ROOT
 def build(snapshot=None):
     stamp=datetime.now(timezone.utc).strftime('%Y%m%d%H%M%S')
     snapshot = snapshot or snapshot_build('AI助手模型选择、密钥查看及安装修复一体化支持。','0.2.0')
-    desktop=lightweight(ROOT/'builds'/('VoxCPM-Desktop-Unified-'+stamp),skip_build=True)
+    desktop=lightweight(ROOT/'builds'/('JVOX-Desktop-Unified-'+stamp),skip_build=True)
     manifest=json.loads((snapshot/'manifest.json').read_text('utf8'))
     for item in manifest['files']:
         file=desktop/item['path']

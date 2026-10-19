@@ -1,6 +1,8 @@
-# VoxCPM Studio Electron
+# JVOX Studio配音系统
 
-2026-10-19 当前正式发布及新安装基准为 `2.0.2 / 20261019074224`，启动发现新版直接打开独立更新器，选择“现在更新”后自动下载、校验、安装和重启；选择“下次启动更新”则下次启动再提醒。自动检查采用切换开关，并修复模型访问时间导致的损坏误报，真实异常在音乐生成前自动修复，完整模型不重下。旧客户端首次迁移仍使用原有更新入口。[下载最终基准安装器 EXE](https://modelscope.cn/api/v1/models/jiangjiang419/voxcpm-studio-updates/repo?Revision=master&FilePath=installers%2F2.0.2%2F20261019074224-43303e7f6c%2FVoxCPM-Installer.exe)：新用户安装后即为当前完整应用版本，所选模型与依赖联网补齐；老用户也可用同一文件检查和修复。详见[分发基准包](./docs/分发基准包.md)及[安装修复一体化使用说明](./docs/安装修复一体化使用说明.md)。
+2026-10-19 正式发布 **JVOX Studio配音系统 2.0.3**，发布序号 `20261019101750`。原 VoxCPM Studio 正式更名，工作台、窗口、图标、安装器、快捷方式和卸载入口统一焕新；首次进入新版显示更名庆祝弹窗，确认后不再重复提示。旧版可通过原有更新入口直接升级，保留模型、配置、音色、作品和功能选择。[下载 JVOX Studio配音系统安装器](https://modelscope.cn/api/v1/models/jiangjiang419/voxcpm-studio-updates/repo?Revision=master&FilePath=installers%2F2.0.3%2F20261019101750-ff0f78a9e7%2FJVOX-Studio-Installer.exe)（约 125.6 MiB），新用户安装和老用户检查修复使用同一文件。详见[分发基准包](./docs/分发基准包.md)及[安装修复一体化使用说明](./docs/安装修复一体化使用说明.md)。
+
+![品牌焕新庆祝弹窗](./docs/screenshots/jvox-rebrand.png)
 
 历史发布：2026-10-19 发布单文件老用户更新修复器及应用 `2.0.2 / 20261018235215`。更新失败的老用户可[直接下载修复器 EXE](https://modelscope.cn/api/v1/models/jiangjiang419/voxcpm-studio-updates/repo?Revision=master&FilePath=repairers%2F2.0.2%2F20261018235215-0f71f753d9%2FVoxCPM-Update-Repairer.exe)，保存任务、确认原目录、点击「开始修复并升级」，自动关闭并强制结束原目录残留进程。同时修复视频环境Arrow/NumPy冲突导致重启回滚。自带修复环境，保留已保存的模型、配置、音色、作品和功能选择，支持同发布损坏修复。修复后直接使用内置更新；独立更新运行环境缺失或损坏时自动补齐。修复器及独立更新器均复用安装器样式，工作台关闭后仍可独立执行。详见[老用户修复器使用说明](./docs/老用户更新修复器使用说明.md)与[自动更新与故障恢复](./docs/自动更新说明.md)。
 
@@ -8,9 +10,9 @@
 
 本机开发版现已支持[视频对口型与照片说话](./docs/本机视频对口型与照片说话.md)：首次进入页面按显卡自动补齐对应模型和独立视频依赖，16GB及以上默认LatentSync 1.6，8～不足16GB默认1.5；支持断点续传、暂停、重试和就绪缓存。复用已生成配音，支持进度、取消、作品恢复及MP4导出；1.6显存不足停止并保留版本。
 
-这是 `VoxCPM Studio` 的 Electron 原生桌面版源码仓库目录，包含：
+这是 `JVOX Studio配音系统` 的 Electron 原生桌面版源码仓库目录，包含：
 
-![VoxCPM Studio 多角色配音工作台](./docs/screenshots/production-studio.png)
+![JVOX Studio配音系统 多角色配音工作台](./docs/screenshots/production-studio.png)
 
 现已支持多角色配音工程、角色文案识别、音色库、逐段重做、作品记录、背景音乐混音，以及整片 WAV / SRT / 分角色音频导出。新界面以台词编排为中心，保留声音设计、克隆、LoRA 训练和自动更新。
 
@@ -49,7 +51,7 @@
 
 ## 为什么做这个项目
 
-官方 `VoxCPM` 项目已经提供了很强的模型能力、Python API、CLI、在线 Demo 和文档体系。  
+官方 `VoxCPM` 项目已经提供了很强的模型能力、Python API、CLI、在线 Demo 和文档体系。
 这个仓库不是替代官方，而是把官方能力包装成一套更适合中文本地工作流、Windows 桌面使用和便携分发的前端方案。
 
 如果你是：
@@ -109,7 +111,7 @@
 2. **本地桌面工作流更顺滑**
 3. **更适合打包分发和交给非开发者使用**
 
-但它依然建立在官方 `VoxCPM` 模型与推理能力之上。  
+但它依然建立在官方 `VoxCPM` 模型与推理能力之上。
 如果你想研究模型本身、训练原理、API 细节和论文实现，仍然应该首先阅读官方仓库与官方文档。
 
 ## 目录结构
@@ -178,7 +180,7 @@ pip install modelscope
 
 ## Electron 前端安装方法
 
-这套 Electron 源码仓库是 `VoxCPM Studio` 的桌面前端和打包脚本，不替代官方 VoxCPM 推理项目本身。  
+这套 Electron 源码仓库是 `JVOX Studio配音系统` 的桌面前端和打包脚本，不替代官方 VoxCPM 推理项目本身。
 也就是说：
 
 1. 官方 `VoxCPM` 负责模型与推理能力

@@ -35,8 +35,8 @@ def publish_repairer(snapshot: Path, executable: Path, activate=False):
     from modelscope.hub.api import HubApi
     api = HubApi()
     repo = config["repository"]
-    remote = (f"installers/{built['version']}/{built['releaseId']}-{built['buildId']}/VoxCPM-Installer.exe" if unified else
-              f"repairers/{built['version']}/{built['releaseId']}-{built['buildId']}/VoxCPM-Update-Repairer.exe")
+    remote = (f"installers/{built['version']}/{built['releaseId']}-{built['buildId']}/JVOX-Studio-Installer.exe" if unified else
+              f"repairers/{built['version']}/{built['releaseId']}-{built['buildId']}/JVOX-Studio-Update-Repairer.exe")
     url = file_url(repo, remote)
     existing = {item["Path"] for item in api.get_model_files(repo, recursive=True) if item["Type"] == "blob"}
     if remote in existing:

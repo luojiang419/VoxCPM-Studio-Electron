@@ -28,7 +28,7 @@ public static class InstallationSmoke {
             uint owner; GetWindowThreadProcessId(window, out owner);
             if (owner == pid) {
                 var title = new StringBuilder(512); GetWindowText(window, title, title.Capacity);
-                if (title.ToString().IndexOf("VoxCPM", StringComparison.OrdinalIgnoreCase) >= 0 && (!visibleOnly || IsWindowVisible(window))) count++;
+                if (title.ToString().IndexOf("JVOX", StringComparison.OrdinalIgnoreCase) >= 0 && (!visibleOnly || IsWindowVisible(window))) count++;
             }
             return true;
         }, IntPtr.Zero); return count;

@@ -7,6 +7,7 @@ const { UpdateService, digest } = require("../frontend/voxcpm_studio_electron/up
 const root = path.resolve(__dirname, "..");
 const original = path.resolve(process.argv[2] && !process.argv[2].startsWith("--") ? process.argv[2] : path.join(root, "builds/VoxCPM-Studio-Electron-Portable-2.0.1"));
 const testRoot = path.join(root, "builds", "update-smoke-" + Date.now());
+const targetVersion = JSON.parse(fs.readFileSync(path.join(root, "frontend/voxcpm_studio_electron/package.json"))).version;
 const fromVersion = process.argv.includes("--same-version") ? "2.0.2" : "2.0.1";
 const lightweight = process.argv.includes("--lightweight");
 const promptFlow = process.argv.includes("--prompt-flow");
@@ -104,7 +105,7 @@ __updateTestDialog.showMessageBox=(...args)=>['启动独立更新器','重启并
   const modelConfig = path.join(testRoot, fs.existsSync(path.join(testRoot, "models/config.json")) ? "models/config.json" : "models/openbmb__VoxCPM2/config.json");
   const modelHash = await digest(modelConfig);
   console.log("测试副本：" + testRoot);
-  const exe = path.join(testRoot, "VoxCPM Studio.exe");
+  const exe = path.join(testRoot, fs.existsSync(path.join(testRoot, "JVOX Studio配音系统.exe")) ? "JVOX Studio配音系统.exe" : "VoxCPM Studio.exe");
   const child = spawn(exe, ["--voxcpm-run", "--remote-debugging-port=19228"], { cwd: testRoot, windowsHide: true, stdio: "ignore" });
   const client = await cdp(19228);
   activeClient = client;
@@ -122,7 +123,7 @@ __updateTestDialog.showMessageBox=(...args)=>['启动独立更新器','重启并
   if (promptFlow) await until(() => client.evaluate("window.voxcpmDesktop.getUpdateState().then(s=>s.promptOpen)"));
   const state = await client.evaluate("window.voxcpmDesktop.checkUpdate()");
   assert.equal(state.status, "available", JSON.stringify(state));
-  assert.equal(state.latestVersion, "2.0.2");
+  assert.equal(state.latestVersion, targetVersion);
   assert.equal((await client.evaluate("window.voxcpmDesktop.getBootstrapState()")).backendRunning, true,
     "更新状态事件不能覆盖已有后端连接状态");
   console.log("魔搭检查更新成功：" + fromVersion + " -> " + state.latestVersion);
@@ -141,7 +142,7 @@ __updateTestDialog.showMessageBox=(...args)=>['启动独立更新器','重启并
   } else {
     const downloaded = await client.evaluate("window.voxcpmDesktop.downloadUpdate()");
     assert.equal(downloaded.status, "downloaded", JSON.stringify(downloaded));
-    await until(async () => client.evaluate("/重启并安装|启动独立更新器/.test(document.body.innerText)"));
+    await until(async () => client.evaluate("/重启并安装|启动独立更新器|现在更新/.test(document.body.innerText)"));
   }
   assert.equal((await client.evaluate("window.voxcpmDesktop.getBootstrapState()")).backendRunning, true);
   const screenshot = await client.send("Page.captureScreenshot", { format: "png" });
@@ -165,7 +166,7 @@ __updateTestDialog.showMessageBox=(...args)=>['启动独立更新器','重启并
     assert.equal(fs.existsSync(path.join(failedSession, "cancel.json")), true);
     assert.ok(fs.readFileSync(path.join(failedSession, "updater.log"), "utf8").includes("Python"));
     nativeFailurePreservedMain = true;
-    const closeCode = "$target=" + "'" + path.join(failedSession, "VoxCPM Updater.exe").replaceAll("'", "''") + "'; Get-CimInstance Win32_Process | Where-Object { $_.ExecutablePath -eq $target } | ForEach-Object { (Get-Process -Id $_.ProcessId).CloseMainWindow() | Out-Null }";
+    const closeCode = "$target=" + "'" + path.join(failedSession, fs.existsSync(path.join(failedSession, "JVOX Updater.exe")) ? "JVOX Updater.exe" : "VoxCPM Updater.exe").replaceAll("'", "''") + "'; Get-CimInstance Win32_Process | Where-Object { $_.ExecutablePath -eq $target } | ForEach-Object { (Get-Process -Id $_.ProcessId).CloseMainWindow() | Out-Null }";
     spawnSync("powershell.exe", ["-NoProfile", "-Command", closeCode], { windowsHide: true });
     assert.equal((await failureClient.evaluate("window.voxcpmDesktop.downloadUpdate()")).status, "downloaded");
     failureClient.close();
@@ -187,7 +188,8 @@ __updateTestDialog.showMessageBox=(...args)=>['启动独立更新器','重启并
     const worker = JSON.parse(fs.readFileSync(path.join(service.session, "ready.json")));
     assert.equal(standalone.workerPid, worker.pid);
     assert.equal(standalone.independent, true);
-    assert.equal(standalone.executable, path.join(service.session, "VoxCPM Updater.exe"));
+    assert.equal(path.dirname(standalone.executable), service.session);
+    assert.ok(["JVOX Updater.exe", "VoxCPM Updater.exe"].includes(path.basename(standalone.executable)));
     assert.notEqual(standalone.hostPid, child.pid);
     if (process.argv.includes("--main-install")) {
       const parent = spawnSync("powershell.exe", ["-NoProfile", "-Command", `Get-CimInstance Win32_Process -Filter 'ProcessId=${Number(standalone.hostPid)}' | Select-Object -ExpandProperty ParentProcessId`], { encoding: "utf8", windowsHide: true });
@@ -213,12 +215,12 @@ __updateTestDialog.showMessageBox=(...args)=>['启动独立更新器','重启并
     if (["error", "rolled-back"].includes(status.status)) throw new Error(status.message);
     return status.status === "complete" && status;
   }, 240000);
-  assert.equal(result.version, "2.0.2");
-  assert.equal(JSON.parse(fs.readFileSync(packagePath)).version, "2.0.2");
+  assert.equal(result.version, targetVersion);
+  assert.equal(JSON.parse(fs.readFileSync(packagePath)).version, targetVersion);
   const installedConfig = JSON.parse(fs.readFileSync(configPath));
   const targetManifest = JSON.parse(JSON.parse(fs.readFileSync(path.join(service.session, "envelope.json"))).payload);
   assert.equal(installedConfig.releaseId, targetManifest.releaseId);
-  const recheck = new UpdateService({ root: testRoot, dataRoot: path.join(testRoot, "data"), appDir, currentVersion: "2.0.2",
+  const recheck = new UpdateService({ root: testRoot, dataRoot: path.join(testRoot, "data"), appDir, currentVersion: targetVersion,
     config: { ...installedConfig, ...(manifestArgument >= 0 ? { manifestUrl: process.argv[manifestArgument + 1] } : {}) } });
   assert.equal((await recheck.check()).status, "current", "重启后不能重复提示同一发布更新");
   if (!process.argv.includes("--legacy-client")) assert.equal(recheck.getState().lastResult?.status, "complete");
@@ -239,7 +241,7 @@ __updateTestDialog.showMessageBox=(...args)=>['启动独立更新器','重启并
     assert.equal(music.models.length, 4);
     assert.equal(music.rules.models.length, 4);
   }
-  const report = { result: "passed", fromVersion, toVersion: "2.0.2", testRoot, session: service.session,
+  const report = { result: "passed", fromVersion, toVersion: targetVersion, testRoot, session: service.session,
     installedReleaseId: installedConfig.releaseId, recheckStatus: recheck.state.status, signedUpdaterBootstrap: process.argv.includes("--fixed-client"),
     legacyClient: process.argv.includes("--legacy-client"),
     startupPromptFlow: promptFlow,
@@ -251,19 +253,19 @@ __updateTestDialog.showMessageBox=(...args)=>['启动独立更新器','重启并
   console.log(JSON.stringify(report, null, 2));
   // 测试进程通过退出关闭；正式便携包与原有服务不受影响。
   const processes = spawnSync("powershell.exe", ["-NoProfile", "-Command",
-    "[Console]::OutputEncoding = [System.Text.UTF8Encoding]::new($false); Get-CimInstance Win32_Process -Filter \"Name='VoxCPM Studio.exe'\" | Select-Object ProcessId,ExecutablePath | ConvertTo-Json -Compress"], { encoding: "utf8", windowsHide: true });
+    "[Console]::OutputEncoding = [System.Text.UTF8Encoding]::new($false); Get-CimInstance Win32_Process -Filter \"Name='VoxCPM Studio.exe' OR Name='JVOX Studio配音系统.exe'\" | Select-Object ProcessId,ExecutablePath | ConvertTo-Json -Compress"], { encoding: "utf8", windowsHide: true });
   const items = JSON.parse(processes.stdout || "[]");
-  for (const item of Array.isArray(items) ? items : [items]) if (item.ExecutablePath?.toLowerCase() === exe.toLowerCase()) {
+  for (const item of Array.isArray(items) ? items : [items]) if ([exe.toLowerCase(), path.join(testRoot,"JVOX Studio配音系统.exe").toLowerCase()].includes(item.ExecutablePath?.toLowerCase())) {
     spawnSync("taskkill", ["/PID", String(item.ProcessId), "/T", "/F"], { windowsHide: true });
   }
 })().catch((error) => {
   activeClient?.close();
   console.error(error); process.exitCode = 1;
   const processes = spawnSync("powershell.exe", ["-NoProfile", "-Command",
-    "[Console]::OutputEncoding = [System.Text.UTF8Encoding]::new($false); Get-CimInstance Win32_Process -Filter \"Name='VoxCPM Studio.exe'\" | Select-Object ProcessId,ExecutablePath | ConvertTo-Json -Compress"], { encoding: "utf8", windowsHide: true });
+    "[Console]::OutputEncoding = [System.Text.UTF8Encoding]::new($false); Get-CimInstance Win32_Process -Filter \"Name='VoxCPM Studio.exe' OR Name='JVOX Studio配音系统.exe'\" | Select-Object ProcessId,ExecutablePath | ConvertTo-Json -Compress"], { encoding: "utf8", windowsHide: true });
   const items = JSON.parse(processes.stdout || "[]");
   const exe = path.join(testRoot, "VoxCPM Studio.exe").toLowerCase();
-  for (const item of Array.isArray(items) ? items : [items]) if (item.ExecutablePath?.toLowerCase() === exe) {
+  for (const item of Array.isArray(items) ? items : [items]) if ([exe, path.join(testRoot,"JVOX Studio配音系统.exe").toLowerCase()].includes(item.ExecutablePath?.toLowerCase())) {
     spawnSync("taskkill", ["/PID", String(item.ProcessId), "/T", "/F"], { windowsHide: true });
   }
 });
