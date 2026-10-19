@@ -133,6 +133,24 @@ def test_incomplete_backups_plan_forward_repair_without_erasing_records(tmp_path
     with pytest.raises(RuntimeError, match="仍在运行"): e.recover_pending(root, transaction)
 
 
+@pytest.mark.parametrize("wait_result,should_fail", [(0, False), (258, True)])
+def test_termination_access_denied_only_succeeds_after_verified_handle_exits(wait_result, should_fail):
+    handle = object.__new__(e.ProcessHandle)
+    handle.handle = 123
+    waits = []
+    handle.kernel = SimpleNamespace(
+        TerminateProcess=lambda process, code: False,
+        WaitForSingleObject=lambda process, timeout: waits.append((process, timeout)) or wait_result,
+    )
+    handle.ctypes = SimpleNamespace(get_last_error=lambda: 5, WinError=lambda code: PermissionError(code, "access denied"))
+    handle.exited = lambda: False
+    if should_fail:
+        with pytest.raises(PermissionError): handle.terminate()
+    else:
+        handle.terminate()
+    assert waits == [(123, 5000)]
+
+
 def test_foreign_recovery_is_refused(tmp_path):
     root = tmp_path / "app"
     foreign = tmp_path / "foreign"; foreign.mkdir()

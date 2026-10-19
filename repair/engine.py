@@ -247,8 +247,14 @@ class ProcessHandle:
         user.EnumWindows(callback_type(visit), 0)
 
     def terminate(self):
-        if not self.exited() and not self.kernel.TerminateProcess(self.handle, 1) and not self.exited():
-            raise self.ctypes.WinError(self.ctypes.get_last_error())
+        if not self.exited() and not self.kernel.TerminateProcess(self.handle, 1):
+            error = self.ctypes.get_last_error()
+            # 主进程退出会同时结束子进程。Windows 在进程结束中也会返回
+            # ERROR_ACCESS_DENIED；仅当同一已校验句柄确已结束才视为成功。
+            if error == 5 and self.kernel.WaitForSingleObject(self.handle, 5000) == 0:
+                return
+            if not self.exited():
+                raise self.ctypes.WinError(error)
         if self.handle and self.kernel.WaitForSingleObject(self.handle, 5000) != 0:
             raise RuntimeError("等待进程退出超时")
 
