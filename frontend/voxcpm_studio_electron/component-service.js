@@ -138,6 +138,15 @@ class ComponentService {
         }
         const models = this.catalog.models.filter(model => profile.selected.includes(model.id));
         await this.checkSpace(models);
+        // 模型文件下载不需要视频或音乐 Python 环境；避免等待完整环境安装后才开始。
+        for (const model of models) {
+          emit({ message: `${model.label} 模型文件检查中`, modelName: model.label, modelState: 'checking', component: model.id });
+          for (const asset of model.files) {
+            const target = safePath(this.root, asset.name);
+            await this.ensureFile(asset, target, emit, signal, true);
+          }
+          emit({ message: `${model.label} 模型文件检查完成`, modelName: model.label, modelState: 'ready', component: model.id });
+        }
         if (profile.selected.includes('lipsync') && (video.needsPreparation || !video.ready)) {
           emit({ status: 'working', activity: 'prepare', message: `正在准备 LatentSync ${video.preferredVersion} 缺失的资源` });
           const task = await this.api(url, '/api/lipsync/prepare', { model_version: 'auto' }, signal);
@@ -160,20 +169,13 @@ class ComponentService {
         }
         if (models.length) {
           await this.prepareRuntime(runtime, emit, signal);
-          for (const model of models) {
-            emit({ message: `${model.label} 模型文件检查中`, modelName: model.label, modelState: 'checking', component: model.id });
-            for (const asset of model.files) {
-              const target = safePath(this.root, asset.name);
-              await this.ensureFile(asset, target, emit, signal, true);
-            }
-            emit({ message: `${model.label} 模型文件检查完成`, modelName: model.label, modelState: 'ready', component: model.id });
-          }
           emit({ message: '音乐音频组件加载与自检中，模型权重将在生成时加载' });
           const directory = safePath(this.root, `runtime/music/${this.catalog.runtime.version}`);
           const args = [path.join(this.appRoot, 'src/voxcpm/music_worker.py'), '--probe', '--engine', directory, '--models', models.map(m => m.id).join(',')];
           try { await service.run(path.join(directory, 'python/python.exe'), args, { timeout: 180000 }); }
           catch (error) {
             signal.throwIfAborted();
+            if (error.code === 'RUNTIME_PROCESS_TIMEOUT') throw error;
             emit({ message: '音乐环境自检未通过，正在从完整包修复一次' });
             await this.prepareRuntime(runtime, emit, signal, true);
             await service.run(path.join(directory, 'python/python.exe'), args, { timeout: 180000 });

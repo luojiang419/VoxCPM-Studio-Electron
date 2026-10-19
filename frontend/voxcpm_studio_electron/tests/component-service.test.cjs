@@ -146,3 +146,72 @@ test('续装空间预检扣除已下载的运行包分卷', async t => {
   fs.writeFileSync(path.join(cache, 'runtime.part00'), payload);
   await service.checkSpace([], true);
 });
+
+test('音乐模型先下载，随后准备视频和音乐环境，全部自检完成才能就绪', async t => {
+  const { service, runtimeService } = await setup(t);
+  service.select({ selected: ['lipsync', 'ace-xl-turbo'] });
+  const order = []; let checks = 0;
+  service.fetchImpl = async () => {
+    order.push('model-download');
+    return new Response(payload, { headers: { 'Content-Length': String(payload.length) } });
+  };
+  service.api = async (_url, route) => {
+    if (route === '/api/lipsync/status') return { hardware: { cuda: true, totalMB: 16384 }, ready: ++checks > 1, needsPreparation: checks === 1 };
+    if (route === '/api/lipsync/prepare') { order.push('video-prepare'); return { taskId: 'video' }; }
+    if (route === '/api/tasks/video') return { status: 'succeeded' };
+    throw new Error('不应访问 ' + route);
+  };
+  service.prepareRuntime = async () => {
+    order.push('music-runtime');
+    assert.ok(!fs.existsSync(service.receipt), '模型下载完成不能冒充全部环境就绪');
+  };
+  runtimeService.run = async () => { order.push('music-probe'); };
+  await service.prepare({ url: '', runtime: {} });
+  assert.deepEqual(order, ['model-download', 'video-prepare', 'music-runtime', 'music-probe']);
+  assert.ok(fs.existsSync(service.receipt));
+});
+
+test('模型下载暂停保留断点，不启动视频/音乐环境；重试续传后才进入准备', async t => {
+  const { service, runtimeService, root } = await setup(t);
+  service.select({ selected: ['ace-xl-turbo'] });
+  service.api = async () => ({ hardware: { cuda: true, totalMB: 16384 } });
+  let requests = 0, preparations = 0;
+  const target = path.join(root, 'models/music/ace-xl-turbo');
+  service.fetchImpl = async (_url, options) => {
+    if (++requests === 1) {
+      return new Response(new ReadableStream({
+        start(controller) { controller.enqueue(payload.subarray(0, 2)); },
+        async pull() {
+          for (let i = 0; i < 200; i++) {
+            if (fs.existsSync(target + '.part') && fs.statSync(target + '.part').size === 2) break;
+            await new Promise(resolve => setTimeout(resolve, 5));
+          }
+          runtimeService.controller.abort(new Error('暂停模型下载'));
+        }
+      }), { headers: { 'Content-Length': String(payload.length) } });
+    }
+    assert.equal(options.headers.Range, 'bytes=2-');
+    return new Response(payload.subarray(2), { status: 206, headers: { 'Content-Length': '3', 'Content-Range': 'bytes 2-4/5' } });
+  };
+  service.prepareRuntime = async () => { preparations++; };
+  await assert.rejects(service.prepare({ url: '', runtime: {} }), /暂停模型下载/);
+  assert.equal(preparations, 0);
+  assert.ok(!fs.existsSync(service.receipt));
+  assert.equal(fs.readFileSync(target + '.part', 'utf8'), 'mu');
+  runtimeService.controller = new AbortController();
+  await service.prepare({ url: '', runtime: {} });
+  assert.equal(preparations, 1);
+  assert.equal(fs.readFileSync(target, 'utf8'), 'music');
+});
+
+test('音乐自检超时不重新安装完整运行包，不标记就绪', async t => {
+  const { service, runtimeService } = await setup(t);
+  service.select({ selected: ['ace-xl-turbo'] });
+  service.api = async () => ({ hardware: { cuda: true, totalMB: 16384 } });
+  const attempts = [];
+  service.prepareRuntime = async (_runtime, _emit, _signal, force) => attempts.push(!!force);
+  runtimeService.run = async () => { throw Object.assign(new Error('自检超时'), { code: 'RUNTIME_PROCESS_TIMEOUT' }); };
+  await assert.rejects(service.prepare({ url: '', runtime: {} }), { code: 'RUNTIME_PROCESS_TIMEOUT' });
+  assert.deepEqual(attempts, [false]);
+  assert.ok(!fs.existsSync(service.receipt));
+});
