@@ -9,6 +9,7 @@ const original = path.resolve(process.argv[2] && !process.argv[2].startsWith("--
 const testRoot = path.join(root, "builds", "update-smoke-" + Date.now());
 const fromVersion = process.argv.includes("--same-version") ? "2.0.2" : "2.0.1";
 const lightweight = process.argv.includes("--lightweight");
+const promptFlow = process.argv.includes("--prompt-flow");
 const sleep = (ms) => new Promise((resolve) => setTimeout(resolve, ms));
 let activeClient;
 async function until(fn, timeout = 60000) {
@@ -117,19 +118,32 @@ __updateTestDialog.showMessageBox=(...args)=>['启动独立更新器','重启并
   console.log("旧版本地 API 已就绪：" + boot.backendBaseUrl);
   await client.evaluate("Array.from(document.querySelectorAll('button')).find(b=>b.textContent.trim()==='设置').click()");
   await until(async () => client.evaluate("document.body.innerText.includes('软件更新')"));
+  await client.evaluate("Array.from(document.querySelectorAll('.settings-navigation button')).find(b=>b.textContent.includes('软件更新'))?.click()");
+  if (promptFlow) await until(() => client.evaluate("window.voxcpmDesktop.getUpdateState().then(s=>s.promptOpen)"));
   const state = await client.evaluate("window.voxcpmDesktop.checkUpdate()");
   assert.equal(state.status, "available", JSON.stringify(state));
   assert.equal(state.latestVersion, "2.0.2");
-  assert.equal(await client.evaluate("Array.from(document.querySelectorAll('button')).find(b=>b.textContent.trim()==='保存设置').disabled"), false,
+  assert.equal((await client.evaluate("window.voxcpmDesktop.getBootstrapState()")).backendRunning, true,
     "更新状态事件不能覆盖已有后端连接状态");
   console.log("魔搭检查更新成功：" + fromVersion + " -> " + state.latestVersion);
   await client.evaluate("window.voxcpmDesktop.setAutoCheckUpdate(false)");
   assert.equal((await client.evaluate("window.voxcpmDesktop.getUpdateState()")).autoCheck, false);
   await client.evaluate("window.voxcpmDesktop.setAutoCheckUpdate(true)");
-  const downloaded = await client.evaluate("window.voxcpmDesktop.downloadUpdate()");
-  assert.equal(downloaded.status, "downloaded", JSON.stringify(downloaded));
-  assert.equal(await client.evaluate("Array.from(document.querySelectorAll('button')).find(b=>b.textContent.trim()==='保存设置').disabled"), false);
-  await until(async () => client.evaluate("/重启并安装|启动独立更新器/.test(document.body.innerText)"));
+  if (promptFlow) {
+    const cache = path.join(testRoot, "data/cache/updates");
+    assert.equal(fs.readdirSync(cache).filter(name=>name.startsWith('session-')).length, 0, '选择前不应下载或准备安装事务');
+    const folder=await until(()=>fs.readdirSync(cache).filter(name=>name.startsWith('prompt-')).map(name=>path.join(cache,name)).find(folder=>fs.existsSync(path.join(folder,'prompt-ready.json'))));
+    const prompt=JSON.parse(fs.readFileSync(path.join(folder,'prompt-ready.json')));
+    const selected=spawnSync('powershell.exe',['-NoProfile','-ExecutionPolicy','Bypass','-File',path.join(root,'scripts/lib/invoke_updater_button.ps1'),'-UpdaterProcessId',String(prompt.hostPid),'-ButtonName','现在更新'],{windowsHide:true,encoding:'utf8'});
+    assert.equal(selected.status,0,selected.stderr);
+    await until(()=>client.evaluate("window.voxcpmDesktop.getUpdateState().then(s=>s.status==='installing')"),180000);
+    console.log('启动自动原生提示，一次选择现在更新后自动下载并交接安装');
+  } else {
+    const downloaded = await client.evaluate("window.voxcpmDesktop.downloadUpdate()");
+    assert.equal(downloaded.status, "downloaded", JSON.stringify(downloaded));
+    await until(async () => client.evaluate("/重启并安装|启动独立更新器/.test(document.body.innerText)"));
+  }
+  assert.equal((await client.evaluate("window.voxcpmDesktop.getBootstrapState()")).backendRunning, true);
   const screenshot = await client.send("Page.captureScreenshot", { format: "png" });
   fs.writeFileSync(path.join(testRoot, "settings-before-update.png"), Buffer.from(screenshot.data, "base64"));
   console.log("设置页版本、更新说明、下载和自动检查开关已验证");
@@ -163,7 +177,7 @@ __updateTestDialog.showMessageBox=(...args)=>['启动独立更新器','重启并
   service.session = path.join(cache, session); service.state.status = "downloaded";
   if (process.argv.includes("--main-install")) {
     const installClient = await cdp(19228);
-    await installClient.send("Runtime.evaluate", { expression: "void window.voxcpmDesktop.installUpdate()", awaitPromise: false });
+    if (!promptFlow) await installClient.send("Runtime.evaluate", { expression: "void window.voxcpmDesktop.installUpdate()", awaitPromise: false });
     installClient.close();
     await until(() => fs.existsSync(path.join(service.session, "host-ready.json")) && fs.existsSync(path.join(service.session, "ready.json")));
   } else await service.launch();
@@ -228,6 +242,7 @@ __updateTestDialog.showMessageBox=(...args)=>['启动独立更新器','重启并
   const report = { result: "passed", fromVersion, toVersion: "2.0.2", testRoot, session: service.session,
     installedReleaseId: installedConfig.releaseId, recheckStatus: recheck.state.status, signedUpdaterBootstrap: process.argv.includes("--fixed-client"),
     legacyClient: process.argv.includes("--legacy-client"),
+    startupPromptFlow: promptFlow,
     nativeFailurePreservedMain,
     ...(standalone ? { standalone, previousAppDirectoryUnavailable: true } : {}),
     userDataPreserved: true, modelPreserved: true, restartedBackend: backendState.serviceUrl, health,
