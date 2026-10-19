@@ -1107,7 +1107,6 @@ function App() {
           </div>
         </div>
         <div className="studio-sidebar-foot">
-          <ComponentManager onRun={handleStartService} backendRunning={Boolean(bootstrap?.backendRunning)} />
           <div><span className={`studio-service-dot ${bootstrap?.backendRunning ? "is-ready" : ""}`} /><strong>{bootstrap?.backendRunning ? "本地引擎已连接" : "本地引擎准备中"}</strong></div>
           <p>{runtime?.cuda_available ? (runtime.gpu_names[0] || "CUDA GPU") : "JVOX · 本地运行"}</p>
           <span>声音，让创作发生。</span>
@@ -1121,7 +1120,7 @@ function App() {
 
         <section className={`panel-shell ${page === "workspace" ? "voice-workspace-shell" : page === "music" ? "music-workspace-shell" : page === "batch" ? "batch-workspace-shell" : page === "overview" ? "overview-shell" : page === "lipsync" ? "lipsync-shell" : ""}`}>
           {page === "lipsync" && <LipSyncStudio backendBaseUrl={backendBaseUrl} latestAudio={workspaceOutputPath} />}
-          {page === "music" && <MusicStudio backendBaseUrl={backendBaseUrl} />}
+          {page === "music" && <MusicStudio backendBaseUrl={backendBaseUrl} modelManager={<ComponentManager onRun={handleStartService} backendRunning={Boolean(bootstrap?.backendRunning)} />} />}
           {["production", "voices", "history"].includes(page) ? <ProductionStudio
             backendBaseUrl={backendBaseUrl}
             view={page === "voices" ? "voices" : page === "history" ? "history" : "editor"}

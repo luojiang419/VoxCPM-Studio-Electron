@@ -49,6 +49,8 @@ async function screenshot(name) {
     if(state.status==='error') throw new Error(state.detail); return state.status==='ready';
   },180000);
   assert.equal(await client.evaluate("document.querySelector('.startup-gate') === null"),true);
+  await client.evaluate("Array.from(document.querySelectorAll('.nav-item')).find(b=>b.textContent.trim()==='音乐创作').click()");
+  await until(()=>client.evaluate("document.querySelector('.music-model-heading button') !== null"));
   await client.evaluate("Array.from(document.querySelectorAll('button')).find(b=>b.textContent==='功能与模型管理' && b.getBoundingClientRect().width>0).click()");
   await until(()=>client.evaluate("Array.from(document.querySelectorAll('dialog[open][aria-label=\"功能与模型管理\"]')).some(d=>d.getBoundingClientRect().width>100)"));
   assert.equal(await client.evaluate("Array.from(document.querySelectorAll('dialog[open]')).filter(d=>d.getBoundingClientRect().width>100).flatMap(d=>[...d.querySelectorAll('input[role=switch]')]).length"),5);

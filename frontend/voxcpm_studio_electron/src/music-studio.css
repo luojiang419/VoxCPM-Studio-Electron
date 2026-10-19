@@ -10,6 +10,7 @@
 .music-card-heading h2, .music-card-heading h3 { margin: 0; color: var(--text); }
 .music-card-heading h2 { font-size: 23px; margin-top: 8px; font-weight: 650; }
 .music-card-heading h3 { font-size: 15px; font-weight: 650; }
+.music-model-heading > .ghost-button { flex-shrink: 0; padding: 6px 9px; font-size: 10px; white-space: nowrap; }
 .music-kicker { font-size: 10px; color: var(--muted); letter-spacing: .09em; }
 .music-idea { min-height: 146px; line-height: 1.9; font-size: 14px; resize: vertical; }
 .music-card textarea, .music-card input, .music-card select { box-sizing: border-box; max-width: 100%; }
