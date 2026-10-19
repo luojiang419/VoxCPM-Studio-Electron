@@ -261,12 +261,30 @@ test("丢失单个模型只补齐该文件，保留已可用的 Python 和依赖
     downloads++;
     return new Response(bytes, { status: 200, headers: { "Content-Length": String(bytes.length) } });
   });
-  await f.create().prepare(f.options);
+  const repaired = f.create();
+  await repaired.prepare(f.options);
   assert.equal(downloads, 1);
   assert.deepEqual(await fs.readFile(target), bytes);
   assert.ok(f.states.some(state => state.status === "working" && state.phase === "models"));
   assert.ok(!f.calls.some(args => args.includes("install")));
+  assert.ok(!f.calls.some(args => args.includes(PROBE) || args.includes("pip")), "模型缺失不能连带重复检查 Python/CUDA 环境");
+  assert.equal(repaired.state.environmentCached, true);
 });
+
+for (const change of ["模型清单变化", "包入口损坏", "依赖版本要求变化", "显卡驱动变化"]) {
+  test(`${change}时环境缓存只对环境自身变化失效`, async t => {
+    const f = await startupFixture(t, true);
+    await f.create().prepare(f.options); f.calls.length = 0;
+    if (change === "模型清单变化") f.localConfig.models[0].label = "新版模型说明";
+    if (change === "包入口损坏") await fs.appendFile(f.moduleFile, "\n# changed");
+    if (change === "依赖版本要求变化") await fs.appendFile(path.join(f.appDir, "runtime-requirements.txt"), "# updated\n");
+    if (change === "显卡驱动变化") f.selected.gpu.driver = "581.01";
+    const restarted = f.create();
+    await restarted.prepare(f.options);
+    assert.equal(restarted.state.environmentCached, change === "模型清单变化");
+    assert.equal(f.calls.some(args => args.includes(PROBE)), change !== "模型清单变化");
+  });
+}
 
 test("缺失模型先下载，再加载音频框架与验证显卡", async t => {
   const f = await startupFixture(t, true);

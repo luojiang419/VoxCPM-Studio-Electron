@@ -124,7 +124,7 @@ function offlinePipArgs(config, profile, cache, requirements) {
 }
 
 const PROBE = String.raw`
-import json, os, sys, locale, importlib
+import json, os, sys, locale, importlib.util
 def progress(message):
     print('VOXCPM_PROBE ' + json.dumps(message, ensure_ascii=False), flush=True)
 if os.name == 'nt':
@@ -148,16 +148,19 @@ if expected != 'cpu' and (expected != 'existing' or torch.cuda.is_available()):
     z = torch.nn.functional.scaled_dot_product_attention(x[None,None], x[None,None], x[None,None])
     torch.cuda.synchronize()
     assert y[0,0].item() == 32 and torch.isfinite(z).all().item(), 'GPU 运算校验失败'
+# 重型框架由随后的真实 API 启动加载；预检不要再导入一次。
 for name, label in [('gradio', '音频界面组件'), ('numpy', '数值计算组件'),
                     ('soundfile', '音频读写组件'), ('yaml', '配置组件'),
                     ('funasr', '语音识别框架'), ('modelscope', '模型管理组件'),
                     ('transformers', '语音模型框架'), ('librosa', '音频分析组件'),
                     ('fastapi', '本地服务组件'), ('uvicorn', '服务运行组件'),
                     ('safetensors', '权重读取组件'), ('datasets', '数据组件'),
-                    ('wetext', '文本处理规则（首次加载较慢）'), ('inflect', '文本转换组件'),
+                    ('wetext', '文本处理规则'), ('inflect', '文本转换组件'),
                     ('einops', '张量组件'), ('addict', '配置字典组件')]:
-    progress('加载' + label)
-    importlib.import_module(name)
+    progress('检查' + label + '安装入口')
+    assert importlib.util.find_spec(name) is not None, name + ' 缺失'
+# 验证音频原生库仍可加载；其余框架的实际导入以 API 健康握手为准。
+import numpy, soundfile
 progress('核对 FFmpeg 与依赖版本')
 if expected not in ('existing', 'existing-gpu'):
     import imageio_ffmpeg
@@ -233,6 +236,12 @@ class RuntimeService {
       root: path.resolve(this.root), appRoot: path.resolve(this.appRoot) }))
       .update(fs.readFileSync(path.join(this.appDir, "runtime-requirements.txt"))).digest("hex");
   }
+  environmentSignature(selected, { existingPython, managed }) {
+    const { models, ...config } = this.config;
+    return crypto.createHash("sha256").update(JSON.stringify({ config, selected, existingPython, managed,
+      root: path.resolve(this.root), appRoot: path.resolve(this.appRoot), probe: 2 }))
+      .update(fs.readFileSync(path.join(this.appDir, "runtime-requirements.txt"))).digest("hex");
+  }
   async startupProbe(python, selected, managed) {
     const args = ["-c", STARTUP_PROBE];
     if (managed) args.push(path.join(this.appDir, "runtime-requirements.txt"), this.config.python.version,
@@ -276,7 +285,8 @@ class RuntimeService {
         this.log("已就绪组件的文件信息发生变化，执行一次完整复检。\n");
         return null;
       }
-      await this.startupProbe(ready.python, selected, ready.managed);
+      try { await this.startupProbe(ready.python, selected, ready.managed); }
+      catch (error) { this.readyProbeFailed = true; throw error; }
       this.controller.signal.throwIfAborted();
       this.log("已复用验证通过的本地环境，跳过完整依赖加载、pip 检查和模型哈希。\n");
       this.emit({ status: "ready", phase: "environment-ready", cached: true, message: "已复用就绪环境，正在启动本地服务", name: "", size: 0 });
@@ -291,6 +301,23 @@ class RuntimeService {
     return { python, modelDir, env: { ...this.modelEnv(), ...(managed ? {
       PATH: `${path.join(path.dirname(python), "ffmpeg")}${path.delimiter}${this.env.PATH || this.env.Path || ""}` } : {}) } };
   }
+  async reuseEnvironment(signature, selected) {
+    if (this.readyProbeFailed) return null;
+    try {
+      const ready = JSON.parse(await fsp.readFile(this.readyPath, "utf8"));
+      if (ready.protocol !== 1 || ready.environmentSignature !== signature || !ready.environmentFiles?.length) return null;
+      const current = await this.stamps(ready.environmentFiles.map(item => item.file));
+      if (JSON.stringify(current) !== JSON.stringify(ready.environmentFiles)) return null;
+      await this.startupProbe(ready.python, selected, ready.managed);
+      this.controller.signal.throwIfAborted();
+      this.log("音频环境未变化，仅重新检查模型；跳过重复框架导入、CUDA 自检与 pip 检查。\n");
+      return ready;
+    } catch (error) {
+      this.controller.signal.throwIfAborted();
+      if (error.code !== "ENOENT") this.log(`音频环境缓存需复检：${error.message}\n`);
+      return null;
+    }
+  }
   async rememberReady(signature, selected, python, modelDir, managed) {
     let temp;
     try {
@@ -298,8 +325,11 @@ class RuntimeService {
       const directory = path.dirname(python);
       for (const entry of await fsp.readdir(directory)) if (/\.(?:exe|dll|pyd|zip|_pth)$/i.test(entry)) files.push(path.join(directory, entry));
       if (managed) files.push(path.join(directory, "ffmpeg/ffmpeg.exe"));
-      files.push(python, ...await this.modelFiles(modelDir));
-      const ready = { protocol: 1, signature, python, modelDir, managed, files: await this.stamps(files), checkedAt: new Date().toISOString() };
+      files.push(python);
+      const environmentFiles = await this.stamps(files);
+      const ready = { protocol: 1, signature, python, modelDir, managed,
+        environmentSignature: this.environmentReadySignature, environmentFiles,
+        files: [...environmentFiles, ...await this.stamps(await this.modelFiles(modelDir))], checkedAt: new Date().toISOString() };
       this.controller.signal.throwIfAborted();
       temp = `${this.readyPath}.${process.pid}.${crypto.randomBytes(4).toString("hex")}.tmp`;
       await fsp.writeFile(temp, JSON.stringify(ready));
@@ -400,6 +430,7 @@ class RuntimeService {
   prepare(options = {}) {
     if (this.pending) return this.pending;
     this.controller = new AbortController();
+    this.readyProbeFailed = false;
     this.pending = this.prepareInternal(options).catch((error) => {
       this.emit({ status: this.controller.signal.aborted ? "cancelled" : "error", message: error.message });
       throw error;
@@ -410,7 +441,7 @@ class RuntimeService {
     this.logPath = path.join(this.dataRoot, "cache", "runtime-bootstrap.log");
     this.readyPath = path.join(this.dataRoot, "cache", "runtime-ready.json");
     await fsp.mkdir(path.dirname(this.logPath), { recursive: true });
-    this.emit({ status: "checking", activity: "startup", phase: "detect", cached: false, message: "正在识别音频设备与已安装环境", log: "", downloaded: 0, size: 0, name: "", modelName: "", modelState: "" });
+    this.emit({ status: "checking", activity: "startup", phase: "detect", cached: false, environmentCached: false, message: "正在识别音频设备与已安装环境", log: "", downloaded: 0, size: 0, name: "", modelName: "", modelState: "" });
     const selected = await this.detect();
     this.emit({ ...selected, phase: "check", message: `已识别 ${selected.label}，正在检查本地准备记录` });
     this.env = { ...process.env, PYTHONUTF8: "1", PYTHONIOENCODING: "utf-8", PYTHONNOUSERSITE: "1", PIP_DISABLE_PIP_VERSION_CHECK: "1" };
@@ -418,10 +449,18 @@ class RuntimeService {
     const existingDirectory = existingPython ? path.resolve(path.dirname(existingPython)) : "";
     managed = managed || (path.dirname(existingDirectory) === path.join(this.root, "runtime", "managed") && /^py312-(cpu|cu126|cu128)$/.test(path.basename(existingDirectory)));
     const startupSignature = this.startupSignature(selected, { existingPython: managed ? "" : existingPython, existingModel, managed });
+    this.environmentReadySignature = this.environmentSignature(selected, { existingPython: managed ? "" : existingPython, managed });
     const reused = await this.reuseReady(startupSignature, selected);
     if (reused) return reused;
+    const environment = await this.reuseEnvironment(this.environmentReadySignature, selected);
     // 模型下载不依赖 Python 导入；先补齐模型，避免被首次框架加载和自检阻塞。
     const modelDir = await this.prepareModels(existingModel);
+    if (environment) {
+      await this.rememberReady(startupSignature, selected, environment.python, modelDir, environment.managed);
+      this.emit({ status: "ready", phase: "environment-ready", environmentCached: true,
+        message: "模型检查完成，已复用验证过的音频环境，正在启动服务", name: "", size: 0 });
+      return this.runtimeResult(environment.python, modelDir, environment.managed);
+    }
     // 完整旧包先实测；不修补其 Python，失败才创建独立托管环境。
     if (!managed && existingPython && fs.existsSync(existingPython)) {
       let existingValid = false;
@@ -480,7 +519,9 @@ try {
       } else await fsp.rename(staging, directory);
     }
     await fsp.mkdir(path.join(directory, "Lib", "site-packages"), { recursive: true });
-    await fsp.writeFile(path.join(directory, "python312._pth"), `python312.zip\n.\nLib/site-packages\n${path.join(this.appRoot, "src")}\nimport site\n`);
+    const pth = path.join(directory, "python312._pth");
+    const pthContent = `python312.zip\n.\nLib/site-packages\n${path.join(this.appRoot, "src")}\nimport site\n`;
+    if (await fsp.readFile(pth, "utf8").catch(() => "") !== pthContent) await fsp.writeFile(pth, pthContent);
     let valid = false;
     const signature = crypto.createHash("sha256").update(JSON.stringify(this.config.profiles[selected.profile]))
       .update(fs.readFileSync(path.join(this.appDir, "runtime-requirements.txt"))).digest("hex");

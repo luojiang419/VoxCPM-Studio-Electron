@@ -17,22 +17,25 @@ async function events(items) { fs.writeFileSync(mailbox, JSON.stringify(items));
 async function shot(name) { await wait(250); const r = await c.send('Page.captureScreenshot', { format: 'png' }); fs.writeFileSync(path.join(output, name + '.png'), Buffer.from(r.data, 'base64')); }
 async function launch(number) {
   const started = Date.now();
-  child = spawn(exe, [path.join(run, 'main.cjs'), '--voxcpm-run', '--remote-debugging-port=19243', `--user-data-dir=${path.join(run, 'profile')}`], { cwd: shell, env, windowsHide: true, stdio: 'ignore' });
+  child = spawn(exe, [path.join(run, 'main.cjs'), '--voxcpm-run', '--remote-debugging-port=19243', `--user-data-dir=${path.join(run, 'profile')}`, '--disable-backgrounding-occluded-windows', '--disable-renderer-backgrounding'], { cwd: shell, env, windowsHide: true, stdio: 'ignore' });
   c = await connect(19243);
   await until(() => c.evaluate("Boolean(document.body && window.voxcpmDesktop)"));
-  await c.evaluate(`(()=>{window.__runtimeStates=[];window.__runtimeDialogs=[];window.voxcpmDesktop.onRuntimeEvent(e=>{if(e.type==='runtime-preparation')window.__runtimeStates.push({status:e.preparation.status,phase:e.preparation.phase,cached:e.preparation.cached,at:Date.now()})});new MutationObserver(()=>{const d=document.querySelector('.runtime-dialog');if(d?.open)window.__runtimeDialogs.push(d.innerText)}).observe(document.body,{subtree:true,attributes:true,attributeFilter:['open']})})()`);
+  await c.evaluate(`(()=>{window.__runtimeStates=[];window.__runtimeDialogs=[];window.voxcpmDesktop.onRuntimeEvent(e=>{if(e.type==='runtime-preparation')window.__runtimeStates.push({status:e.preparation.status,phase:e.preparation.phase,cached:e.preparation.cached,at:Date.now()})});new MutationObserver(()=>{const d=document.querySelector('.runtime-startup-dialog');if(d?.open)window.__runtimeDialogs.push(d.innerText)}).observe(document.body,{subtree:true,attributes:true,attributeFilter:['open']})})()`);
   const boot = await until(() => c.evaluate(`window.voxcpmDesktop.getBootstrapState().then(s=>{if(s.status==='error')return {failed:s.detail};return s.status==='ready'&&s})`), 180000);
   assert.ok(!boot.failed, boot.failed);
   await until(() => c.evaluate("Boolean(document.querySelector('.ps-project-bar'))"));
   const prep = await c.evaluate('window.voxcpmDesktop.getPreparationState()');
   const states = await c.evaluate('window.__runtimeStates'), dialogs = await c.evaluate('window.__runtimeDialogs');
-  assert.equal(await c.evaluate("document.querySelector('.runtime-dialog').open"), false);
+  assert.equal(await c.evaluate("document.querySelector('.runtime-startup-dialog').open"), false);
   assert.ok(dialogs.every(text => !text.includes('补齐') && !text.includes('首次运行')), JSON.stringify(dialogs));
   assert.ok(!states.some(state => state.status === 'working'), JSON.stringify(states));
   if (number === 2) assert.equal(prep.cached, true);
   const timing = JSON.parse(fs.readFileSync(path.join(run, 'preparation-timing.json'), 'utf8'));
   const result = { launch: number, elapsedMs: Date.now() - started, cached: prep.cached, preparationMs: timing.elapsedMs, dialogs: dialogs.length };
-  launches.push(result); await shot(`launch-${number}-ready`); return boot;
+  launches.push(result);
+  fs.writeFileSync(path.join(run, `launch-${number}-states.json`), JSON.stringify(states, null, 2));
+  fs.writeFileSync(path.join(run, 'launches.json'), JSON.stringify(launches, null, 2));
+  await shot(`launch-${number}-ready`); return boot;
 }
 (async () => {
   fs.mkdirSync(shell, { recursive: true }); fs.mkdirSync(runtime, { recursive: true });
@@ -56,23 +59,23 @@ async function launch(number) {
   const boot = await launch(2);
   const quick = launches[1]; assert.ok(quick.preparationMs < launches[0].preparationMs, JSON.stringify(launches));
   await events([{ ...boot, type: 'boot', status: 'preparing' }, { type: 'runtime-preparation', preparation: { status: 'checking', phase: 'check', message: '正在检查本地运行环境' } }]);
-  assert.equal(await c.evaluate("document.querySelector('.runtime-dialog').open"), true);
+  await until(() => c.evaluate("document.querySelector('.runtime-startup-dialog').open"));
   assert.equal(await c.evaluate("document.querySelector('#runtime-title').textContent"), '音频系统启动中');
   for (const theme of ['light', 'dark']) {
     await c.evaluate(`document.body.dataset.theme=${JSON.stringify(theme)}`); await shot(`normal-check-${theme}`);
   }
   await events([{ type: 'runtime-preparation', preparation: { status: 'working', phase: 'dependencies', message: '正在补齐缺失的组件', name: 'missing.whl', downloaded: 5, size: 10 } }]);
-  assert.equal(await c.evaluate("document.querySelector('.runtime-dialog').open"), true);
+  assert.equal(await c.evaluate("document.querySelector('.runtime-startup-dialog').open"), true);
   assert.ok(await c.evaluate("document.querySelector('#runtime-title').textContent.includes('缺失的音频资源')"));
-  assert.equal(await c.evaluate("document.querySelector('.runtime-dialog').innerText.includes('首次运行')"), false);
+  assert.equal(await c.evaluate("document.querySelector('.runtime-startup-dialog').innerText.includes('首次运行')"), false);
   for (const theme of ['light', 'dark']) {
     await c.evaluate(`document.body.dataset.theme=${JSON.stringify(theme)}`); await shot(`actual-repair-${theme}`);
   }
   await events([{ type: 'runtime-preparation', preparation: { status: 'ready', phase: 'ready', message: '本地环境已就绪' } }, { ...boot, type: 'error', status: 'error', detail: '模拟应用源码启动错误' }]);
-  assert.equal(await c.evaluate("document.querySelector('.runtime-dialog').open"), true);
+  assert.equal(await c.evaluate("document.querySelector('.runtime-startup-dialog').open"), true);
   assert.equal(await c.evaluate("document.querySelector('#runtime-title').textContent"), '音频系统启动未完成');
   await events([{ ...boot, type: 'ready' }]);
-  assert.equal(await c.evaluate("document.querySelector('.runtime-dialog').open"), false);
+  assert.equal(await c.evaluate("document.querySelector('.runtime-startup-dialog').open"), false);
   assert.equal(c.events.filter(e => e.method === 'Runtime.exceptionThrown').length, 0);
   const report = { result: 'passed', launches, realRuntime: 'Python 3.12 / cu126 / RTX 4070 Ti SUPER', uiFixtures: ['startup-progress', 'actual-repair', 'backend-error', 'ready-close'], javascriptErrors: 0, run };
   fs.writeFileSync(path.join(output, 'result.json'), JSON.stringify(report, null, 2)); console.log(JSON.stringify(report, null, 2));
