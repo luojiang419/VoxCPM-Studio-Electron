@@ -356,13 +356,13 @@ function loadFallbackHtml(message) {
     .replace(/</g, "&lt;")
     .replace(/>/g, "&gt;");
   mainWindow.loadURL(
-    `data:text/html;charset=utf-8,<!doctype html><html lang="zh-CN"><head><meta charset="utf-8"><title>VoxCPM Studio Electron</title><style>body{margin:0;min-height:100vh;display:grid;place-items:center;background:#181817;color:#eeece6;font-family:'Segoe UI','Microsoft YaHei UI',sans-serif}main{width:min(760px,calc(100vw - 48px));padding:28px;border-radius:24px;background:rgba(32,32,30,.94);border:1px solid rgba(255,255,255,.08);box-shadow:0 20px 60px rgba(0,0,0,.34)}pre{white-space:pre-wrap;word-break:break-word;background:rgba(255,255,255,.05);padding:14px;border-radius:16px;color:#ffd9d9}</style></head><body><main><h1>VoxCPM Studio Electron</h1><p>前端构建文件不存在，请先执行 <code>npm run build</code>。</p><pre>${safeMessage}</pre></main></body></html>`,
+    `data:text/html;charset=utf-8,<!doctype html><html lang="zh-CN"><head><meta charset="utf-8"><title>JVOX Studio配音系统</title><style>body{margin:0;min-height:100vh;display:grid;place-items:center;background:#181817;color:#eeece6;font-family:'Segoe UI','Microsoft YaHei UI',sans-serif}main{width:min(760px,calc(100vw - 48px));padding:28px;border-radius:24px;background:rgba(32,32,30,.94);border:1px solid rgba(255,255,255,.08);box-shadow:0 20px 60px rgba(0,0,0,.34)}pre{white-space:pre-wrap;word-break:break-word;background:rgba(255,255,255,.05);padding:14px;border-radius:16px;color:#ffd9d9}</style></head><body><main><h1>JVOX Studio配音系统</h1><p>前端构建文件不存在，请先执行 <code>npm run build</code>。</p><pre>${safeMessage}</pre></main></body></html>`,
   );
 }
 
 function createWindow() {
   mainWindow = new BrowserWindow({
-    title: "VoxCPM Studio Electron",
+    title: "JVOX Studio配音系统",
     icon: path.join(__dirname, "app.ico"),
     show: !preparingInstallation,
     width: WINDOW_BOUNDS.width,

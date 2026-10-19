@@ -5,7 +5,7 @@
 状态：更名庆祝弹窗首版已完成，实际 Electron 预览已打开，供用户先行查阅；整体更名发布任务尚未完成。
 下一步：根据用户查阅反馈调整设计，随后继续全软件更名、安装器重编译、魔搭更新发布。
 TODO：正式名称覆盖；旧安装兼容；弹窗正式接入；安装器编译验收；签名更新包与魔搭发布验收。
-最近验证：TypeScript 类型检查、Vite 生产构建、15 项真实 Electron 交互检查通过；已查看浅色、深色及窄窗口截图。
+最近验证：TypeScript 类型检查、Vite 生产构建、15 项真实 Electron 交互检查通过；窗口标题追加修改已通过 JS 语法、生产构建及真实 Electron 主窗口/页面/回退页标题验证。
 Branch：feat/jvox-studio-rebrand，基于 15ba88a。
 阻塞：暂无；按用户“先给我真实演示查阅弹窗页”的顺序，先交付设计预览，暂不发布设计未查阅的新版本。
 
@@ -19,4 +19,10 @@ Branch：feat/jvox-studio-rebrand，基于 15ba88a。
 - `BrandAnnouncementPreview.tsx` 与对应 CSS：独立交互查阅页；更新按钮明确显示演示反馈，不调用正式服务。`main.tsx` 的 `?preview=jvox-announcement` 可打开，默认软件入口不变。
 - `scripts/preview_jvox_announcement.cjs`：使用现有 Electron 运行实际生产构建，隔离 userData、不加载后端或更新服务。重开命令（仓库目录）：`frontend\voxcpm_studio_electron\node_modules\electron\dist\electron.exe scripts\preview_jvox_announcement.cjs`。构建缺失时先在前端目录执行 `npm run build`。
 - 验证记录：`builds/jvox-announcement-preview/report.json`；截图 `light.png`、`dark.png`、`compact.png`。15 项覆盖模态、新名称/标题、默认焦点、桌面宽度、Tab、深色、Escape、重新打开、更新演示、延期、关闭、小窗口滚动、减弱动效、运行时异常。
-- 仅完成设计预览；尚未更改正式名称、安装文件名、协议、正式版本、签名包、魔搭入口，也未重新编译安装器。正式接入需与现有 C# 原生更新选择及 UpdateService 保持一致，不能将预览反馈冒充实际更新。
+- 已完成设计预览与下述主窗口标题修改；其余正式名称、安装文件名、协议、正式版本、签名包、魔搭入口尚未修改，也未重新编译安装器。正式接入需与现有 C# 原生更新选择及 UpdateService 保持一致，不能将预览反馈冒充实际更新。
+
+## 查阅反馈：移除窗口标题 Electron 字样
+
+- 主窗口 `main.js` 的 BrowserWindow 标题、异常回退页面标题和标题正文，以及 `index.html` 的页面标题均统一为 `JVOX Studio配音系统`，防止页面加载后恢复旧标题。
+- `node --check` 与 Vite 构建通过。隔离 Electron 调用当前源码中的真实 `createWindow` 与 `loadFallbackHtml`，实际主窗口、页面、回退页标题均为新名称；记录 `builds/jvox-title-validation/report.json`。该标题检查未启动后端与 IPC 服务，因此其中缺少 IPC handler 的日志属于隔离夹具，不代表完整工作台启动验收。
+- 本次修改尚未进入安装包或魔搭发布，已安装的旧客户端需要后续打包更新才能生效。
