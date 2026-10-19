@@ -210,9 +210,14 @@ __updateTestDialog.showMessageBox=(...args)=>['启动独立更新器','重启并
   if (!process.argv.includes("--legacy-client")) assert.equal(recheck.getState().lastResult?.status, "complete");
   assert.equal(await digest(sentinel), dataHash);
   assert.equal(await digest(modelConfig), modelHash);
-  if (lightweight) assert.ok(fs.readFileSync(path.join(testRoot, "data/cache/runtime-bootstrap.log"), "utf8").includes("已复用验证通过的本地环境"), "更新重启未复用已验证运行时");
   const backendState = JSON.parse(fs.readFileSync(path.join(testRoot, "data/cache/electron_backend_state.json")));
   const health = await (await fetch(backendState.serviceUrl + "/api/health")).json();
+  if (lightweight) {
+    if (fs.readFileSync(path.join(appDir, "runtime-service.js"), "utf8").includes("async launch(")) {
+      const runtime = await (await fetch(backendState.serviceUrl + "/api/runtime/summary")).json();
+      assert.equal(runtime.runtime_pending, true, "正常更新重启应走按需加载，不重新导入所有模型框架");
+    } else assert.ok(fs.readFileSync(path.join(testRoot, "data/cache/runtime-bootstrap.log"), "utf8").includes("已复用验证通过的本地环境"), "更新重启未复用已验证运行时");
+  }
   let music;
   if (componentProfile) {
     assert.deepEqual(JSON.parse(fs.readFileSync(path.join(testRoot, "data/component-selection.json"))), componentProfile);
