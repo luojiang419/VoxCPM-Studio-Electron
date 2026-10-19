@@ -34,6 +34,8 @@ export default function MusicStudio({ backendBaseUrl }: { backendBaseUrl: string
   const [tab, setTab] = useState<"caption" | "lyrics">("caption");
   const [compiled, setCompiled] = useState<PromptPacket | null>(null), [compileError, setCompileError] = useState("");
   const initial = useRef(stored());
+  const mounted = useRef(false);
+  useEffect(() => { mounted.current = true; return () => { mounted.current = false; }; }, []);
   const sourceRef = useRef(sourceKey(brief)); sourceRef.current = sourceKey(brief);
   const locked = busy || !!running;
   const current = packet?.modelId === brief.modelId && preparedKey === sourceKey(brief) && (!status || !packet.rulesVersion || packet.rulesVersion === status.rules.version);
@@ -119,11 +121,19 @@ export default function MusicStudio({ backendBaseUrl }: { backendBaseUrl: string
     setPreparedKey(sourceKey(brief)); setPreviousWriterKey(writerKey(brief));
   }
   async function enableModel() {
+    const modelId = brief.modelId;
     await perform(async () => {
       const components = await window.voxcpmDesktop.getComponents();
       const profile = components.profile || { selected: [], removed: [], defaultModel: "ace-xl-turbo" };
-      await window.voxcpmDesktop.selectComponents({ ...profile, selected: [...new Set([...profile.selected, brief.modelId])], removed: profile.removed.filter((id: string) => id !== brief.modelId) });
-      await window.voxcpmDesktop.startBackend();
+      await window.voxcpmDesktop.selectComponents({ ...profile, defaultModel: modelId, selected: [...new Set([...profile.selected, modelId])], removed: profile.removed.filter((id: string) => id !== modelId) });
+      const backend = await window.voxcpmDesktop.startBackend();
+      // 组件准备会重建音乐页；若页面仍在原处，也必须从恢复后的服务读取就绪状态。
+      if (!mounted.current) return;
+      const state = await musicRequest<Status>(backend.backendBaseUrl || backendBaseUrl, "/api/music/status");
+      if (!mounted.current) return;
+      setStatus(state);
+      setBrief(value => ({ ...value, modelId }));
+      setMessage(state.models.find(model => model.id === modelId)?.ready ? "模型已补齐并选用，可以生成音乐。" : "模型尚未就绪，请检查补齐进度后重试。");
     });
   }
   async function saveAudio() {
