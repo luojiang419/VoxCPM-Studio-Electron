@@ -266,7 +266,7 @@ namespace VoxBootstrap {
         public static void RequireReady(string root, string report, string session, bool requireComponents = false) {
             ValidateReportPath(root, report, session);
             if (!File.Exists(report)) throw new IOException("运行环境尚未完成，不能登记安装完成。");
-            var result = Json.Deserialize<Dictionary<string, object>>(File.ReadAllText(report));
+            var result = Json.Deserialize<Dictionary<string, object>>(ReadPreparationReport(report));
             if (Convert.ToString(result["session"]) != session || !SamePath(Convert.ToString(result["root"]), root)) throw new IOException("安装就绪报告与当前会话不一致。");
             if (!Convert.ToBoolean(result["ok"])) throw new IOException(Convert.ToString(result["error"]));
             if (Convert.ToString(result["status"]) != "ready") throw new IOException("本地服务尚未就绪。");
@@ -282,6 +282,11 @@ namespace VoxBootstrap {
                 if (Convert.ToString(stored["signature"]) != Convert.ToString(receipt["signature"])) throw new IOException("组件自检记录不匹配。");
             }
         }
+        static string ReadPreparationReport(string file) {
+            // Windows 原子替换要求所有读者允许删除共享，避免与进度写入方争用。
+            using (var stream = new FileStream(file, FileMode.Open, FileAccess.Read, FileShare.Read | FileShare.Delete))
+            using (var reader = new StreamReader(stream)) return reader.ReadToEnd();
+        }
         public static async Task WaitForReady(string root, string report, string session, Process child, CancellationToken token, IProgress<Status> progress, bool requireComponents = false) {
             ValidateReportPath(root, report, session);
             var deadline = DateTime.UtcNow.AddHours(24); string previous = "";
@@ -293,7 +298,7 @@ namespace VoxBootstrap {
                 }
                 string progressPath = report + ".progress";
                 if (File.Exists(progressPath)) try {
-                    string text = File.ReadAllText(progressPath);
+                    string text = ReadPreparationReport(progressPath);
                     if (text != previous) {
                         var value = Json.Deserialize<Dictionary<string, object>>(text);
                         if (Convert.ToString(value["session"]) == session) {

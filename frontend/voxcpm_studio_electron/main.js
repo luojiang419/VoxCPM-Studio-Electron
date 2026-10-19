@@ -946,7 +946,7 @@ app.whenReady().then(async () => {
         const deadline = setTimeout(() => reject(new Error("工作台界面初始化超时，请重新运行安装器")), 60000);
         rendererReady.then(() => { clearTimeout(deadline); resolve(); });
       });
-      installSession.ready(componentReceipt);
+      await installSession.ready(componentReceipt);
     }
     if (process.env.VOXCPM_UPDATE_HEALTH_FILE && !updateHealthWritten) {
       await rendererReady;
@@ -961,13 +961,17 @@ app.whenReady().then(async () => {
         status: "error", message: String(error), checkedAt: Date.now() });
       clearInterval(updatePreparationHeartbeat);
     }
-    installSession?.fail(error);
+    let reportFailed = false;
+    try { await installSession?.fail(error); }
+    catch (reportError) { reportFailed = true; console.error("无法写入安装失败报告：", reportError); }
     setBootstrapState({
       status: "error",
       statusText: "桌面壳启动失败",
       detail: String(error),
     });
     sendRuntimeEvent("error", summarizeBootstrapState());
+    // 无法落盘失败报告时退出准备进程，让原生安装器明确失败，避免一直等待。
+    if (reportFailed) app.quit();
   }
 });
 
