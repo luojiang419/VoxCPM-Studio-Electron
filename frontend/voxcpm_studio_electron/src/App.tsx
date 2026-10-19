@@ -1,4 +1,4 @@
-import { startTransition, useEffect, useState, type ReactNode } from "react";
+import { startTransition, useEffect, useLayoutEffect, useState, type ReactNode } from "react";
 import UpdatePanel from "./UpdatePanel";
 import BrandAnnouncementDialog from "./BrandAnnouncementDialog";
 import ProductionStudio from "./ProductionStudio";
@@ -509,7 +509,7 @@ function App() {
   ];
   const workspaceReferenceAudioUrl = toLocalFileUrl(singleForm.referenceAudio, bootstrap);
 
-  useEffect(() => {
+  useLayoutEffect(() => {
     window.voxcpmDesktop.rendererReady();
     document.body.setAttribute("data-theme", effectiveTheme);
   }, [effectiveTheme]);
@@ -1049,12 +1049,17 @@ function App() {
   );
 
   return (
-    <div className={`app-shell studio-shell ${["production", "voices", "history"].includes(page) ? "studio-creative-page" : ""}`}>
-      {brandAnnouncementOpen && bootstrap?.status === "ready" && <BrandAnnouncementDialog welcome
+    <>
+      {brandAnnouncementOpen && <div className="jvox-entry-screen">
+        <span className="jvox-entry-wordmark" aria-hidden="true">JVOX Studio配音系统</span>
+        <BrandAnnouncementDialog welcome
         onToggleTheme={() => setThemeMode(effectiveTheme === "dark" ? "light" : "dark")}
         onDismiss={() => setBrandAnnouncementOpen(false)}
-        onUpdate={() => { try { localStorage.setItem("jvox-brand-welcome-2026", "seen"); } catch { /* 无法保存时下次启动再次提醒。 */ } setBrandAnnouncementOpen(false); }} />}
-      <RuntimePreparation onRun={handleStartService} backendStatus={bootstrap?.status || "booting"} backendDetail={bootstrap?.detail || ""} />
+        onUpdate={() => { try { localStorage.setItem("jvox-brand-welcome-2026", "seen"); } catch { /* 无法保存时下次启动再次提醒。 */ } setBrandAnnouncementOpen(false); }} />
+      </div>}
+    <div className={`app-shell studio-shell ${["production", "voices", "history"].includes(page) ? "studio-creative-page" : ""}`}
+      style={brandAnnouncementOpen ? { display: "none" } : undefined} aria-hidden={brandAnnouncementOpen || undefined}>
+      <RuntimePreparation onRun={handleStartService} backendStatus={bootstrap?.status || "booting"} backendDetail={bootstrap?.detail || ""} suppressed={brandAnnouncementOpen} />
       <aside className="sidebar">
         <div className="sidebar-top">
           <div className="studio-brand">
@@ -1770,6 +1775,7 @@ function App() {
         mode={singleForm.mode} editing={!!editingVoiceId} referenceOnly={saveVoiceReferenceOnly}
         onCancel={() => setSaveVoiceOpen(false)} onSave={saveDesignedVoice} />}
     </div>
+    </>
   );
 }
 

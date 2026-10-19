@@ -23,6 +23,7 @@ let server;
   const child = spawn(process.execPath, ['scripts/smoke_update.cjs', baseline, '--same-version', '--empty-components',
     ...(promptFlow ? ['--prompt-flow','--main-install'] : ['--legacy-client']),
     ...(process.argv.includes('--lightweight') ? ['--lightweight'] : []),
+    ...(process.argv.includes('--preserve-installed-identity') ? ['--preserve-installed-identity'] : []),
     ...(process.argv.includes('--assert-native') ? ['--assert-native'] : []), '--manifest-url', base + '/latest'], { cwd: root, windowsHide: true, stdio: ['ignore', log, log] });
   fs.closeSync(log);
   console.log((promptFlow ? '正在验证新版启动自动更新：' : '正在验证未修补旧版：') + baseline);

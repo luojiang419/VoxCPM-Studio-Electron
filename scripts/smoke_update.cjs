@@ -8,7 +8,8 @@ const root = path.resolve(__dirname, "..");
 const original = path.resolve(process.argv[2] && !process.argv[2].startsWith("--") ? process.argv[2] : path.join(root, "builds/VoxCPM-Studio-Electron-Portable-2.0.1"));
 const testRoot = path.join(root, "builds", "update-smoke-" + Date.now());
 const targetVersion = JSON.parse(fs.readFileSync(path.join(root, "frontend/voxcpm_studio_electron/package.json"))).version;
-const fromVersion = process.argv.includes("--same-version") ? "2.0.2" : "2.0.1";
+const preserveIdentity = process.argv.includes("--preserve-installed-identity");
+const fromVersion = preserveIdentity ? JSON.parse(fs.readFileSync(path.join(original, "resources/app/package.json"))).version : process.argv.includes("--same-version") ? "2.0.2" : "2.0.1";
 const lightweight = process.argv.includes("--lightweight");
 const promptFlow = process.argv.includes("--prompt-flow");
 const sleep = (ms) => new Promise((resolve) => setTimeout(resolve, ms));
@@ -93,7 +94,8 @@ __updateTestDialog.showMessageBox=(...args)=>['启动独立更新器','重启并
   const pkg = JSON.parse(fs.readFileSync(packagePath)); pkg.version = fromVersion;
   fs.writeFileSync(packagePath, JSON.stringify(pkg, null, 2));
   const configPath = path.join(appDir, "update-config.json");
-  const config = JSON.parse(fs.readFileSync(configPath)); config.releaseId = "00000000000000";
+  const config = JSON.parse(fs.readFileSync(configPath));
+  if (!preserveIdentity) config.releaseId = "00000000000000";
   const manifestArgument = process.argv.indexOf("--manifest-url");
   if (manifestArgument >= 0) config.manifestUrl = process.argv[manifestArgument + 1];
   fs.writeFileSync(configPath, JSON.stringify(config, null, 2));
@@ -117,6 +119,7 @@ __updateTestDialog.showMessageBox=(...args)=>['启动独立更新器','重启并
     return state.backendRunning && state.status === "ready" && state;
   }, 180000);
   console.log("旧版本地 API 已就绪：" + boot.backendBaseUrl);
+  await client.evaluate('document.querySelector(".jvox-announcement .jvox-update")?.click()');
   await client.evaluate("Array.from(document.querySelectorAll('button')).find(b=>b.textContent.trim()==='设置').click()");
   await until(async () => client.evaluate("document.body.innerText.includes('软件更新')"));
   await client.evaluate("Array.from(document.querySelectorAll('.settings-navigation button')).find(b=>b.textContent.includes('软件更新'))?.click()");

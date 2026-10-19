@@ -1,3 +1,6 @@
+.jvox-entry-screen { position: fixed; inset: 0; display: grid; place-items: center; background: radial-gradient(ellipse at 65% 25%, #f8e5cc, transparent 55%), #f1ede6; }
+.jvox-entry-wordmark { position: absolute; bottom: 22px; color: #9c8873; font-size: 10px; letter-spacing: 3px; }
+[data-theme="dark"] .jvox-entry-screen { background: radial-gradient(ellipse at 65% 25%, #3a2d20, transparent 55%), #171715; }
 .jvox-announcement {
   --ja-bg: #fffcf8; --ja-ink: #302c28; --ja-muted: #8b8177; --ja-line: #e9e1d8;
   --ja-accent: #c96b37; --ja-card: #f8f3ec; --ja-button: #302c28; --ja-button-ink: #fff5e8;

@@ -8,7 +8,7 @@ const stages = ["设备检查", "模型检查", "音频环境", "音频服务", 
 const phases: Record<string, number> = { detect: 0, check: 0, python: 2, dependencies: 2, verify: 2, models: 1, "environment-ready": 2, service: 3, components: 4, ready: 5 };
 const mb = (n: number) => `${(n / 1024 / 1024).toFixed(1)} MB`;
 
-export default function RuntimePreparation({ onRun, backendStatus, backendDetail }: { onRun: () => void; backendStatus: string; backendDetail: string }) {
+export default function RuntimePreparation({ onRun, backendStatus, backendDetail, suppressed = false }: { onRun: () => void; backendStatus: string; backendDetail: string; suppressed?: boolean }) {
   const [state, setState] = useState<State | null>(null);
   const [open, setOpen] = useState(false);
   const [showLog, setShowLog] = useState(false);
@@ -26,9 +26,9 @@ export default function RuntimePreparation({ onRun, backendStatus, backendDetail
     else if (backendStatus === "error") setOpen(true);
   }, [backendStatus]);
   useEffect(() => {
-    if (open) { returnFocus.current = document.activeElement as HTMLElement; if (!dialog.current?.open) dialog.current?.showModal(); }
+    if (open && !suppressed) { returnFocus.current = document.activeElement as HTMLElement; if (!dialog.current?.open) dialog.current?.showModal(); }
     else { dialog.current?.close(); returnFocus.current?.focus(); }
-  }, [open]);
+  }, [open, suppressed]);
   const backendFailed = state?.status === "ready" && backendStatus === "error";
   const failed = backendFailed || state?.status === "error" || backendStatus === "error";
   const paused = state?.status === "cancelled";

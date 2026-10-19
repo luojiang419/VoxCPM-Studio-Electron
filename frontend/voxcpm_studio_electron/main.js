@@ -368,7 +368,7 @@ function createWindow() {
   mainWindow = new BrowserWindow({
     title: "JVOX Studio配音系统",
     icon: path.join(__dirname, "app.ico"),
-    show: !preparingInstallation,
+    show: false,
     width: WINDOW_BOUNDS.width,
     height: WINDOW_BOUNDS.height,
     minWidth: WINDOW_BOUNDS.minWidth,
@@ -381,6 +381,10 @@ function createWindow() {
       nodeIntegration: false,
       sandbox: false,
     },
+  });
+
+  mainWindow.once("ready-to-show", () => {
+    if (!preparingInstallation && mainWindow && !mainWindow.isDestroyed()) mainWindow.show();
   });
 
   const distIndex = path.join(__dirname, "dist", "index.html");
