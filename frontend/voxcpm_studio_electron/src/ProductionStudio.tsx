@@ -1,6 +1,6 @@
 import { useEffect, useRef, useState, type CSSProperties, type ReactNode } from "react";
 import {
-  DEFAULT_GENERATION_CONFIG, type GenerationConfig, type StudioExport, type StudioHistory,
+  DEFAULT_GENERATION_CONFIG, type GenerationConfig, type StudioExport,
   type StudioProject, type StudioRole, type StudioSegment, type StudioTask, type StudioView, type StudioVoice,
 } from "./production-types";
 import "./production-studio.css";
@@ -89,7 +89,6 @@ export default function ProductionStudio({ backendBaseUrl, view = "editor", onNa
   const [projects, setProjects] = useState<StudioProject[]>([]);
   const [voices, setVoices] = useState<StudioVoice[]>([]);
   const [expandedVoiceId, setExpandedVoiceId] = useState("");
-  const [history, setHistory] = useState<StudioHistory[]>([]);
   const [loras, setLoras] = useState<Array<{ id: string; label: string }>>([]);
   const [selectedRoleId, setSelectedRoleId] = useState("");
   const [deleteRoleRequest, setDeleteRoleRequest] = useState<{ projectId: string; roleId: string } | null>(null);
@@ -226,11 +225,8 @@ export default function ProductionStudio({ backendBaseUrl, view = "editor", onNa
   }
 
   async function refreshAssets() {
-    const [voiceResult, historyResult] = await Promise.all([
-      request<{ items: StudioVoice[] }>(backendBaseUrl, "/api/workspace/voices"),
-      request<{ items: StudioHistory[] }>(backendBaseUrl, "/api/workspace/history"),
-    ]);
-    setVoices(voiceResult.items); setHistory(historyResult.items);
+    const voiceResult = await request<{ items: StudioVoice[] }>(backendBaseUrl, "/api/workspace/voices");
+    setVoices(voiceResult.items);
   }
 
   async function initialize() {
@@ -489,7 +485,7 @@ export default function ProductionStudio({ backendBaseUrl, view = "editor", onNa
 
   const applyVoice = (voice: StudioVoice) => { updateRole({ config: { ...voice.config } }, true); setNotice(`已将「${voice.name}」应用到「${selectedRole?.name}」。`); };
 
-  const pageTitle = view === "voices" ? "我的音色" : view === "history" ? "作品记录" : "配音工作台";
+  const pageTitle = view === "voices" ? "我的音色" : "配音工作台";
 
   return <div className={`production-studio ps-view-${view}`}>
     <header className="ps-header">
@@ -567,7 +563,6 @@ export default function ProductionStudio({ backendBaseUrl, view = "editor", onNa
           </div>
         </article>)}</div> : <div className="ps-empty ps-library-empty"><Icon name="mic" size={37} /><h2>{voiceSearch ? "没有找到匹配的音色" : "为喜欢的声音，留一个位置"}</h2><p>{voiceSearch ? "试试另一个关键词。" : "在「声音设计与克隆」中保存参考音或设计音色，即可在这里编辑和应用。"}</p><button className="ps-button" disabled={!voiceSearch && (locked || designerBusy || !onOpenVoiceDesigner)} onClick={() => voiceSearch ? setVoiceSearch("") : onOpenVoiceDesigner?.()}>{voiceSearch ? "清除搜索" : "设计新音色"}</button></div>}</section>}
 
-      {view === "history" && <section className="ps-library"><div className="ps-library-heading"><div><h2>每一次创作，都有迹可循<span>{history.length} 条记录</span></h2><p>试听历史生成与完整作品，返回项目继续打磨。</p></div><button className="ps-button ps-small" disabled={locked} onClick={() => void run("刷新记录", refreshAssets)}><Icon name="refresh" size={14} />刷新记录</button></div>{history.length ? <div className="ps-history-list"><div className="ps-history-columns"><span>作品与台词</span><span>时长</span><span>生成时间</span><span>操作</span></div>{history.map(item => <article className="ps-history-row" key={item.id}><div className="ps-history-info"><div className="ps-history-icon"><Icon name={item.segmentId ? "mic" : "music"} size={20} /></div><div><h3>{item.projectName}<span>{item.kind === "single" ? "单条创作" : item.segmentId ? "分段音频" : "完整作品"}</span></h3><p title={item.text || basename(item.audioPath)}>{item.text || basename(item.audioPath)}</p></div></div><span>{durationText(item.duration)}</span><time>{dateText(item.createdAt)}</time><div className="ps-history-actions"><IconButton icon="play" label="试听历史音频" onClick={() => void playAudio(item.previewUrl, item.projectName)} /><IconButton icon="folder" label="显示音频文件" onClick={() => void window.voxcpmDesktop.showItemInFolder(item.audioPath).catch(() => setError("无法打开文件位置。"))} />{item.projectId ? <button className="ps-text-button" disabled={locked} onClick={() => void run("打开历史项目", async () => { await flushProject(); const next = await request<StudioProject>(backendBaseUrl, `/api/workspace/projects/${item.projectId}`); acceptProject(next); setExportResult(next.lastExport?.stale ? null : next.lastExport || null); onNavigate?.("editor"); })}>打开项目<Icon name="chevron" size={12} /></button> : item.config ? <button className="ps-text-button" disabled={locked} onClick={() => { updateRole({ config: { ...item.config! } }, true); setNotice(`已应用历史音色配置到「${selectedRole?.name}」。`); }}>应用配置<Icon name="chevron" size={12} /></button> : null}</div></article>)}</div> : <div className="ps-empty ps-library-empty"><Icon name="music" size={37} /><h2>你的第一部作品，即将诞生</h2><p>真实生成的音频与导出作品会保存在这里。</p><button className="ps-button" onClick={() => onNavigate?.("editor")}>开始创作</button></div>}</section>}
 
       <footer className="ps-production-footer">
         {taskRunning && <div className="ps-task-progress" role="status"><div><span className="ps-live-dot" /><strong>{task.cancelRequested ? "将在当前段结束后暂停" : task.statusText || "正在合成"}</strong><span>{task.progressText}</span><b>{task.completed || 0} / {task.total || segments.length}</b></div><progress value={task.completed || 0} max={task.total || segments.length || 1} /></div>}

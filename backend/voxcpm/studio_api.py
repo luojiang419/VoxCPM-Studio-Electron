@@ -18,6 +18,7 @@ from fastapi.responses import FileResponse
 from pydantic import BaseModel, Field
 
 from .studio_workspace import WorkspaceStore
+from .studio_works import collect_works
 from .studio_lipsync import LipSyncService
 from .studio_music import MusicService
 from .studio_assistant import AssistantError
@@ -455,6 +456,10 @@ def create_api_app(studio: Optional[Any] = None, model_dir: Optional[str] = None
     def workspace_history():
         return workspace.history()
 
+    @app.get("/api/workspace/works")
+    def workspace_works():
+        return collect_works(workspace, music, lipsync, studio_service.settings_payload()["output_dir"])
+
     @app.post("/api/tasks/{task_id}/cancel")
     def cancel_task(task_id: str):
         return workspace_call(task_queue.cancel, task_id)
@@ -484,6 +489,8 @@ def create_api_app(studio: Optional[Any] = None, model_dir: Optional[str] = None
 
     @app.put("/api/settings")
     def put_settings(payload: StudioSettingsModel) -> dict[str, Any]:
+        old_output = Path(studio_service.settings_payload()["output_dir"])
+        workspace.index_batches((old_output / "batch").glob("*/manifest.json"))
         message, _runtime_markdown = studio_service.persist_settings(
             model_dir=payload.model_dir,
             hf_repo_id=payload.hf_repo_id,
@@ -575,6 +582,7 @@ def create_api_app(studio: Optional[Any] = None, model_dir: Optional[str] = None
             )
             result["archivePath"] = result["archive_path"]
             result["outputDir"] = result["output_dir"]
+            workspace.record_batch(result)
             return result
 
         return task_queue.submit(

@@ -143,13 +143,13 @@ class MusicService:
                 raise ValueError('请先在功能与模型管理中启用该模型并补齐所需资源')
             self.active = True
 
-    def results(self):
+    def results(self, limit=50):
         folder = self.data_root / 'outputs/music'
         rows = []
-        for file in sorted(folder.glob('*/result.json'), key=lambda p: p.stat().st_mtime, reverse=True)[:50]:
+        for file in sorted(folder.glob('*/result.json'), key=lambda p: p.stat().st_mtime, reverse=True)[:limit]:
             try:
                 item = json.loads(file.read_text(encoding='utf8'))
-                if Path(item['outputPath']).is_file():
+                if limit is None or Path(item['outputPath']).is_file():
                     rows.append(item)
             except (OSError, KeyError, ValueError):
                 continue

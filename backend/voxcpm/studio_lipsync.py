@@ -387,15 +387,15 @@ class LipSyncService:
             with self.lock:
                 self.active = False
 
-    def results(self):
+    def results(self, limit=30):
         jobs = self.data_root / "lipsync-jobs"
         if not jobs.is_dir():
             return []
         results = []
-        for path in sorted(jobs.glob("*/result.json"), key=lambda p: p.stat().st_mtime, reverse=True)[:30]:
+        for path in sorted(jobs.glob("*/result.json"), key=lambda p: p.stat().st_mtime, reverse=True)[:limit]:
             try:
                 result = json.loads(path.read_text(encoding="utf-8"))
-                if Path(result["outputPath"]).is_file():
+                if limit is None or Path(result["outputPath"]).is_file():
                     results.append(result)
             except (OSError, ValueError, KeyError):
                 continue

@@ -82,7 +82,7 @@ function stop() {
   await until(() => client.evaluate("Boolean(document.querySelector('.ps-voice-card'))"));
   await screenshot("voice-library", 1560, 980);
   await clickText("作品记录");
-  await until(() => client.evaluate("Boolean(document.querySelector('.ps-history-row'))"));
+  await until(() => client.evaluate("Boolean(document.querySelector('.works-row'))"));
   await screenshot("history", 1560, 980);
   await clickText("配音工作台");
   await client.evaluate("document.querySelector('[aria-label=\"切换界面主题\"]').click()");

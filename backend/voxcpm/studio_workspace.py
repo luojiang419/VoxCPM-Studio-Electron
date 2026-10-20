@@ -71,7 +71,7 @@ class WorkspaceStore:
         self.path = self.root / "workspace.json"
         self.studio = studio
         self.lock = threading.RLock()
-        self.db = {"projects": [], "voices": [], "history": []}
+        self.db = {"projects": [], "voices": [], "history": [], "batches": []}
         if self.path.exists():
             loaded = json.loads(self.path.read_text(encoding="utf-8"))
             self.db.update({key: loaded.get(key, []) for key in self.db})
@@ -384,6 +384,29 @@ class WorkspaceStore:
             self.db["history"].insert(0, {"id": history_id, "kind": "single", "projectId": "", "projectName": "单条创作",
                 "text": text, "config": clean_config(config), "audioPath": str(audio_path), "duration": duration, "createdAt": timestamp()})
             self._save()
+
+    def record_batch(self, result: dict) -> None:
+        """保存清单索引，保持音频与归档在用户选择的输出目录。"""
+        self.index_batches([Path(result["manifest_path"])])
+
+    def index_batches(self, manifests) -> None:
+        """切换输出位置前登记旧批量，保留清单原始时间。"""
+        with self.lock:
+            known = {row["manifestPath"] for row in self.db["batches"]}
+            changed = False
+            for path in manifests:
+                manifest = str(path.resolve())
+                if manifest in known:
+                    continue
+                try:
+                    created_at = datetime.fromtimestamp(path.stat().st_mtime).isoformat()
+                except FileNotFoundError:
+                    continue
+                self.db["batches"].append({"manifestPath": manifest, "createdAt": created_at})
+                known.add(manifest)
+                changed = True
+            if changed:
+                self._save()
 
     def generate(self, project_id: str, segment_ids: list[str] | None, force: bool,
                  progress: Callable[[int, int, str], None], cancelled: Callable[[], bool]) -> dict:

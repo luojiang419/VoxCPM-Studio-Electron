@@ -2,6 +2,7 @@ import { startTransition, useEffect, useLayoutEffect, useState, type ReactNode }
 import UpdatePanel from "./UpdatePanel";
 import BrandAnnouncementDialog from "./BrandAnnouncementDialog";
 import ProductionStudio from "./ProductionStudio";
+import WorksLibrary, { type Work, type WorkCategory } from "./WorksLibrary";
 import WorkspacePlayer from "./WorkspacePlayer";
 import SaveVoiceDialog from "./SaveVoiceDialog";
 import LipSyncStudio from "./LipSyncStudio";
@@ -833,6 +834,24 @@ function App() {
     setPage("workspace");
   }
 
+  async function openRecordedWork(work: Work) {
+    if (busy) return;
+    try {
+      if (work.projectId) {
+        await apiJson(backendBaseUrl, `/api/workspace/projects/${encodeURIComponent(work.projectId)}`);
+        localStorage.setItem("voxcpm-production-project", work.projectId);
+        setPage("production");
+      } else if (work.config) {
+        openVoiceDesigner({ id: work.id, name: work.title, tags: [], config: work.config, createdAt: work.createdAt,
+          sampleText: work.subtitle, previewAudio: work.available ? work.outputPath : "", previewUrl: work.available ? work.previewUrl : "" });
+      }
+    } catch (error) { setGlobalMessage(`无法打开历史作品：${String(error)}`); }
+  }
+
+  function createRecordedWork(category: WorkCategory) {
+    setPage(({ voice: "workspace", dubbing: "production", video: "lipsync", music: "music", batch: "batch" } as const)[category]);
+  }
+
   async function saveDesignedVoice(name: string, tags: string[]) {
     if (busy || (saveVoiceReferenceOnly ? !singleForm.referenceAudio.trim() :
       !designedVoice || voiceDesignSignature(designedVoice.form) !== voiceDesignSignature(singleForm))) {
@@ -1121,9 +1140,10 @@ function App() {
         <section className={`panel-shell ${page === "workspace" ? "voice-workspace-shell" : page === "music" ? "music-workspace-shell" : page === "batch" ? "batch-workspace-shell" : page === "overview" ? "overview-shell" : page === "lipsync" ? "lipsync-shell" : ""}`}>
           {page === "lipsync" && <LipSyncStudio backendBaseUrl={backendBaseUrl} latestAudio={workspaceOutputPath} />}
           {page === "music" && <MusicStudio backendBaseUrl={backendBaseUrl} modelManager={<ComponentManager onRun={handleStartService} backendRunning={Boolean(bootstrap?.backendRunning)} />} />}
-          {["production", "voices", "history"].includes(page) ? <ProductionStudio
+          {page === "history" && <WorksLibrary backendBaseUrl={backendBaseUrl} headerTools={headerTools} onCreate={createRecordedWork} onOpen={work => void openRecordedWork(work)} />}
+          {["production", "voices"].includes(page) ? <ProductionStudio
             backendBaseUrl={backendBaseUrl}
-            view={page === "voices" ? "voices" : page === "history" ? "history" : "editor"}
+            view={page === "voices" ? "voices" : "editor"}
             headerTools={headerTools}
             onOpenVoiceDesigner={openVoiceDesigner}
             designerBusy={busy}

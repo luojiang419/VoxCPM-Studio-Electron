@@ -34,7 +34,7 @@ function unchanged(before, after) {
 async function noBlue() {
   const bad = await client.evaluate(`(()=>{
     function blue(value){const m=value.match(/^rgba?\\(([^)]+)\\)/);if(!m)return false;const [r,g,b,a=1]=m[1].split(/[, ]+/).map(Number);if(!a)return false;const max=Math.max(r,g,b),min=Math.min(r,g,b),d=max-min;if(d<14||d/(max||1)<.12)return false;let h=max===r?((g-b)/d)%6:max===g?(b-r)/d+2:(r-g)/d+4;h=(h*60+360)%360;return h>=160&&h<=290;}
-    return [...document.querySelectorAll('body *')].filter(e=>{const r=e.getBoundingClientRect();return r.width&&r.height&&r.bottom>0&&r.top<innerHeight}).flatMap(e=>{const s=getComputedStyle(e);return ['color','backgroundColor','borderTopColor','borderRightColor','accentColor'].filter(p=>blue(s[p]||'')).map(p=>({tag:e.tagName,class:e.className,property:p,value:s[p]}))}).slice(0,12);
+    return [...document.querySelectorAll('body *')].filter(e=>{const r=e.getBoundingClientRect();return !e.closest('.works-tone-video,.works-tone-music')&&r.width&&r.height&&r.bottom>0&&r.top<innerHeight}).flatMap(e=>{const s=getComputedStyle(e);return ['color','backgroundColor','borderTopColor','borderRightColor','accentColor'].filter(p=>blue(s[p]||'')).map(p=>({tag:e.tagName,class:e.className,property:p,value:s[p]}))}).slice(0,12);
   })()`);
   assert.deepEqual(bad, [], JSON.stringify(bad));
 }
@@ -85,7 +85,7 @@ async function noBlue() {
     for (const page of pages) {
       await click(page);
       const before = await rects();
-      await client.evaluate("document.querySelector('.panel-shell').scrollTop=1000;document.querySelectorAll('.ps-library > .ps-history-list,.ps-library > .ps-voice-grid').forEach(e=>e.scrollTop=1000)");
+      await client.evaluate("document.querySelector('.panel-shell').scrollTop=1000;document.querySelectorAll('.works-content,.ps-library > .ps-voice-grid').forEach(e=>e.scrollTop=1000)");
       await wait(100);
       unchanged(before, await rects());
       assert.equal(await client.evaluate("document.scrollingElement.scrollTop"), 0);

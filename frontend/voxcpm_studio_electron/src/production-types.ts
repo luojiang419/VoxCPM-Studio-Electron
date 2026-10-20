@@ -1,4 +1,4 @@
-export type StudioView = "editor" | "voices" | "history";
+export type StudioView = "editor" | "voices";
 
 export type GenerationConfig = {
   mode: "声音设计" | "可控克隆" | "极致克隆";
