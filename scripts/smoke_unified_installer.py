@@ -18,9 +18,15 @@ def run(build, installed=None):
     report=json.loads(Path(build).read_text('utf8'))
     exe=Path(report['executable'])
     out=ROOT/'builds/unified-validation'/str(time.time_ns());out.mkdir(parents=True)
+    # 安装验收在隔离副本准备环境；只把正式安装作为只读资源来源。
+    child_env = dict(os.environ)
+    for name in ('VOXCPM_INSTALLED_ROOT', 'VOXCPM_INSTALLED_RESOURCES_READONLY', 'VOXCPM_PYTHON_EXE',
+                 'VOXCPM_MODELS_ROOT', 'VOXCPM_MODEL_DIR', 'ZIPENHANCER_MODEL_PATH',
+                 'VOXCPM_MUSIC_MODELS_ROOT', 'VOXCPM_MUSIC_ENGINE_ROOT', 'VOXCPM_LIPSYNC_ROOT'):
+        child_env.pop(name, None)
     if installed is None:
         # 使用实际最终EXE打开全新位置，只观察首页，不登记真实安装。
-        first=subprocess.Popen([str(exe),'--root',str(out/'fresh-target')])
+        first=subprocess.Popen([str(exe),'--root',str(out/'fresh-target')], env=child_env)
         try:
             capture_window(first,out/'first-install.png')
         finally:
@@ -48,7 +54,10 @@ def run(build, installed=None):
             '/resource:'+str(Path(report['payload']).parent/'repair-bundle.json')+',repair-bundle.json',
             *['/reference:'+s for s in ('System.Windows.Forms.dll','System.Drawing.dll','Accessibility.dll','System.Web.Extensions.dll','System.IO.Compression.dll','System.IO.Compression.FileSystem.dll')],
             *[str(ROOT/'bootstrap'/name) for name in ('Program.cs','SharedTheme.cs','Installation.cs','Components.cs','DiskCard.cs')],str(ROOT/'repair/Program.cs'),str(ROOT/'updater/Program.cs'),str(test)],check=True)
-        subprocess.run([str(native),report['desktopManifest'],report['desktopArchive'],str(exe),str(ROOT/'builds/bootstrap-validation/runtime'),str(ROOT.parent/'models'),str(out),str(ROOT/'assets/brand/voxcpm-app.ico')],check=True,timeout=600)
+        installed_root = os.environ.get('VOXCPM_INSTALLED_ROOT')
+        runtime_source = Path(installed_root) / 'runtime' if installed_root else ROOT / 'builds/bootstrap-validation/runtime'
+        models_source = Path(installed_root) / 'models' if installed_root else ROOT.parent / 'models'
+        subprocess.run([str(native),report['desktopManifest'],report['desktopArchive'],str(exe),str(runtime_source),str(models_source),str(out),str(ROOT/'assets/brand/voxcpm-app.ico')],check=True,timeout=600,env=child_env)
         root=Path(json.loads((out/'installed-root.json').read_text('utf-8-sig'))['root'])
     else:
         root=Path(installed).resolve()
@@ -57,7 +66,7 @@ def run(build, installed=None):
     selection=(root/'data/component-selection.json').read_bytes()
     def maintenance(name,expected):
         result=out/(name+'.json')
-        child=subprocess.Popen([str(exe),'--root',str(root),'--report',str(result)])
+        child=subprocess.Popen([str(exe),'--root',str(root),'--report',str(result)], env=child_env)
         try:
             capture_window(child,out/(name+'-progress.png'))
             deadline=time.monotonic()+480
