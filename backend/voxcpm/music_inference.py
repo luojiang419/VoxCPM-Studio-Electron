@@ -15,8 +15,6 @@ def generate(engine, models, packet, output):
     torch.manual_seed(packet['seed'])
     torch.cuda.reset_peak_memory_stats()
     if packet['modelId'] == 'yue2':
-        if not packet['canGenerate']:
-            raise ValueError('当前YuE2运行接口尚未接入纯音乐转谱流程，请改用ACE/MiniMax')
         import folder_paths
         folder_paths.add_model_folder_path('checkpoints', str(models / 'comfy/checkpoints'))
         folder_paths.set_output_directory(str(output.parent))
@@ -24,11 +22,17 @@ def generate(engine, models, packet, output):
         folder_paths.set_user_directory(str(output.parent / 'yue2-user'))
         from yue2_comfy.constants import DEFAULT_OPTIONS
         from yue2_comfy.nodes import YuE2GenerateSong
+        options = {**DEFAULT_OPTIONS, 'max_seconds': packet['duration'], 'cot': 'full', 'offload': 'on', 'download': 'off',
+                   'quantization': 'int8', 'keep_model_loaded': False}
+        transfer = None
         with torch.inference_mode():
-            result = YuE2GenerateSong().generate(style=packet['inputs']['style'], lyrics=packet['inputs']['lyrics'], seed=packet['seed'],
-                options={**DEFAULT_OPTIONS, 'max_seconds': packet['duration'], 'cot': 'full', 'offload': 'on', 'download': 'off',
-                         'quantization': 'int8', 'keep_model_loaded': False}, score_abc='')
-        audio, score = result['result']
+            if packet['draft']['instrumental']:
+                from music_instrumental import generate_instrumental
+                audio, score, transfer = generate_instrumental(packet, output, options)
+            else:
+                result = YuE2GenerateSong().generate(style=packet['inputs']['style'], lyrics=packet['inputs']['lyrics'],
+                    seed=packet['seed'], options=options, score_abc='')
+                audio, score = result['result']
         waveform = audio['waveform'].squeeze(0).float().cpu().numpy().T
         rate = audio['sample_rate']
         peak = float(abs(waveform).max())
@@ -36,6 +40,8 @@ def generate(engine, models, packet, output):
         sf.write(output, waveform * gain, rate, subtype='PCM_24')
         output.with_suffix('.abc').write_text(score, encoding='utf8')
         report = {'normalizationGain': gain, 'sampleRate': rate}
+        if transfer is not None:
+            report['instrumentalTransfer'] = transfer
     elif packet['modelId'] == 'heartmula':
         from heartlib import HeartMuLaGenPipeline
         report = {'sampleRate': 48000, 'codecDtype': 'float32', 'codecSteps': 30}

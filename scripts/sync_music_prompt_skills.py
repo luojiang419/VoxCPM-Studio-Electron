@@ -63,7 +63,8 @@ def main():
             result.writestr(info, data)
             count += 1
     files[target.name] = {'url': archive_url, 'sha256': hashlib.sha256(target.read_bytes()).hexdigest(), 'textFiles': count}
-    manifest = {'version': '20261018-v1', 'checkedOn': '2026-10-18', 'files': files,
+    files['instrumental-rules.md'] = {'kind': 'local-rules', 'sha256': hashlib.sha256((OUTPUT / 'instrumental-rules.md').read_bytes()).hexdigest()}
+    manifest = {'version': '20261020-v2', 'checkedOn': '2026-10-18', 'files': files,
         'models': {
             'ace-xl-turbo': {'name': 'ACE-Step 1.5 XL Turbo', 'kind': 'official-skill', 'skill': 'acestep-songwriting', 'revision': ACE,
                 'url': f'https://github.com/ace-step/ACE-Step-1.5/blob/{ACE}/.claude/skills/acestep-songwriting/SKILL.md'},

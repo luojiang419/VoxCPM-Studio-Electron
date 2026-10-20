@@ -11,5 +11,5 @@ import pytest
 if __name__ == '__main__':
     arguments = sys.argv[1:]
     if not any(not item.startswith('-') and Path(item).exists() for item in arguments):
-        arguments = [str(ROOT / 'tests/test_music_prompts.py'), str(ROOT / 'tests/test_studio_assistant.py'), str(ROOT / 'tests/test_studio_music.py'), '-q', *arguments]
+        arguments = [str(ROOT / 'tests/test_music_prompts.py'), str(ROOT / 'tests/test_music_instrumental.py'), str(ROOT / 'tests/test_studio_assistant.py'), str(ROOT / 'tests/test_studio_music.py'), '-q', *arguments]
     raise SystemExit(pytest.main(arguments))

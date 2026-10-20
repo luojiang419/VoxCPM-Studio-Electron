@@ -11,8 +11,8 @@ type Task = { taskId: string; status: string; statusText: string; progressText: 
 const modelDescriptions: Record<string, string> = {
   "ace-xl-turbo": "推荐主力。Turbo适合快速尝试不同编曲，支持中文歌曲与纯音乐，可单独控制速度、调式和拍号。",
   "minimax-music3": "适合细致描述人声、音色与编曲层次。采用分段风格描述，支持歌曲和纯音乐，适合流行与电影配乐方向。",
-  "yue2": "先规划乐谱，再生成演唱与伴奏，适合重视旋律及歌曲结构的创作。当前接入以人声歌曲为主，生成较慢。",
-  "heartmula": "用简洁风格标签搭配歌词，支持多语言歌曲，适合探索不同风格与声线；建议先生成短段试听。",
+  "yue2": "先规划乐谱，再生成音乐。支持人声歌曲与纯音乐；纯音乐会自动将旋律转为器乐声部，生成较慢。",
+  "heartmula": "用简洁风格标签创作多语言歌曲或纯音乐；纯音乐使用器乐标签与空歌词，建议先生成短段试听。",
 };
 const STORAGE = "voxcpm-music-studio-v1";
 const defaults: MusicBrief = { modelId: "ace-xl-turbo", idea: "", requirements: "", lyrics: "", caption: "", preserveLyrics: true, instrumental: false, language: "auto", duration: 120, bpm: null, keyScale: "", timeSignature: "", seed: 1247, providerId: "" };
@@ -62,6 +62,7 @@ export default function MusicStudio({ backendBaseUrl, modelManager }: { backendB
   }
   const draftKey = JSON.stringify([draft, brief.title, brief.bpm, brief.keyScale, brief.timeSignature, brief.seed, current]);
   useEffect(() => {
+    if (!current) { setCompiled(null); setCompileError(""); }
     if (!backendBaseUrl || !packet || !current || locked) return;
     let active = true;
     const timer = setTimeout(() => {
@@ -121,6 +122,11 @@ export default function MusicStudio({ backendBaseUrl, modelManager }: { backendB
       draft: { ...draft, ...value, modelId: brief.modelId } });
     setPreparedKey(sourceKey(brief)); setPreviousWriterKey(writerKey(brief));
   }
+  function toggleInstrumental(enabled: boolean) {
+    const keepDraftLyrics = enabled && !draft.instrumental && writerKey(brief) === previousWriterKey;
+    setBrief({ ...brief, instrumental: enabled, lyrics: keepDraftLyrics ? draft.lyrics || brief.lyrics : brief.lyrics });
+    setTab("caption");
+  }
   async function enableModel() {
     const modelId = brief.modelId;
     await perform(async () => {
@@ -152,7 +158,7 @@ export default function MusicStudio({ backendBaseUrl, modelManager }: { backendB
     });
   }
   const hasContent = !!(brief.idea.trim() || brief.lyrics.trim() || draft.caption.trim() || draft.captionZh?.trim() || draft.lyrics.trim());
-  const canGenerate = !locked && !!backendBaseUrl && (!!selected?.ready || canRepairModel) && hasContent && (autoOptimize || current) && !(brief.modelId === "yue2" && brief.instrumental) && !(current && (compiled?.canGenerate === false || !!compileError));
+  const canGenerate = !locked && !!backendBaseUrl && (!!selected?.ready || canRepairModel) && hasContent && (autoOptimize || current) && !(current && (compiled?.canGenerate === false || !!compileError));
   const taskPanel = (running || message) && <section className="music-task-card" role="status" aria-live="polite"><div><strong>{running ? task?.progressText || task?.statusText || "任务已加入队列" : message}</strong>{running && <progress max={100} value={running.kind === "prompt" ? task?.completed || undefined : undefined} />}</div>{running && <button className="ghost-button" disabled={!!task?.cancelRequested} onClick={() => void perform(async () => { const route = running.kind === "prompt" ? "/api/music/prompt-tasks/" : "/api/tasks/"; setTask(await musicRequest(backendBaseUrl, route + running.id + "/cancel", { method: "POST", body: "{}" })); })}>{task?.cancelRequested ? "正在取消…" : "取消任务"}</button>}</section>;
   return <>
   <div className="music-layout">
@@ -160,14 +166,15 @@ export default function MusicStudio({ backendBaseUrl, modelManager }: { backendB
       <section className="music-card music-brief-card">
         <div className="music-card-heading"><div><span className="music-kicker">从灵感开始</span><h2>今天，想听到怎样的音乐？</h2></div></div>
         <textarea className="music-idea" aria-label="音乐需求与提示词" value={brief.idea} disabled={locked} onChange={e => setBrief({ ...brief, idea: e.target.value })} placeholder="描述主题、情绪或故事，也可以粘贴已有提示词。例如：一首中文史诗歌曲，回望人类五十万年的战争与文明，从苍凉克制走向宏大，最终落在对和平的希望。" rows={4} />
-        <details className="music-details"><summary>更多要求与已有歌词 <span>可选</span></summary><label className="field"><span>创作要求</span><textarea value={brief.requirements} disabled={locked} onChange={e => setBrief({ ...brief, requirements: e.target.value })} rows={3} placeholder="如：男中音、不要说唱、铜管和弦乐逐步进入、结尾完整收束。" /></label><label className="field"><span>已有歌词</span><textarea value={brief.lyrics} disabled={locked} onChange={e => setBrief({ ...brief, lyrics: e.target.value })} rows={6} placeholder="有歌词可以直接粘贴；没有时，AI会根据需求创作。" /></label><label className="music-switch-label"><input className="music-switch" type="checkbox" role="switch" checked={brief.preserveLyrics} disabled={locked} onChange={e => setBrief({ ...brief, preserveLyrics: e.target.checked })} />保留已有歌词原文</label></details>
-        <div className="music-brief-actions"><label className="music-switch-label"><input className="music-switch" type="checkbox" role="switch" checked={brief.instrumental} disabled={locked} onChange={e => setBrief({ ...brief, instrumental: e.target.checked })} />纯音乐</label><button className="primary-button" disabled={locked || !backendBaseUrl || !hasContent} onClick={() => void compose()}>{current ? "再次优化 / 创作" : packet ? "AI 适配所选模型" : "AI 创作 / 优化"}</button></div>
+        <details className="music-details"><summary>更多要求与已有歌词 <span>可选</span></summary><label className="field"><span>创作要求</span><textarea value={brief.requirements} disabled={locked} onChange={e => setBrief({ ...brief, requirements: e.target.value })} rows={3} placeholder="如：男中音、不要说唱、铜管和弦乐逐步进入、结尾完整收束。" /></label><label className="field"><span>已有歌词</span><textarea value={brief.lyrics} disabled={locked || brief.instrumental} onChange={e => setBrief({ ...brief, lyrics: e.target.value })} rows={6} placeholder="有歌词可以直接粘贴；没有时，AI会根据需求创作。" /></label><label className="music-switch-label"><input className="music-switch" type="checkbox" role="switch" checked={brief.preserveLyrics} disabled={locked || brief.instrumental} onChange={e => setBrief({ ...brief, preserveLyrics: e.target.checked })} />保留已有歌词原文</label></details>
+        <div className="music-brief-actions"><label className="music-switch-label"><input className="music-switch" type="checkbox" role="switch" checked={brief.instrumental} disabled={locked} onChange={e => toggleInstrumental(e.target.checked)} />纯音乐</label><button className="primary-button" disabled={locked || !backendBaseUrl || !hasContent} onClick={() => void compose()}>{current ? "再次优化 / 创作" : packet ? "AI 适配所选模型" : "AI 创作 / 优化"}</button></div>
+        {brief.instrumental && <p className="music-help">全器乐模式：AI将设计旋律、配器与段落发展，生成时不使用歌词或人声要求。关闭后可继续编辑已有歌词。</p>}
       </section>
       <section className="music-card music-prompt-card">
         <div className="music-card-heading"><div><span className="music-kicker">生成前，可自由修改</span><h3>最终音乐提示词</h3></div><span className={`music-ready-label ${current ? "is-ready" : ""}`}>{current ? "已适配当前模型" : draft.captionNeedsAdaptation ? "中文已修改，等待重新适配" : packet ? "草稿或模型已改变，等待适配" : "等待创作或填写中文风格"}</span></div>
         <label className="music-title-input"><span>作品名称</span><input value={brief.title ?? draft.title} maxLength={150} disabled={locked} placeholder="填写名称，生成后以此命名音频" onChange={e => setBrief({ ...brief, title: e.target.value })} /></label>
-        <div className="music-tabs" role="tablist" aria-label="提示词与歌词"><button role="tab" aria-selected={tab === "caption"} onClick={() => setTab("caption")}>{brief.modelId === "heartmula" ? "风格标签" : "风格与编曲"}</button><button role="tab" aria-selected={tab === "lyrics"} onClick={() => setTab("lyrics")}>歌词</button></div>
-        <textarea className="music-final-text" aria-label={tab === "lyrics" ? "最终歌词" : "最终风格提示词"} value={tab === "lyrics" ? draft.lyrics : draft.captionZh || ""} disabled={locked || (tab === "lyrics" && brief.instrumental)} onChange={e => editDraft(tab === "lyrics" ? { lyrics: e.target.value } : { captionZh: e.target.value, captionNeedsAdaptation: true })} rows={12} placeholder={tab === "lyrics" ? "AI创作的歌词会显示在这里。" : draft.caption && !draft.captionZh ? "这份旧草稿仅有英文，点击AI适配即可同时获得中文展示稿和英文生成稿。" : brief.modelId === "heartmula" ? "填写中文风格标签，如：电影感、管弦乐、男声、庄重。" : "用中文描述风格与编曲，AI会同时创作中文展示稿和英文生成稿。"} />
+        <div className="music-tabs" role="tablist" aria-label="提示词与歌词"><button role="tab" aria-selected={tab === "caption"} onClick={() => setTab("caption")}>{brief.modelId === "heartmula" ? "风格标签" : "风格与编曲"}</button><button role="tab" disabled={brief.instrumental} aria-selected={tab === "lyrics"} onClick={() => setTab("lyrics")}>歌词</button></div>
+        <textarea className="music-final-text" aria-label={tab === "lyrics" ? "最终歌词" : "最终风格提示词"} value={tab === "lyrics" ? draft.lyrics : draft.captionZh || ""} disabled={locked || (tab === "lyrics" && brief.instrumental)} onChange={e => editDraft(tab === "lyrics" ? { lyrics: e.target.value } : { captionZh: e.target.value, captionNeedsAdaptation: true })} rows={12} placeholder={tab === "lyrics" ? "AI创作的歌词会显示在这里。" : draft.caption && !draft.captionZh ? "这份旧草稿仅有英文，点击AI适配即可同时获得中文展示稿和英文生成稿。" : brief.modelId === "heartmula" ? "填写中文风格标签，如：纯音乐、电影感、管弦乐、庄重。" : "用中文描述风格与编曲，AI会同时创作中文展示稿和英文生成稿。"} />
         {tab === "caption" && <p className="music-help">中文展示与英文生成稿由AI同时创作。修改中文后需重新适配，生成时使用配套英文稿。</p>}
         {compileError && current && <p className="music-message">{compileError}</p>}
         {(current ? compiled?.warnings || packet?.warnings || [] : []).map(warning => <p className="music-help" key={warning}>{warning}</p>)}
@@ -178,14 +185,14 @@ export default function MusicStudio({ backendBaseUrl, modelManager }: { backendB
     </div>
     <aside className="music-options">
       <section className="music-card"><div className="music-card-heading music-model-heading"><h3>音乐模型</h3>{modelManager}</div><label className="field"><span>当前模型</span><select value={brief.modelId} disabled={locked} onChange={e => setBrief({ ...brief, modelId: e.target.value })}>{(status?.models || [{ id: "ace-xl-turbo", name: "ACE-Step 1.5 XL Turbo" }]).map(model => <option value={model.id} key={model.id}>{model.name}</option>)}</select></label>{selected && <div className="music-model-facts"><span>{(selected.size / 1024 ** 3).toFixed(2)} GiB</span><span>{selected.ready ? "已就绪" : canRepairModel ? "生成时自动补齐" : selected.installed ? "文件已安装" : "待补齐"}</span></div>}{selected && !selected.ready && !canRepairModel && <button className="ghost-button music-full-button" disabled={locked} onClick={() => void enableModel()}>启用并补齐此模型</button>}{canRepairModel && !selected?.installed && <p className="music-help">生成时自动下载缺失文件，校验通过后继续生成，可随时取消。</p>}<p className="music-model-description">{modelDescriptions[brief.modelId]}</p><p className="music-help">更换模型后会重新适配提示词，保留相同需求下的歌词。</p></section>
-      <section className="music-card"><div className="music-card-heading"><h3>歌曲参数</h3></div><div className="music-parameter-grid">
+      <section className="music-card"><div className="music-card-heading"><h3>音乐参数</h3></div><div className="music-parameter-grid">
         <label className="field"><span>期望时长 / 秒</span><input type="number" min={10} max={300} value={brief.duration} disabled={locked} onChange={e => setBrief({ ...brief, duration: Number(e.target.value) })} /></label>
-        <label className="field"><span>歌词语言</span><select value={brief.language} disabled={locked} onChange={e => setBrief({ ...brief, language: e.target.value })}><option value="auto">跟随需求</option><option value="zh">中文 / 普通话</option><option value="yue">粤语</option><option value="en">英语</option><option value="ja">日语</option><option value="ko">韩语</option></select></label>
+        <label className="field"><span>歌词语言</span><select value={brief.instrumental ? "unknown" : brief.language} disabled={locked || brief.instrumental} onChange={e => setBrief({ ...brief, language: e.target.value })}>{brief.instrumental && <option value="unknown">无歌词</option>}<option value="auto">跟随需求</option><option value="zh">中文 / 普通话</option><option value="yue">粤语</option><option value="en">英语</option><option value="ja">日语</option><option value="ko">韩语</option></select></label>
         <label className="field"><span>速度 / BPM</span><input type="number" min={30} max={300} placeholder="由AI推断" value={brief.bpm ?? ""} disabled={locked} onChange={e => setBrief({ ...brief, bpm: e.target.value === "" ? null : Number(e.target.value) })} /></label>
         <label className="field"><span>拍号</span><select value={brief.timeSignature} disabled={locked} onChange={e => setBrief({ ...brief, timeSignature: e.target.value })}><option value="">由AI推断</option><option>4/4</option><option>3/4</option><option>6/8</option><option>2/4</option></select></label>
         <label className="field"><span>调式</span><input placeholder="如 D minor，可留空" value={brief.keyScale} disabled={locked} onChange={e => setBrief({ ...brief, keyScale: e.target.value })} /></label>
         <label className="field"><span>随机种子</span><input type="number" min={0} max={2147483647} value={brief.seed} disabled={locked} onChange={e => setBrief({ ...brief, seed: Number(e.target.value) })} /></label>
-      </div><p className="music-help">模型可能提前结束歌曲。节奏、音色和结构是生成方向，可通过试听继续调整。</p>{brief.modelId === "yue2" && brief.instrumental && <p className="music-help">当前YuE2运行接口尚未接入官方纯音乐转谱。可先创作提示词，或使用ACE/MiniMax生成纯音乐。</p>}</section>
+      </div><p className="music-help">模型可能提前结束歌曲。节奏、音色和结构是生成方向，可通过试听继续调整。</p></section>
     </aside>
   </div>
   <WorkspacePlayer variant="music"

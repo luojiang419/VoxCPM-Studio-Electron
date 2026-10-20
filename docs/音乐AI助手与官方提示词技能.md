@@ -34,12 +34,21 @@ MiniMax完整文本库包含18个风格族与1000个模板。运行时先形成�
 
 旧版显式指定的共享ComfyUI地址仍兼容，软件不关闭外部服务；仅在队列允许时请求卸载模型，取消也只处理自己的任务。全机桌面及其他软件的内存/显存不属于本任务的释放范围。
 
-当前YuE2运行接口尚未集成官方纯音乐转谱流程。可以创作并导出相应提示词；生成纯音乐时请选择ACE或MiniMax。这里也不提供参考歌手克隆、音频翻唱、逐音跟谱或局部重绘等未接入的能力。
+四个模型均支持「纯音乐」开关。开启后，AI围绕旋律动机、核心乐器、奏法与空间质感、段落发展及结尾收束，同时创作配套中英文；旧需求中的演唱要求失效，已有歌词保留在编辑区但不提交给模型，歌词语言显示「纯音乐 · 无歌词」。关闭开关后可继续编辑原有歌词。
+
+| 模型 | 纯音乐输入与流程 |
+| --- | --- |
+| ACE | `[Instrumental]` 歌词标记、`unknown` 语言，风格包含全器乐条件，速度与调式仍使用独立参数 |
+| MiniMax | 空歌词；保留官方三段式，`Vocal Details` 仅声明无人声，`Arrangement` 描述器乐结构 |
+| YuE2 | 空歌词，由 YuE2 先规划原谱，再把 Vocal 音符的音高、起音和时值移到 Ins；保留和弦与未重叠的器乐填充，重叠处保留主旋律并记录裁剪；校验后从转换后的固定谱重新编码生成 |
+| HeartMuLa | 空歌词，简洁小写器乐标签，包含 `instrumental` 与 `no vocals` |
+
+YuE2 随作品保存 `.source.abc`、`.instrumental.abc`、`.transfer.json` 和最终 `.abc`，便于核对原谱、转谱与实际输入。解析或转谱失败会停止，不静默改成直接生成或由助手编写替代曲谱。谱面及字段校验不等于听觉上绝对无人声，试听仍用于判断生成效果。参考歌手克隆、音频翻唱、逐音跟谱与局部重绘尚未接入。
 
 模型大小与是否已安装会显示在模型卡片中。未安装的模型可点击「启用并补齐此模型」，沿用启动器的国内源校验和准备流程。用户移除状态、共享文件保护以及现有ComfyUI模型不变。
 
 ## 开发与发布
 
-核心代码位于`backend/voxcpm/music_prompts.py`、`studio_assistant.py`、`studio_music.py`及前端`MusicStudio.tsx`。官方文本在`backend/voxcpm/music_skills/`，通过`scripts/sync_music_prompt_skills.py`按固定提交获取；更新资料时维护版本与清单。
+核心代码位于`backend/voxcpm/music_prompts.py`、`music_instrumental.py`、`music_inference.py`、`studio_assistant.py`、`studio_music.py`及前端`MusicStudio.tsx`。官方文本在`backend/voxcpm/music_skills/`，通过`scripts/sync_music_prompt_skills.py`按固定提交获取；`instrumental-rules.md` 为项目自有的纯音乐规则，独立标记并校验 SHA256。规则版本 `20261020-v2` 会使旧草稿重新适配，音乐运行包与权重版本不变。
 
 轻量构建和跨版本更新必须持续携带完整的音乐技能文本与新增后端模块。文本库约2.2MB，不含音乐权重、Python或CUDA；既有音乐运行包仍按原固定清单复用。2026-10-18已随2.0.2 / 20261018125140发布并激活魔搭更新，详情见[自动更新说明](自动更新说明.md)。

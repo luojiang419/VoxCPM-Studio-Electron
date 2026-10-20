@@ -1,5 +1,5 @@
 {
-  "version": "20261018-v1",
+  "version": "20261020-v2",
   "checkedOn": "2026-10-18",
   "files": {
     "ace-songwriting.md": {
@@ -46,6 +46,10 @@
       "url": "https://codeload.github.com/MiniMax-AI/MiniMax-Music3/zip/945655064d59b98004dd70002e7eb5c8c6e11373",
       "sha256": "c49b905ddc874472789830353f1e3bc85640e30cecc8120597f4e8ff1543dfae",
       "textFiles": 1021
+    },
+    "instrumental-rules.md": {
+      "kind": "local-rules",
+      "sha256": "e2dc11cc8b5d7ac479d1b2972750f80df1b848a1c29b7916b3a15cff90d5ca90"
     }
   },
   "models": {

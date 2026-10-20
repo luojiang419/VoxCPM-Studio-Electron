@@ -45,14 +45,54 @@ def test_model_contracts_keep_language_lyrics_and_parameters(model, fields):
         assert packet['inputs']['tags'] == 'piano,melancholic,male vocal'
 
 
-def test_instrumental_does_not_add_vocals_and_advertise_unwired_yue2_flow():
+def test_instrumental_does_not_add_vocals():
     brief = MusicBrief(instrumental=True)
     with pytest.raises(ValueError, match='纯音乐'):
         compile_packet(brief, raw('epic female choir'))
-    packet = compile_packet(brief, raw('instrumental piano, no vocals'))
+    data = {**raw('instrumental piano, no vocals'), 'captionZh': '全器乐钢琴，无人声'}
+    packet = compile_packet(brief, data)
     assert packet['draft']['lyrics'] == '' and packet['inputs']['lyrics'] == '[Instrumental]'
-    assert compile_packet(brief, raw('instrumental piano, no male vocals, no choir'))['canGenerate']
-    assert not compile_packet(MusicBrief(modelId='yue2', instrumental=True), raw('instrumental piano'))['canGenerate']
+    assert compile_packet(brief, {**data, 'caption': 'instrumental piano, no male vocals, no choir'})['canGenerate']
+    assert compile_packet(MusicBrief(modelId='yue2', instrumental=True), data)['canGenerate']
+
+
+@pytest.mark.parametrize('model', ['ace-xl-turbo', 'minimax-music3', 'yue2', 'heartmula'])
+def test_instrumental_contracts_ignore_preserved_lyrics_and_language(tmp_path, model):
+    calls = []
+    def complete(provider, key, system, user):
+        calls.append((system, json.loads(user)))
+        if '{"families"' in system:
+            return json.dumps({'families': ['cinematic-orchestral-epic']})
+        if '{"templates"' in system:
+            return json.dumps({'templates': [re.search(r'`(templates/[a-zA-Z0-9_-]+\.txt)`', system).group(1)]})
+        caption = 'instrumental,piano,strings,cinematic,no vocals' if model == 'heartmula' else 'Instrumental piano and strings, a recurring motif develops into a luminous climax and resolves; no vocals'
+        if '{"caption":"...","captionZh":"..."}' in system:
+            caption = 'Global Metadata\nInstrumental cinematic piano and strings.\nVocal Details\nNo vocals, singing, choir, humming or spoken words.\nArrangement\nA recurring piano motif grows with strings, then resolves quietly.'
+        return json.dumps({**raw(caption), 'captionZh': '全器乐电影配乐，钢琴动机逐步加入弦乐，高潮后安静收束，无人声。', 'lyrics': ''})
+    brief = MusicBrief(modelId=model, instrumental=True, idea='丝路河西，荒凉到壮阔', lyrics='保留这份人声歌词', language='zh')
+    packet = MusicPromptService(store(tmp_path, complete)).compose(brief)
+    assert packet['canGenerate'] and packet['draft']['instrumental']
+    assert packet['draft']['lyrics'] == '' and packet['draft']['metadata']['language'] == 'unknown'
+    assert packet['inputs']['lyrics'] == ('[Instrumental]' if model == 'ace-xl-turbo' else '')
+    assert 'instrumental' in packet['inputs'].get('tags', packet['inputs'].get('style', packet['inputs'].get('caption', ''))).lower()
+    assert calls[0][1]['lyrics'] == '' and calls[0][1]['preserveLyrics'] is False
+    assert '旋律动机' in calls[0][0] and '旧需求或旧稿' in calls[0][0]
+    if model == 'minimax-music3':
+        assert '本次模式规则' in calls[-1][0] and structured_caption(packet['inputs']['caption'])
+    assert compile_packet(MusicBrief(modelId=model, lyrics=brief.lyrics), raw('piano,male vocal'))['draft']['lyrics'] == brief.lyrics
+
+
+@pytest.mark.parametrize('caption', ['wordless humming', 'soft chanting', 'spoken words', 'male baritone', 'female soprano', 'vocal', '纯音乐中加入女高音', '弦乐与哼唱'])
+def test_instrumental_rejects_positive_voice_requests(caption):
+    with pytest.raises(ValueError, match='纯音乐'):
+        compile_packet(MusicBrief(instrumental=True), {**raw(caption), 'captionZh': '纯音乐'})
+
+
+def test_instrumental_accepts_negative_voice_lists_and_minimax_heading():
+    caption = 'Global Metadata\nVocal-free piano.\nVocal Details\nNo vocals, singing, choir, humming, chanting, rap, or spoken words.\nArrangement\nFlute and piano resolve.'
+    assert compile_packet(MusicBrief(modelId='minimax-music3', instrumental=True), {**raw(caption), 'captionZh': '人声细节\n无人声；禁止演唱、合唱、哼唱、吟唱、说唱与口白。'})['canGenerate']
+    assert compile_packet(MusicBrief(modelId='minimax-music3', instrumental=True), {**raw(caption.replace('Details\n', 'Details: ')), 'captionZh': '人声细节：全器乐，无人声。'})['canGenerate']
+    assert compile_packet(MusicBrief(instrumental=True), {**raw('Tibetan singing bowls, no vocals'), 'captionZh': '颂钵纯音乐，无人声'})['canGenerate']
 
 
 def test_bad_metadata_and_unsupported_heart_prompt_fail_explicitly():
