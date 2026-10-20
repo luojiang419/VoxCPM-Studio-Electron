@@ -18,7 +18,8 @@ let child, client;
   const python = spawnSync('python',['-c','import sys; print(sys.executable)'],{encoding:'utf8',windowsHide:true}).stdout.trim();
   assert.ok(fs.existsSync(python));
   const launches=[];
-  for(const {delay,fail} of [{delay:2},{delay:0},{delay:0,fail:true}]){
+  const startupOnly=process.argv.includes('--startup-only');
+  for(const {delay,fail} of (startupOnly?[{delay:2},{delay:0}]:[{delay:2},{delay:0},{delay:0,fail:true}])){
     const env={...process.env,VOXCPM_APP_ROOT:appRoot,VOXCPM_DATA_ROOT:data,VOXCPM_PYTHON_EXE:python,VOXCPM_VALIDATION_DELAY:String(delay),VOXCPM_VALIDATION_FAIL_BOOT:fail?'1':'0'};delete env.ELECTRON_RUN_AS_NODE;
     const started=Date.now(),log=fs.openSync(path.join(run,'electron.log'),'a');
     child=spawn(require(path.join(frontend,'node_modules/electron')).trim(),[run,'--remote-debugging-port=19482',`--user-data-dir=${path.join(run,'profile')}`],{env,windowsHide:true,stdio:['ignore',log,log]});fs.closeSync(log);
@@ -56,6 +57,6 @@ let child, client;
     await client.evaluate('window.voxcpmDesktop.stopBackend()');client.close();client=null;
     if(child?.pid)spawnSync('taskkill.exe',['/PID',String(child.pid),'/T','/F'],{windowsHide:true,stdio:'ignore'});child=null;
   }
-  fs.writeFileSync(path.join(run,'report.json'),JSON.stringify({ok:true,launches,checks:['本地服务连接前已显示工作区且可导航','所有模型缺失不阻塞正常启动','实际API、运行摘要和已有LoRA列表未导入Torch/Gradio/FunASR/core','未执行组件完整准备或伪写就绪凭证','实际调用ASR时才校验该模型并返回明确400错误','实际助手配置保存与默认选择持久化','实际设置布局截图与重启通过','后端提前退出立即显示错误与修复入口'],run},null,2));
+  fs.writeFileSync(path.join(run,'report.json'),JSON.stringify({ok:true,launches,startupOnly,checks:['本地服务连接前已显示工作区且可导航','所有模型缺失不阻塞正常启动','实际API、运行摘要和已有LoRA列表未导入Torch/Gradio/FunASR/core','未执行组件完整准备或伪写就绪凭证','实际调用ASR时才校验该模型并返回明确400错误','实际助手配置保存与默认选择持久化','实际设置布局截图与重启通过',...(startupOnly?[]:['后端提前退出立即显示错误与修复入口'])],run},null,2));
   console.log(JSON.stringify({run,launches},null,2));
 })().catch(e=>{console.error(e);process.exitCode=1;}).finally(async()=>{if(client){await client.evaluate('window.voxcpmDesktop.stopBackend()').catch(()=>{});client.close();}if(child?.pid)spawnSync('taskkill.exe',['/PID',String(child.pid),'/T','/F'],{windowsHide:true,stdio:'ignore'});});

@@ -41,6 +41,29 @@ def download(asset, target, progress=lambda *args: None, allow_http=False):
         progress(asset["size"], asset["size"])
         return target
     partial = target.with_name(target.name + ".part")
+    # 完整断点和本机固定资源优先复用；不把可修改的模型与缓存建立硬链接。
+    if partial.is_file() and partial.stat().st_size == asset["size"] and sha256(partial) == asset["sha256"]:
+        partial.replace(target)
+        progress(asset["size"], asset["size"])
+        return target
+    for directory in os.environ.get("VOXCPM_LOCAL_ASSET_DIRS", "").split(os.pathsep):
+        if not directory:
+            continue
+        names = [asset["name"], asset.get("path", asset["name"])]
+        for name in dict.fromkeys(names):
+            source = Path(directory) / name
+            if source.resolve() == target.resolve() or not source.is_file():
+                continue
+            if source.stat().st_size != asset["size"] or sha256(source) != asset["sha256"]:
+                continue
+            shutil.copyfile(source, partial)
+            if sha256(partial) != asset["sha256"]:
+                raise RuntimeError("本地资源复制校验失败")
+            partial.replace(target)
+            progress(asset["size"], asset["size"])
+            return target
+    if os.environ.get("VOXCPM_OFFLINE") == "1" and not allow_http:
+        raise RuntimeError(f"离线验收缺少资源：{asset['name']}（{asset['size']} 字节），请复用本地缓存或显式关闭 VOXCPM_OFFLINE。")
     errors = []
     for url in asset["urls"]:
         if not url.startswith("https://") and not (allow_http and url.startswith("http://127.0.0.1:")):

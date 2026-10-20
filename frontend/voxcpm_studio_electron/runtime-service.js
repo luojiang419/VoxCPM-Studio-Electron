@@ -36,7 +36,8 @@ function validateAsset(asset) {
   }
 }
 
-async function downloadAsset(asset, directory, { signal, progress = () => {}, fetchImpl = fetch, allowHttp = false } = {}) {
+async function downloadAsset(asset, directory, { signal, progress = () => {}, fetchImpl = fetch, allowHttp = false,
+  localDirectories = (process.env.VOXCPM_LOCAL_ASSET_DIRS || '').split(path.delimiter).filter(Boolean) } = {}) {
   if (!allowHttp) validateAsset(asset);
   const target = safePath(directory, asset.name), part = target + ".part";
   await fsp.mkdir(path.dirname(target), { recursive: true });
@@ -44,6 +45,21 @@ async function downloadAsset(asset, directory, { signal, progress = () => {}, fe
   progress({ name: asset.name, downloaded: 0, size: asset.size, verifying: true });
   if (await verified(target, asset)) { signal?.throwIfAborted(); progress({ name: asset.name, downloaded: asset.size, size: asset.size, reused: true }); return target; }
   if (await verified(part, asset)) { signal?.throwIfAborted(); await fsp.rename(part, target); return target; }
+  // 只读取显式配置的固定资源目录；校验后复制，避免模型编辑污染共享缓存。
+  for (const local of localDirectories) {
+    const source = safePath(local, asset.name);
+    if (path.resolve(source) === path.resolve(target) || !await verified(source, asset)) continue;
+    signal?.throwIfAborted();
+    await fsp.copyFile(source, part);
+    if (!await verified(part, asset)) throw new Error(`本地资源复制校验失败：${asset.name}`);
+    signal?.throwIfAborted();
+    await fsp.rename(part, target);
+    progress({ name: asset.name, downloaded: asset.size, size: asset.size, reused: true, source: 'local' });
+    return target;
+  }
+  if (process.env.VOXCPM_OFFLINE === '1' && !allowHttp) {
+    throw new Error(`离线验收缺少资源：${asset.name}（${asset.size} 字节）。请复用本地资源；确需冷启动下载时显式关闭 VOXCPM_OFFLINE。`);
+  }
   progress({ name: asset.name, downloaded: 0, size: asset.size, downloading: true, verifying: false });
   const errors = [];
   for (const url of asset.urls) {

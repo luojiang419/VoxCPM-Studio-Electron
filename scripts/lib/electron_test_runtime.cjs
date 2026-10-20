@@ -1,7 +1,7 @@
 // 嵌入式 Python 忽略 PYTHONPATH；隔离启动文件并引用现有依赖，确保验收运行当前源码。
 const fs = require('fs'), path = require('path');
 function preparePython(root, run) {
-  const original = path.join(root, 'builds/VoxCPM-Studio-Electron-Portable-2.0.1/runtime/python');
+  const original = path.join(root, 'builds/bootstrap-validation/runtime/managed/py312-cu126');
   const target = path.join(run, 'python');
   fs.mkdirSync(target, { recursive: true });
   for (const file of fs.readdirSync(original)) {

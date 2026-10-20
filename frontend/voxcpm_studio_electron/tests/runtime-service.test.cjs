@@ -43,6 +43,30 @@ async function fixture(t, handler) {
   return { directory, bytes, requests, asset, options: { allowHttp: true } };
 }
 
+test("跨目录资源通过哈希复用，缺失或同大小损坏在离线模式下禁止下载", async (t) => {
+  const directory = await fs.mkdtemp(path.join(os.tmpdir(), "voxcpm-local-reuse-"));
+  t.after(() => fs.rm(directory, { recursive: true, force: true }));
+  const source = path.join(directory, 'source'), target = path.join(directory, 'target');
+  await fs.mkdir(source);
+  const bytes = Buffer.from('可信共享依赖');
+  const asset = { name: 'dependency.whl', size: bytes.length,
+    sha256: crypto.createHash('sha256').update(bytes).digest('hex'), urls: ['https://example.invalid/dependency.whl'] };
+  await fs.writeFile(path.join(source, asset.name), bytes);
+  const previous = process.env.VOXCPM_OFFLINE;
+  process.env.VOXCPM_OFFLINE = '1';
+  t.after(() => { if (previous === undefined) delete process.env.VOXCPM_OFFLINE; else process.env.VOXCPM_OFFLINE = previous; });
+  let requests = 0;
+  const options = { localDirectories: [source], fetchImpl: () => { requests++; throw new Error('禁止外网'); } };
+  const file = await downloadAsset(asset, target, options);
+  assert.deepEqual(await fs.readFile(file), bytes);
+  // 修改副本不会影响共享来源。
+  await fs.writeFile(file, Buffer.alloc(bytes.length));
+  assert.deepEqual(await fs.readFile(path.join(source, asset.name)), bytes);
+  await fs.writeFile(path.join(source, asset.name), Buffer.alloc(bytes.length));
+  await assert.rejects(downloadAsset(asset, target, options), /离线验收缺少资源/);
+  assert.equal(requests, 0);
+});
+
 test("续传请求准确接续，完成文件零下载复用，同大小损坏重新下载", async (t) => {
   const f = await fixture(t, (req, res, bytes) => {
     const offset = req.headers.range ? Number(req.headers.range.match(/\d+/)[0]) : 0;
@@ -275,6 +299,9 @@ test("快速检查异常会回到真实复检，通过时复用依赖而不强�
 });
 
 test("丢失单个模型只补齐该文件，保留已可用的 Python 和依赖", async t => {
+  const offline = process.env.VOXCPM_OFFLINE;
+  delete process.env.VOXCPM_OFFLINE; // 本例使用内存 fetch 夹具，不访问外网。
+  t.after(() => { if (offline !== undefined) process.env.VOXCPM_OFFLINE = offline; });
   const f = await startupFixture(t, true);
   await f.create().prepare(f.options); f.calls.length = 0; f.states.length = 0;
   const target = path.join(f.options.existingModel, "weights.bin"), bytes = await fs.readFile(target);
@@ -310,6 +337,9 @@ for (const change of ["模型清单变化", "包入口损坏", "依赖版本要�
 }
 
 test("缺失模型先下载，再加载音频框架与验证显卡", async t => {
+  const offline = process.env.VOXCPM_OFFLINE;
+  delete process.env.VOXCPM_OFFLINE;
+  t.after(() => { if (offline !== undefined) process.env.VOXCPM_OFFLINE = offline; });
   const f = await startupFixture(t, true);
   const target = path.join(f.options.existingModel, "weights.bin"), bytes = await fs.readFile(target);
   await fs.rm(target);

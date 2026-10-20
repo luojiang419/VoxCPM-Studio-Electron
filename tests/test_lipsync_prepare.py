@@ -42,6 +42,29 @@ def server(data, ignore_range=False):
         http.server_close()
 
 
+def test_local_resource_reuse_and_offline_missing(tmp_path, monkeypatch):
+    source = tmp_path / "shared"
+    source.mkdir()
+    data = b"verified-local-model"
+    (source / "weight.pt").write_bytes(data)
+    asset = {"name": "weight.pt", "size": len(data), "sha256": hashlib.sha256(data).hexdigest(),
+             "urls": ["https://example.invalid/weight.pt"]}
+    monkeypatch.setenv("VOXCPM_LOCAL_ASSET_DIRS", str(source))
+    monkeypatch.setenv("VOXCPM_OFFLINE", "1")
+    def unexpected_network(*args, **kwargs):
+        raise AssertionError("本地复用不能联网")
+    monkeypatch.setattr("urllib.request.urlopen", unexpected_network)
+    target = tmp_path / "copy/weight.pt"
+    assert download(asset, target).read_bytes() == data
+    target.write_bytes(b"x" * len(data))
+    assert (source / "weight.pt").read_bytes() == data
+    (source / "weight.pt").write_bytes(b"x" * len(data))
+    with pytest.raises(RuntimeError, match="离线验收缺少资源"):
+        download(asset, target)
+    target.with_name("weight.pt.part").write_bytes(data)
+    assert download(asset, target).read_bytes() == data
+
+
 @pytest.mark.parametrize("ignore_range", [False, True])
 def test_resume_or_restart_does_not_duplicate_bytes(tmp_path, ignore_range):
     data = b"verified-model-data" * 10000
