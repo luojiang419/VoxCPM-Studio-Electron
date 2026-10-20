@@ -1285,14 +1285,14 @@ class VoxCPMStudio:
 
         if model_dir:
             settings.model_dir = model_dir
-        elif not settings.model_dir and env_model_dir:
+        elif env_model_dir and (not settings.model_dir or os.environ.get('VOXCPM_INSTALLED_RESOURCES_READONLY') == '1'):
             settings.model_dir = env_model_dir
         elif not settings.model_dir and (LOCAL_VOXCPM2_DIR / "config.json").is_file():
             settings.model_dir = str(LOCAL_VOXCPM2_DIR)
 
         if not settings.hf_repo_id and env_repo_id:
             settings.hf_repo_id = env_repo_id
-        if not settings.zipenhancer_path and env_zip:
+        if env_zip and (not settings.zipenhancer_path or os.environ.get('VOXCPM_INSTALLED_RESOURCES_READONLY') == '1'):
             settings.zipenhancer_path = env_zip
         elif not settings.zipenhancer_path and LOCAL_ZIPENHANCER_DIR.is_dir():
             settings.zipenhancer_path = str(LOCAL_ZIPENHANCER_DIR)
@@ -1551,6 +1551,8 @@ class VoxCPMStudio:
         target_dir = PROJECT_ROOT / "models" / model_source.replace("/", "__")
         if (target_dir / "config.json").is_file():
             return str(target_dir)
+        if os.environ.get('VOXCPM_INSTALLED_RESOURCES_READONLY') == '1' or os.environ.get('VOXCPM_OFFLINE') == '1':
+            raise RuntimeError(f'本地复用模式未找到模型：{model_source}。未创建新模型目录或发起下载，请检查已安装资源路径。')
         target_dir.parent.mkdir(parents=True, exist_ok=True)
         errors: list[str] = []
 

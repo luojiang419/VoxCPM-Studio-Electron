@@ -223,8 +223,10 @@ print(json.dumps({'files': files}))
 `;
 
 class RuntimeService {
-  constructor({ root, appRoot, dataRoot, appDir, onState = () => {}, config, runProcess } = {}) {
+  constructor({ root, appRoot, dataRoot, appDir, onState = () => {}, config, runProcess,
+    readOnlyResources = process.env.VOXCPM_INSTALLED_RESOURCES_READONLY === '1' } = {}) {
     Object.assign(this, { root, appRoot, dataRoot, appDir, onState });
+    this.readOnlyResources = readOnlyResources;
     this.config = config || JSON.parse(fs.readFileSync(path.join(appDir, "runtime-config.json"), "utf8"));
     if (this.config.protocol !== 1) throw new Error("不支持的运行环境清单");
     for (const a of [this.config.python, this.config.pip, ...Object.values(this.config.profiles).flatMap((p) => p.wheels),
@@ -455,6 +457,7 @@ class RuntimeService {
     return selectProfile(gpus);
   }
   prepare(options = {}) {
+    if (this.readOnlyResources) return Promise.reject(new Error('当前开发入口只读复用已安装资源，不重新下载或安装依赖。缺失资源请在正式安装的软件中处理。'));
     if (this.pending) return this.pending;
     this.controller = new AbortController();
     this.readyProbeFailed = false;
@@ -620,8 +623,9 @@ try {
     return this.runtimeResult(python, modelDir, true);
   }
   modelEnv() {
-    return { ...this.env, VOXCPM_MODELS_ROOT: path.join(this.root, "models"),
-      ZIPENHANCER_MODEL_PATH: safePath(this.root, `models/${this.config.models[2].folder}`) };
+    const modelsRoot = this.env?.VOXCPM_MODELS_ROOT || process.env.VOXCPM_MODELS_ROOT || path.join(this.root, 'models');
+    return { ...this.env, VOXCPM_MODELS_ROOT: modelsRoot,
+      ZIPENHANCER_MODEL_PATH: this.env?.ZIPENHANCER_MODEL_PATH || process.env.ZIPENHANCER_MODEL_PATH || safePath(modelsRoot, this.config.models[2].folder) };
   }
   async prepareModels(existingModel) {
     this.check({ phase: "models", message: "正在检查本地语音、识别和降噪模型", name: "", size: 0 });

@@ -19,6 +19,22 @@ test("50 系及 Blackwell 路由 CUDA 12.8，40 系路由 CUDA 12.6，集显使�
   assert.equal(result.gpu.index, "1");
 });
 
+test('已安装资源只读模式直接启动并保留外部模型目录，禁止重新准备依赖', async t => {
+  const f = await startupFixture(t, true), service = f.create();
+  service.readOnlyResources = true;
+  const before = process.env.VOXCPM_MODELS_ROOT;
+  const shared = path.join(f.root, 'installed-models');
+  process.env.VOXCPM_MODELS_ROOT = shared;
+  t.after(() => { if (before === undefined) delete process.env.VOXCPM_MODELS_ROOT; else process.env.VOXCPM_MODELS_ROOT = before; });
+  const result = await service.launch(f.options);
+  assert.equal(result.python, f.options.existingPython);
+  assert.equal(result.modelDir, f.options.existingModel);
+  assert.equal(result.env.VOXCPM_MODELS_ROOT, shared);
+  assert.equal(result.env.ZIPENHANCER_MODEL_PATH, path.join(shared, f.localConfig.models[2].folder));
+  await assert.rejects(service.prepare(f.options), /只读复用/);
+  assert.equal(f.calls.length, 0);
+});
+
 test("驱动不足和无法确认驱动时阻止启动并提供修复信息", () => {
   assert.throws(() => selectProfile([{ name: "RTX 5090", driver: "566.36", capability: 12 }]), /570.65/);
   assert.throws(() => selectProfile([{ name: "RTX 4090", driver: "551.61", capability: 8.9 }]), /560.76/);

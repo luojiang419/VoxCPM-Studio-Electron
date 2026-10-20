@@ -279,6 +279,8 @@ def ensure_model_resources(model, directory=None, *, root=None, data_root=None, 
             try:
                 verify_files([asset], target, cache, cancelled)
             except ResourceFileError as error:
+                if os.environ.get('VOXCPM_INSTALLED_RESOURCES_READONLY') == '1' or os.environ.get('VOXCPM_OFFLINE') == '1':
+                    raise RuntimeError(f'本地复用模式下模型缺失或校验失败：{file}。未下载或替换文件，请在已安装软件中检查该模型。') from error
                 if not error.repairable:
                     raise RuntimeError(f'无法读取 {file.name}，请检查文件权限或占用；未自动替换原文件') from error
                 with _repair_lock(cache, cancelled):

@@ -9,8 +9,8 @@
     "test:runtime": "node --test tests/runtime-service.test.cjs",
     "typecheck": "tsc --noEmit",
     "build": "vite build",
-    "start": "npm run build && electron .",
-    "dev": "npm run build && electron .",
+    "start": "pwsh -NoProfile -File ../../scripts/start_local.ps1",
+    "dev": "pwsh -NoProfile -File ../../scripts/start_local.ps1",
     "build:updater": "python ../../scripts/build_updater_runtime.py && python ../../scripts/build_standalone_updater.py",
     "package:dir": "npm run build:updater && npm run build && electron-builder --dir",
     "package:win": "npm run build:updater && npm run build && electron-builder --win portable"

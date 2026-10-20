@@ -9,6 +9,13 @@ const { ComponentService, normalizeProfile } = require('../component-service');
 const hash = data => crypto.createHash('sha256').update(data).digest('hex');
 const payload = Buffer.from('music');
 const asset = name => ({ name, size: payload.length, sha256: hash(payload), urls: ['https://example.invalid/' + name] });
+test('只读复用安装资源时拒绝安装与移除，不更改选择或资源', async t => {
+  const { service, runtimeService, root } = await setup(t);
+  runtimeService.readOnlyResources = true;
+  await assert.rejects(service.prepare({}), /只读复用/);
+  await assert.rejects(service.remove('ace-xl-turbo'), /不能从此入口移除/);
+  assert.equal(fs.existsSync(path.join(root, 'data/component-selection.json')), false);
+});
 async function setup(t) {
   const root = await fsp.mkdtemp(path.join(os.tmpdir(), 'vox-components-'));
   t.after(() => fsp.rm(root, { recursive: true, force: true }));

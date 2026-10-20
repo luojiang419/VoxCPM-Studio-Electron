@@ -27,6 +27,7 @@ function normalizeProfile(value = {}) {
 class ComponentService {
   constructor({ root, dataRoot, appRoot, appDir, runtimeService, fetchImpl = fetch, catalog, reuseRoots = [] }) {
     Object.assign(this, { root, dataRoot, appRoot, appDir, runtimeService, fetchImpl, reuseRoots });
+    if (runtimeService.readOnlyResources && process.env.VOXCPM_INSTALLED_ROOT) this.root = path.resolve(process.env.VOXCPM_INSTALLED_ROOT);
     this.file = path.join(dataRoot, 'component-selection.json');
     this.receipt = path.join(dataRoot, 'cache', 'component-ready.json');
     this.catalog = catalog || JSON.parse(fs.readFileSync(path.join(appDir, 'music-config.json'), 'utf8'));
@@ -117,6 +118,7 @@ class ComponentService {
     return result;
   }
   async prepare({ url, runtime }) {
+    if (this.runtimeService.readOnlyResources) throw new Error('当前开发入口只读复用安装目录，不重新下载或安装组件。');
     if (this.working) return this.working;
     const perform = async () => {
       const service = this.runtimeService, signal = service.controller.signal;
@@ -254,6 +256,7 @@ class ComponentService {
     signal.throwIfAborted();
   }
   async remove(id) {
+    if (this.runtimeService.readOnlyResources) throw new Error('已安装模型正在被开发入口只读复用，不能从此入口移除。');
     if (this.working) throw new Error('组件准备中，请先暂停');
     const model = this.catalog.models.find(m => m.id === id);
     if (!model) throw new Error('该组件不支持在此移除');

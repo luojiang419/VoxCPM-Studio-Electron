@@ -42,6 +42,19 @@ def service(tmp_path, monkeypatch):
     return service
 
 
+@pytest.mark.parametrize('ready', [True, False])
+def test_installed_video_resources_never_prepare_or_download(service, monkeypatch, ready):
+    monkeypatch.setenv('VOXCPM_INSTALLED_RESOURCES_READONLY', '1')
+    monkeypatch.setattr(LipSyncService, 'preparation_ready', lambda *args: ready)
+    monkeypatch.setattr(service, '_process', lambda *args: pytest.fail('只读复用不能创建补齐进程'))
+    if ready:
+        assert service.prepare('1.5', lambda *_: None, lambda: False)['version'] == '1.5'
+    else:
+        with pytest.raises(RuntimeError, match='只读复用'):
+            service.prepare('1.5', lambda *_: None, lambda: False)
+    assert not (service.root() / 'prepare.log').exists()
+
+
 def test_profile_and_invalid_configuration_preserve_working_root(service, tmp_path):
     assert service.status()["ready"] and service.status()["engine"] == "LatentSync 1.5"
     root = service.root()

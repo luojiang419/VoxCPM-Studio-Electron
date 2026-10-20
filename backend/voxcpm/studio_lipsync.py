@@ -153,9 +153,11 @@ class LipSyncService:
             if not version:
                 raise ValueError(reason)
             root = self.root()
-            root.mkdir(parents=True, exist_ok=True)
             if self.preparation_ready(root, version):
                 return {"status": f"LatentSync {version} 已就绪，复用本地资源。", "version": version}
+            if os.environ.get('VOXCPM_INSTALLED_RESOURCES_READONLY') == '1':
+                raise RuntimeError('当前只读复用已安装的视频模型，未重新下载或修改视频环境。请在正式安装的软件中检查资源。')
+            root.mkdir(parents=True, exist_ok=True)
             reset = getattr(self.studio, "reset_runtime", None)
             if reset:
                 reset()

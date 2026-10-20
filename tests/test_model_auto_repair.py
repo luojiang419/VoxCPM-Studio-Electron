@@ -14,7 +14,9 @@ from voxcpm.studio_resources import ensure_model_resources, verify_model_resourc
 
 
 @pytest.fixture
-def download_server():
+def download_server(monkeypatch):
+    # 本组使用受控的本机 HTTP 服务器验证修复，不允许继承常规验收的离线标志。
+    monkeypatch.delenv('VOXCPM_OFFLINE', raising=False)
     state = SimpleNamespace(data=b'good weights', mode='normal', requests=[])
 
     class Handler(http.server.BaseHTTPRequestHandler):
@@ -63,6 +65,24 @@ def repair(tmp_path, server, **kwargs):
     asset = spec(server)
     ensure_model_resources('ace-xl-turbo', root=tmp_path, catalog=catalog(asset), **kwargs)
     return tmp_path / asset['name']
+
+
+@pytest.mark.parametrize('flag', ['VOXCPM_INSTALLED_RESOURCES_READONLY', 'VOXCPM_OFFLINE'])
+def test_local_mode_reuses_complete_model_but_never_downloads_or_replaces(tmp_path, download_server, monkeypatch, flag):
+    monkeypatch.setenv(flag, '1')
+    file = tmp_path / spec(download_server)['name']
+    with pytest.raises(RuntimeError, match='未下载或替换'):
+        repair(tmp_path, download_server)
+    assert not file.exists() and not download_server.requests
+    file.parent.mkdir(parents=True)
+    file.write_bytes(download_server.data)
+    before = file.stat().st_mtime_ns
+    repair(tmp_path, download_server)
+    assert file.stat().st_mtime_ns == before and not download_server.requests
+    file.write_bytes(b'x' * len(download_server.data))
+    with pytest.raises(RuntimeError, match='未下载或替换'):
+        repair(tmp_path, download_server)
+    assert file.read_bytes() == b'x' * len(download_server.data) and not download_server.requests
 
 
 def test_missing_file_auto_repairs_only_current_model_and_reuses_verified_file(tmp_path, download_server):

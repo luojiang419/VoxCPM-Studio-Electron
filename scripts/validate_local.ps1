@@ -1,4 +1,4 @@
-param([string]$PythonExe = "python", [string]$Script = "", [string[]]$ScriptArgs = @())
+param([string]$PythonExe = "python", [string]$Script = "", [string[]]$ScriptArgs = @(), [string]$InstallRoot = '', [switch]$Fixture)
 $ErrorActionPreference = 'Stop'
 $repoRoot = [IO.Path]::GetFullPath((Join-Path $PSScriptRoot '..'))
 $projectRoot = [IO.Path]::GetFullPath((Join-Path $repoRoot '..'))
@@ -14,6 +14,13 @@ $assetDirs = @(
 ) + @(Get-ChildItem -LiteralPath "$projectRoot\models" -Directory | ForEach-Object FullName)
 $values = @{ VOXCPM_OFFLINE='1'; HF_HUB_OFFLINE='1'; HF_DATASETS_OFFLINE='1'; PIP_NO_INDEX='1'; PYTHONUTF8='1'; PYTHONIOENCODING='utf-8';
     PIP_DISABLE_PIP_VERSION_CHECK='1'; PYTHONDONTWRITEBYTECODE='1'; VOXCPM_LOCAL_ASSET_DIRS=($assetDirs -join [IO.Path]::PathSeparator) }
+if ($Script -and -not $Fixture) {
+    . (Join-Path $PSScriptRoot 'installed_resources.ps1')
+    $installed = Get-InstalledVoxCPMResources -InstallRoot $InstallRoot
+    foreach ($key in $installed.Keys) { $values[$key] = $installed[$key] }
+    if (-not $PSBoundParameters.ContainsKey('PythonExe')) { $PythonExe = $installed.VOXCPM_PYTHON_EXE }
+    Write-Host "验收直接读取已安装模型：$($installed.VOXCPM_INSTALLED_ROOT)"
+}
 $saved = @{}
 try {
     foreach ($key in $values.Keys) { $saved[$key] = [Environment]::GetEnvironmentVariable($key, 'Process'); [Environment]::SetEnvironmentVariable($key, $values[$key], 'Process') }

@@ -10,6 +10,21 @@ def asset(name, data=b'weights'):
     return {'name': name, 'size': len(data), 'sha256': hashlib.sha256(data).hexdigest()}
 
 
+@pytest.mark.parametrize('flag', ['VOXCPM_INSTALLED_RESOURCES_READONLY', 'VOXCPM_OFFLINE'])
+def test_local_model_directory_never_falls_back_to_hub_download(tmp_path, monkeypatch, flag):
+    from voxcpm import studio_app
+    monkeypatch.setenv(flag, '1')
+    monkeypatch.setattr(studio_app, 'PROJECT_ROOT', tmp_path)
+    service = object.__new__(studio_app.VoxCPMStudio)
+    monkeypatch.setattr(service, 'try_modelscope_download', lambda *_: pytest.fail('不能回退到魔搭下载'))
+    local = tmp_path / 'installed-model'
+    local.mkdir()
+    assert service.ensure_model_directory(str(local)) == str(local)
+    with pytest.raises(RuntimeError, match='未创建新模型目录或发起下载'):
+        service.ensure_model_directory('missing/offline-model')
+    assert not (tmp_path / 'models').exists()
+
+
 def test_verifies_only_requested_model_and_invalidates_changed_file(tmp_path, monkeypatch):
     monkeypatch.delenv('VOXCPM_RUNTIME_CONFIG', raising=False)
     spec = asset('models/music/selected.bin')
