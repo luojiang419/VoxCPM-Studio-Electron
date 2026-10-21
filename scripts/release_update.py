@@ -231,7 +231,8 @@ def publish(output):
         if source.is_file():
             target = activation / remote
             target.parent.mkdir(parents=True, exist_ok=True)
-            target.write_bytes(source.read_bytes())
+            # 魔搭文本提交会统一为LF，先规范公开副本再计算哈希；源码保持原样。
+            target.write_bytes(source.read_text(encoding="utf-8-sig").encode("utf-8"))
             documentation.append({"path": remote, "sha256": sha256(target)})
             with (activation / "README.md").open("a", encoding="utf-8") as stream:
                 stream.write(f"\n[{label}]({remote})\n")
