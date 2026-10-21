@@ -222,11 +222,28 @@ def publish(output):
                 "若修复仍失败，保留窗口所列的 updater.log 与会话目录，并提供错误内容给维护者定位；"
                 "运行环境缺失、权限限制或安全软件拦截需要按日志处理，不通过修改版本标记掩盖失败。\n\n"
                 f"修复包 SHA256：`{repair['sha256']}`。\n")
+    documentation = []
+    for local, remote, label in (
+        ("docs/API文档-开发者语音接口.md", "docs/developer-voice-api.md", "开发者语音 API 文档"),
+        ("examples/voice_api_client.py", "examples/voice_api_client.py", "Python 调用示例"),
+    ):
+        source = ROOT / local
+        if source.is_file():
+            target = activation / remote
+            target.parent.mkdir(parents=True, exist_ok=True)
+            target.write_bytes(source.read_bytes())
+            documentation.append({"path": remote, "sha256": sha256(target)})
+            with (activation / "README.md").open("a", encoding="utf-8") as stream:
+                stream.write(f"\n[{label}]({remote})\n")
     api.upload_folder(repo_id=repo, folder_path=str(activation), commit_message=f"activate: JVOX Studio配音系统 {manifest['version']}")
     if json.loads(read_remote(latest_url)) != envelope:
         raise ValueError("魔搭最新入口匿名回读不一致")
+    for document in documentation:
+        if hashlib.sha256(read_remote(file_url(repo, document["path"]))).hexdigest() != document["sha256"]:
+            raise ValueError("魔搭开发者文档匿名回读不一致：" + document["path"])
     report = {"repository": repo, "version": manifest["version"], "releaseId": manifest.get("releaseId"), "sha256": manifest["package"]["sha256"],
-              "size": manifest["package"]["size"], "anonymousVerification": True, "manifestUrl": latest_url}
+              "size": manifest["package"]["size"], "anonymousVerification": True, "manifestUrl": latest_url,
+              "documentationFiles": documentation}
     write_json(output / "publication.json", report)
     print(json.dumps(report, ensure_ascii=False, indent=2))
 
