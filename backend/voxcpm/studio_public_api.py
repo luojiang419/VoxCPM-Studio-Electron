@@ -73,7 +73,9 @@ def management(request: Request, response: Response):
     if request.url.hostname not in {"127.0.0.1", "localhost", "::1", "testserver"}:
         raise HTTPException(403, "管理地址必须为 localhost")
     origin = request.headers.get("origin")
-    desktop = origin == "null" and bool(os.environ.get("VOXCPM_API_MANAGEMENT_TOKEN")) and secrets.compare_digest(request.headers.get("x-jvox-management", ""), os.environ["VOXCPM_API_MANAGEMENT_TOKEN"])
+    # Electron 的 file: 页面在部分 GET 请求中省略 Origin，但仍标记 cross-site。
+    # 仅允许携带本次主进程令牌的无 Origin/null Origin；普通网页源仍须同源。
+    desktop = origin in {None, "null"} and bool(os.environ.get("VOXCPM_API_MANAGEMENT_TOKEN")) and secrets.compare_digest(request.headers.get("x-jvox-management", ""), os.environ["VOXCPM_API_MANAGEMENT_TOKEN"])
     if origin and not desktop and origin != str(request.base_url).rstrip("/"):
         raise HTTPException(403, "不允许跨站管理 API")
     if request.headers.get("sec-fetch-site") == "cross-site" and not desktop:

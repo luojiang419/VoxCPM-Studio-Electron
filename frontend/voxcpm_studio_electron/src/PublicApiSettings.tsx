@@ -11,11 +11,11 @@ export default function PublicApiSettings({backendBaseUrl, managementToken}: {ba
   async function request(path: string, options: RequestInit = {}) {
     const response = await fetch(backendBaseUrl + "/api/access" + path, {...options, headers: {"Content-Type": "application/json", ...(managementToken ? {"X-JVOX-Management": managementToken} : {})}});
     const data = await response.json();
-    if (!response.ok) throw Error(data.detail || "操作失败");
+    if (!response.ok) throw Error(Array.isArray(data.detail) ? data.detail.map((e: {loc?: string[]; msg: string}) => `${e.loc?.slice(1).join(".") || "参数"}：${e.msg}`).join("；") : data.detail || "操作失败");
     return data;
   }
   async function load() { const [cfg, list] = await Promise.all([request(""), request("/keys")]); setConfig(cfg); setKeys(list.keys); }
-  useEffect(() => { void load().catch(e => setMessage(e.message)); }, [backendBaseUrl]);
+  useEffect(() => { void load().catch(e => setMessage(e.message)); }, [backendBaseUrl, managementToken]);
   async function run(action: () => Promise<void>) { setBusy(true); setMessage(""); try { await action(); await load(); } catch(e) { setMessage((e as Error).message); } finally { setBusy(false); } }
   async function change(key: Key, action: string) {
     if (action === "rotate" && !confirm(`轮换“${key.name}”？旧 Key 将立即失效。`)) return;

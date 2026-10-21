@@ -1,13 +1,13 @@
 # VoxCPM / JVOX 开发者语音 API
 
-版本：1.0.0；隔离演示验收日期：2026-10-21。
+版本：1.0.0；实际 Electron 源码与 H3 联调验收日期：2026-10-21。
 
 ## 运行与连接
 
-演示入口：
+实际程序入口为 Electron 设置→开发者 API。当前源码验收使用隔离数据，运行入口：
 
 - H3 工作台：`http://127.0.0.1:8870/`。
-- VoxCPM API 设置页：`http://127.0.0.1:8918/`，与 Electron 设置→开发者 API 使用同一个 React 组件。
+- VoxCPM API 设置：实际 Electron 的设置→开发者 API。历史 `8918` 浏览器设置演示保留供回归，本轮未启动。
 - 开发者 API Base URL：`http://127.0.0.1:8848/v1`。
 - 交互文档：`http://127.0.0.1:8848/docs`；规范：`http://127.0.0.1:8848/openapi.json`。
 
@@ -160,7 +160,7 @@ Path("cloned.wav").write_bytes(r.content)
 | 429 | 开发者生成队列已满 |
 | 502 / 504 | 推理失败 / 同步等待超时，运行日志提供详细原因 |
 
-设置页使用本机控制端口的接口：`GET/PUT /api/access`、`GET/POST /api/access/keys`、`GET /api/access/keys/{id}/secret`、`POST /api/access/keys/{id}/rotate`、`POST /api/access/keys/{id}/disable`、`DELETE /api/access/keys/{id}`。这些路径不在 8848 公共服务中提供。管理仅接受本机连接与本机 Host/同源访问；Electron 的 `Origin:null` 还需要主进程生成的每次启动管理令牌，该令牌不属于开发者 API Key。
+设置页使用本机控制端口的接口：`GET/PUT /api/access`、`GET/POST /api/access/keys`、`GET /api/access/keys/{id}/secret`、`POST /api/access/keys/{id}/rotate`、`POST /api/access/keys/{id}/disable`、`DELETE /api/access/keys/{id}`。这些路径不在 8848 公共服务中提供。管理仅接受本机连接与本机 Host/同源访问；Electron 文件页面的无 Origin / `Origin:null` 跨站请求还需要主进程生成的每次启动管理令牌，该令牌不属于开发者 API Key。普通外站 Origin 即使附加该令牌仍被拒绝。
 
 H3 内部新增 `POST /api/jobs/voice-design`，请求 `{name, text, instructions}`；通过原有 `/api/jobs/{id}` 查询。完成结果包含媒体 `id`、`url`、声音名称、台词与需求，前端入库并按所属工程绑定。取消等待不强杀 VoxCPM 正在执行的 GPU 推理；可在 VoxCPM 作品记录核对已完成音频。
 
@@ -183,7 +183,26 @@ H3 本机接口（8870端口，区别于VoxCPM公共8848端口）：
 | POST | `/api/voice/prepare` | 预览优化结果，不执行声音生成 |
 | POST | `/api/jobs/voice-design` | 整理需求、生成及处理音频的持久化任务 |
 
-两个POST共用请求字段：`name`、`text`、`instructions`，以及可选的 `reference_media_id`（H3媒体ID）、`ai_optimize`（默认true）、`speed`（0.6～1.6，默认1）、`pitch`（-6～6半音，默认0）。UI按开关状态明确传入 `ai_optimize`，批量补齐也遵循开关。仅上传入库不需要这些生成参数。
+两个POST共用请求字段：`name`、`text`、`instructions`，以及可选的 `reference_media_id`（H3媒体ID）、`ai_optimize`（默认true）、`speed`（0.6～1.6，默认1）、`pitch`（-6～6半音，默认0）、`mode`（`auto` 或 `clone_prompt`）和 `prompt_text`。默认 `auto` 无参考音时设计、有参考音时可控克隆；UI按开关传入 `ai_optimize`，批量补齐也遵循开关。仅上传入库不需要这些生成参数。
+
+极致克隆在声音工作区选择模式后输入参考音准确逐字转录；`/api/jobs/voice-design` 提交 `mode=clone_prompt`、`reference_media_id` 和 `prompt_text`，此时 `instructions` 可为空，不调用 AI、不应用控制描述。参考音必须完整处于1～30秒，不静默截短，以免转录与音频错位。模式、转录与原参考媒体 ID 随任务和声音资产保存，重新编辑仍使用原参考音。
+
+旧 `/api/jobs/voice-clone` 已适配当前选中的 VoxCPM 配置，提交时固定配置 ID，使用任务 ID 防止远端重复推理；语速按 `speed=1/duration_factor` 在 H3 后处理，超出0.6～1.6倍返回422。未选 VoxCPM 时保留原 IndexTTS 检测。页面入口为“准备素材→外部文案配音（可选）”，可从声音库选参考后克隆当前文案、试听，并自行选择是否在拼接时覆盖 H3 原生声音。
+
+## 可执行独立客户端
+
+仓库 `examples/voice_api_client.py` 只依赖 Python 标准库。PowerShell 示例：
+
+```powershell
+$env:JVOX_API_KEY = '<在设置中复制的API Key>'
+python examples/voice_api_client.py generate --input '明天我们一起去看那棵老树。' --instructions '温暖自然的女声' --request-key project-design-001 --output design.wav
+python examples/voice_api_client.py upload design.wav
+# 将上一命令返回的 id 填入下面的 <reference_id>。重试时复用同一个 id。
+python examples/voice_api_client.py generate --mode clone --reference-id '<reference_id>' --input '雨停了，我们出去看看吧。' --instructions '语气轻松' --sync --request-key project-clone-001 --output clone.wav
+python examples/voice_api_client.py generate --mode clone_prompt --reference-id '<reference_id>' --prompt-text '明天我们一起去看那棵老树。' --input '雨停了，我们出去看看吧。' --request-key project-extreme-001 --output extreme.wav
+```
+
+默认为异步任务，自动查询并下载；`--sync` 改为同步 WAV。`--base-url` 或 `JVOX_BASE_URL` 指定服务地址，`--timeout` 调整等待秒数。密钥只读环境变量，不写入结果与日志。超时后保留原请求标识、参考 ID 和全部参数重试；每次重新上传产生新的参考 ID，不能与旧请求标识混用。参考转录需要核对实际音频中说出的文字。
 
 `speed`和`pitch`由H3使用FFmpeg处理生成结果，实现明确的数值变速/移调，不是VoxCPM原生数值参数。文字描述中的自然音色、音高感、语速和表达仍由模型理解。参考音自动转为16kHz单声道WAV，最长使用前30秒；原上传媒体不修改。
 
@@ -198,3 +217,19 @@ H3 页面真实生成“林奶奶 · 温柔安慰”12.48 秒、“小禾 · 参
 
 
 声音卡片上方现为可交互的真实音频波形。点击或拖动可定位并播放，与下方原生播放器共用同一音轨；方向键前后1秒，Shift加方向键5秒，Home/End到开头/结尾，空格或回车播放/暂停。波形由FFmpeg流式解码后的真实采样峰值生成，静音保持平线；缓存按文件SHA-256和采样数区分，替换音频不会沿用旧峰值。卡片按需加载，复用未变化的播放器节点；重复渲染保留播放位置。没有音频的占位资产不显示模拟波形。
+
+## 实际 Electron 与 H3 验收（2026-10-21）
+
+本轮在 `Electron版本` 实际源码启动完整主进程→preload→React→Python 链路，使用 `builds/public-api-acceptance/data` 隔离数据；安装模型、Python 与依赖只读复用。实际操作密钥创建、查看、复制、隐藏、轮换、停用、删除及监听范围、端口、启停，完全退出并重启后配置、密钥和监听自动恢复。修复文件页面 GET 省略 Origin 导致的管理接口403，继续拒绝错误令牌与外站请求。
+
+| 路径 | 实际结果 |
+| --- | --- |
+| 公开 API `design` 异步 | 5.44秒、48kHz、单声道 WAV |
+| 公开 API `clone` 同步 | 2.56秒、48kHz、单声道 WAV |
+| 公开 API `clone_prompt` 异步 | 使用本轮设计音频及对应文案，3.04秒、48kHz、单声道 WAV |
+| H3 声音工作区极致克隆 | 参考奶奶音频及原任务逐字文案，生成4.96秒，自动入库、真实播放和刷新恢复 |
+| H3 旧文案克隆按钮 | 独立验收工程中实际点击，生成3.20秒，持久化并真实播放 |
+
+独立标准库客户端命令已实跑并复用相同极致克隆任务及文件。跨 Key 查询任务、下载结果和引用参考音均404；重复标识相同参数复用、不同参数409；验收 Key 仅三次生成计入统计。完整证据位于 `builds/public-api-acceptance/`，运行报告和截图均不包含明文密钥。
+
+本轮未运行8918历史设置演示，未替换 `G:/app/H3_SalesVideo` 原项目，未打包或发布安装程序。

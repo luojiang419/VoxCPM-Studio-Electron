@@ -65,6 +65,12 @@ def test_electron_null_origin_requires_current_process_management_token(service,
     assert local.get("/api/access", headers=headers).status_code == 403
     headers["X-JVOX-Management"] = "current-desktop-session"
     assert local.get("/api/access", headers=headers).status_code == 200
+    del headers["Origin"]
+    assert local.get("/api/access", headers=headers).status_code == 200
+    headers["X-JVOX-Management"] = "wrong-session"
+    assert local.get("/api/access", headers=headers).status_code == 403
+    headers.update({"Origin": "https://evil.example", "X-JVOX-Management": "current-desktop-session"})
+    assert local.get("/api/access", headers=headers).status_code == 403
 
 
 def test_async_ownership_download_stats_and_validation(service):
@@ -145,3 +151,48 @@ def test_live_listener_config_persists_and_occupied_port_is_reported(service):
         assert api.config()["port"] == port
     finally:
         api.stop()
+
+
+@pytest.mark.parametrize("mode,expected", [("design", "声音设计"), ("clone", "可控克隆"), ("clone_prompt", "极致克隆")])
+def test_each_mode_preserves_reference_transcript_and_model_controls(service, monkeypatch, mode, expected):
+    local, public, api = service
+    token = local.post("/api/access/keys", json={"name": mode}).json()["api_key"]
+    headers = {"Authorization": f"Bearer {token}"}
+    audio = io.BytesIO()
+    with wave.open(audio, "wb") as wav:
+        wav.setparams((1, 2, 24000, 0, "NONE", "not compressed"))
+        wav.writeframes(b"\0\0" * 24000)
+    ref = public.post("/v1/audio/references", headers=headers, content=audio.getvalue()).json()["id"]
+    calls = []
+    original = api.studio.generate_audio_payload
+    def generate(**kwargs):
+        calls.append(kwargs)
+        return original(**kwargs)
+    monkeypatch.setattr(api.studio, "generate_audio_payload", generate)
+    payload = {"input": "你好，明天见。", "instructions": "温暖的女声", "mode": mode,
+               "reference_id": ref, "prompt_text": "这是参考音准确转录。", "cfg_value": 3, "inference_timesteps": 12}
+    response = public.post("/v1/audio/speech", headers=headers, json=payload)
+    assert response.status_code == 200
+    assert calls[0]["mode"] == expected
+    assert calls[0]["prompt_text"] == payload["prompt_text"]
+    assert calls[0]["cfg_value"] == 3 and calls[0]["inference_timesteps"] == 12
+    if mode == "design":
+        assert calls[0]["reference_audio"] is None
+    else:
+        assert calls[0]["reference_audio"].endswith(ref + ".wav")
+    if mode == "clone_prompt":
+        assert public.post("/v1/audio/generations", headers=headers, json={**payload, "prompt_text": " "}).status_code == 422
+
+
+def test_concurrent_retries_share_one_inference_and_deleted_key_is_revoked(service):
+    from concurrent.futures import ThreadPoolExecutor
+    local, public, api = service
+    created = local.post("/api/access/keys", json={"name": "并发重试"}).json()
+    headers = {"Authorization": f"Bearer {created['api_key']}", "Idempotency-Key": "concurrent"}
+    payload = {"input": "你好，明天见。", "instructions": "温暖的女声"}
+    with ThreadPoolExecutor(max_workers=8) as pool:
+        results = list(pool.map(lambda _: public.post("/v1/audio/generations", headers=headers, json=payload), range(8)))
+    assert all(r.status_code == 202 for r in results)
+    assert len({r.json()["id"] for r in results}) == len(api.tasks) == api.keys()[0]["calls"] == 1
+    assert local.delete(f"/api/access/keys/{created['id']}").status_code == 200
+    assert public.get("/v1/models", headers=headers).status_code == 401
