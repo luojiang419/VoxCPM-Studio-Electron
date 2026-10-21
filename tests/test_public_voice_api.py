@@ -58,6 +58,15 @@ def test_public_surface_has_no_local_files_or_management_and_rejects_cross_site(
     assert preflight.headers["access-control-allow-origin"] == "*"
 
 
+def test_electron_null_origin_requires_current_process_management_token(service, monkeypatch):
+    local, _, _ = service
+    monkeypatch.setenv("VOXCPM_API_MANAGEMENT_TOKEN", "current-desktop-session")
+    headers = {"Origin": "null", "Sec-Fetch-Site": "cross-site", "X-JVOX-Management": "wrong-session"}
+    assert local.get("/api/access", headers=headers).status_code == 403
+    headers["X-JVOX-Management"] = "current-desktop-session"
+    assert local.get("/api/access", headers=headers).status_code == 200
+
+
 def test_async_ownership_download_stats_and_validation(service):
     local, public, api = service
     first = local.post("/api/access/keys", json={"name": "H3"}).json()
