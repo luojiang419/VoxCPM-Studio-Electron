@@ -10,6 +10,7 @@ import RuntimePreparation from "./RuntimePreparation";
 import ComponentManager from "./ComponentManager";
 import MusicStudio from "./MusicStudio";
 import AssistantSettings from "./AssistantSettings";
+import PublicApiSettings from "./PublicApiSettings";
 import SettingsLayout from "./SettingsLayout";
 import WindowCloseManager from "./WindowCloseManager";
 import WindowBehaviorSettings from "./WindowBehaviorSettings";
@@ -20,6 +21,7 @@ type ThemeMode = "dark" | "light" | "system";
 type PageKey = "production" | "voices" | "history" | "workspace" | "lipsync" | "music" | "control" | "overview" | "batch" | "training" | "settings";
 
 type BootstrapState = {
+  apiManagementToken?: string;
   status: string;
   statusText: string;
   detail: string;
@@ -1660,7 +1662,7 @@ function App() {
           ) : null}
 
           {page === "settings" ? (
-            <SettingsLayout focusRequest={updateFocusRequest} assistant={<AssistantSettings backendBaseUrl={backendBaseUrl} />} system={
+            <SettingsLayout api={<PublicApiSettings backendBaseUrl={backendBaseUrl} managementToken={bootstrap?.apiManagementToken} />} focusRequest={updateFocusRequest} assistant={<AssistantSettings backendBaseUrl={backendBaseUrl} />} system={
               <section className="panel-card">
                 <div className="panel-head">
                   <div>

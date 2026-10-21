@@ -278,6 +278,8 @@ def create_api_app(studio: Optional[Any] = None, model_dir: Optional[str] = None
     app.state.lipsync = lipsync
     app.state.music = music
     app.state.prompt_queue = prompt_queue
+    from .studio_public_api import install_public_api
+    install_public_api(app, explicit_root or runtime_root or fallback_root, studio_service, task_queue, workspace)
 
     def workspace_call(operation: Callable, *args, **kwargs):
         try:

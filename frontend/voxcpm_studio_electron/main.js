@@ -49,7 +49,9 @@ const preparingInstallation = process.argv.includes("--voxcpm-install");
 let updateHealthWritten = false;
 let rendererReadyResolve;
 const rendererReady = new Promise((resolve) => { rendererReadyResolve = resolve; });
+const apiManagementToken = require("node:crypto").randomBytes(32).toString("hex");
 let bootstrapState = {
+  apiManagementToken,
   status: "booting",
   statusText: "正在准备 JVOX Studio配音系统。",
   detail: "即将启动本地 Python API 服务。",
@@ -707,6 +709,7 @@ async function startBackend({ prepare = false } = {}) {
     PYTHONUTF8: "1",
     PYTHONIOENCODING: "utf-8",
     VOXCPM_BACKEND_LOG: backendLogPath,
+    VOXCPM_API_MANAGEMENT_TOKEN: apiManagementToken,
     VOXCPM_DATA_ROOT: dataRoot,
     VOXCPM_PROJECT_ROOT: projectRoot,
     VOXCPM_PYTHON_EXE: pythonCommand,
