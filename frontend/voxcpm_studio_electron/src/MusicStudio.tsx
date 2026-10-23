@@ -27,6 +27,7 @@ export default function MusicStudio({ backendBaseUrl, modelManager }: { backendB
   const [preparedKey, setPreparedKey] = useState<string>(() => stored().preparedKey || "");
   const [previousWriterKey, setPreviousWriterKey] = useState<string>(() => stored().previousWriterKey || "");
   const [autoOptimize, setAutoOptimize] = useState<boolean>(true);
+  const [manualMode, setManualMode] = useState<boolean>(() => !!stored().manualMode);
   const [running, setRunning] = useState<Running | null>(() => stored().running || null);
   const [task, setTask] = useState<Task | null>(null), [status, setStatus] = useState<Status | null>(null);
   const [results, setResults] = useState<MusicResult[]>([]), [result, setResult] = useState<MusicResult | null>(null);
@@ -38,12 +39,12 @@ export default function MusicStudio({ backendBaseUrl, modelManager }: { backendB
   useEffect(() => { mounted.current = true; return () => { mounted.current = false; }; }, []);
   const sourceRef = useRef(sourceKey(brief)); sourceRef.current = sourceKey(brief);
   const locked = busy || !!running;
-  const current = !!packet?.draft.captionZh?.trim() && !packet.draft.captionNeedsAdaptation && packet.modelId === brief.modelId && preparedKey === sourceKey(brief) && (!status || !packet.rulesVersion || packet.rulesVersion === status.rules.version);
+  const current = !!packet?.draft.captionZh?.trim() && (!manualMode || !!packet.draft.caption.trim()) && !packet.draft.captionNeedsAdaptation && packet.modelId === brief.modelId && (manualMode || preparedKey === sourceKey(brief)) && (!status || !packet.rulesVersion || packet.rulesVersion === status.rules.version);
   const selected = status?.models.find(model => model.id === brief.modelId);
   const canRepairModel = !!selected?.selected && !!status?.runtimeReady;
   const official = status?.rules.models.find(model => model.id === brief.modelId);
   const draft: MusicDraft = packet?.draft || { title: "", caption: "", lyrics: "", metadata: { bpm: brief.bpm, keyScale: brief.keyScale, language: brief.language, timeSignature: brief.timeSignature }, modelId: brief.modelId, instrumental: brief.instrumental, duration: brief.duration, seed: brief.seed };
-  useEffect(() => { localStorage.setItem(STORAGE, JSON.stringify({ brief, packet, preparedKey, previousWriterKey, running })); }, [brief, packet, preparedKey, previousWriterKey, running]);
+  useEffect(() => { localStorage.setItem(STORAGE, JSON.stringify({ brief, packet, preparedKey, previousWriterKey, running, manualMode })); }, [brief, packet, preparedKey, previousWriterKey, running, manualMode]);
   async function refresh(accept: () => boolean = () => true) {
     const [state, config, history] = await Promise.all([musicRequest<Status>(backendBaseUrl, "/api/music/status"), musicRequest<AssistantConfig>(backendBaseUrl, "/api/assistant/settings"), musicRequest<{ items: MusicResult[] }>(backendBaseUrl, "/api/music/results")]);
     if (!accept()) return;
@@ -58,9 +59,9 @@ export default function MusicStudio({ backendBaseUrl, modelManager }: { backendB
     return { ...brief, title: brief.title?.trim() || (reuse ? draft.title : ""), providerId: "", caption: reuse ? (draft.captionNeedsAdaptation ? "" : draft.caption) : brief.caption, captionZh: reuse ? draft.captionZh || "" : brief.captionZh || "", lyrics: reuse ? draft.lyrics : brief.lyrics };
   }
   function manualBrief(): MusicBrief {
-    return { ...buildBrief(), title: brief.title?.trim() || draft.title, lyrics: draft.lyrics, preserveLyrics: true, caption: draft.caption, captionZh: draft.captionZh || "" };
+    return { ...(manualMode ? brief : buildBrief()), title: brief.title?.trim() || draft.title, lyrics: draft.lyrics, preserveLyrics: true, caption: draft.caption, captionZh: draft.captionZh || "" };
   }
-  const draftKey = JSON.stringify([draft, brief.title, brief.bpm, brief.keyScale, brief.timeSignature, brief.seed, current]);
+  const draftKey = JSON.stringify([draft, brief.title, brief.bpm, brief.keyScale, brief.timeSignature, brief.seed, current, manualMode]);
   useEffect(() => {
     if (!current) { setCompiled(null); setCompileError(""); }
     if (!backendBaseUrl || !packet || !current || locked) return;
@@ -108,11 +109,12 @@ export default function MusicStudio({ backendBaseUrl, modelManager }: { backendB
   }
   async function generate() {
     await perform(async () => {
-      if (!autoOptimize && (!packet || !current)) throw new Error("请先点击AI创作或适配，完成配套的中英文提示词后再生成。");
+      if (manualMode && !current) throw new Error("请填写中文风格说明与英文生成提示词，再生成音乐。");
+      if (!manualMode && !autoOptimize && (!packet || !current)) throw new Error("请先点击AI创作或适配，完成配套的中英文提示词后再生成。");
       const cached = current && packet;
       const next = await musicRequest<Task>(backendBaseUrl, "/api/music/generate", { method: "POST", body: JSON.stringify({
         brief: cached ? manualBrief() : buildBrief(), draft: cached ? draft : undefined,
-        autoOptimize: autoOptimize && !cached, promptId: cached ? packet.promptId || "" : "",
+        autoOptimize: !manualMode && autoOptimize && !cached, promptId: cached ? packet.promptId || "" : "",
       }) });
       setRunning({ id: next.taskId, kind: "audio", sourceKey: sourceKey(brief), writerKey: writerKey(brief) }); setTask(next);
     });
@@ -158,7 +160,7 @@ export default function MusicStudio({ backendBaseUrl, modelManager }: { backendB
     });
   }
   const hasContent = !!(brief.idea.trim() || brief.lyrics.trim() || draft.caption.trim() || draft.captionZh?.trim() || draft.lyrics.trim());
-  const canGenerate = !locked && !!backendBaseUrl && (!!selected?.ready || canRepairModel) && hasContent && (autoOptimize || current) && !(current && (compiled?.canGenerate === false || !!compileError));
+  const canGenerate = !locked && !!backendBaseUrl && (!!selected?.ready || canRepairModel) && hasContent && (manualMode ? current : autoOptimize || current) && !(current && (compiled?.canGenerate === false || !!compileError));
   const taskPanel = (running || message) && <section className="music-task-card" role="status" aria-live="polite"><div><strong>{running ? task?.progressText || task?.statusText || "任务已加入队列" : message}</strong>{running && <progress max={100} value={running.kind === "prompt" ? task?.completed || undefined : undefined} />}</div>{running && <button className="ghost-button" disabled={!!task?.cancelRequested} onClick={() => void perform(async () => { const route = running.kind === "prompt" ? "/api/music/prompt-tasks/" : "/api/tasks/"; setTask(await musicRequest(backendBaseUrl, route + running.id + "/cancel", { method: "POST", body: "{}" })); })}>{task?.cancelRequested ? "正在取消…" : "取消任务"}</button>}</section>;
   return <>
   <div className="music-layout">
@@ -171,11 +173,13 @@ export default function MusicStudio({ backendBaseUrl, modelManager }: { backendB
         {brief.instrumental && <p className="music-help">全器乐模式：AI将设计旋律、配器与段落发展，生成时不使用歌词或人声要求。关闭后可继续编辑已有歌词。</p>}
       </section>
       <section className="music-card music-prompt-card">
-        <div className="music-card-heading"><div><span className="music-kicker">生成前，可自由修改</span><h3>最终音乐提示词</h3></div><span className={`music-ready-label ${current ? "is-ready" : ""}`}>{current ? "已适配当前模型" : draft.captionNeedsAdaptation ? "中文已修改，等待重新适配" : packet ? "草稿或模型已改变，等待适配" : "等待创作或填写中文风格"}</span></div>
+        <div className="music-card-heading"><div><span className="music-kicker">生成前，可自由修改</span><h3>最终音乐提示词</h3></div><span className={`music-ready-label ${current ? "is-ready" : ""}`}>{current ? manualMode ? "手工提示词已就绪" : "已适配当前模型" : manualMode ? "填写中文说明与英文提示词" : draft.captionNeedsAdaptation ? "中文已修改，等待重新适配" : packet ? "草稿或模型已改变，等待适配" : "等待创作或填写中文风格"}</span></div>
+        <label className="music-switch-label music-manual-switch"><input className="music-switch" type="checkbox" role="switch" aria-label="手工填写中英文提示词" checked={manualMode} disabled={locked} onChange={event => { setManualMode(event.target.checked); if (event.target.checked) editDraft({ captionNeedsAdaptation: false }); }} />手工填写提示词，无需 AI 助手</label>
         <label className="music-title-input"><span>作品名称</span><input value={brief.title ?? draft.title} maxLength={150} disabled={locked} placeholder="填写名称，生成后以此命名音频" onChange={e => setBrief({ ...brief, title: e.target.value })} /></label>
         <div className="music-tabs" role="tablist" aria-label="提示词与歌词"><button role="tab" aria-selected={tab === "caption"} onClick={() => setTab("caption")}>{brief.modelId === "heartmula" ? "风格标签" : "风格与编曲"}</button><button role="tab" disabled={brief.instrumental} aria-selected={tab === "lyrics"} onClick={() => setTab("lyrics")}>歌词</button></div>
-        <textarea className="music-final-text" aria-label={tab === "lyrics" ? "最终歌词" : "最终风格提示词"} value={tab === "lyrics" ? draft.lyrics : draft.captionZh || ""} disabled={locked || (tab === "lyrics" && brief.instrumental)} onChange={e => editDraft(tab === "lyrics" ? { lyrics: e.target.value } : { captionZh: e.target.value, captionNeedsAdaptation: true })} rows={12} placeholder={tab === "lyrics" ? "AI创作的歌词会显示在这里。" : draft.caption && !draft.captionZh ? "这份旧草稿仅有英文，点击AI适配即可同时获得中文展示稿和英文生成稿。" : brief.modelId === "heartmula" ? "填写中文风格标签，如：纯音乐、电影感、管弦乐、庄重。" : "用中文描述风格与编曲，AI会同时创作中文展示稿和英文生成稿。"} />
-        {tab === "caption" && <p className="music-help">中文展示与英文生成稿由AI同时创作。修改中文后需重新适配，生成时使用配套英文稿。</p>}
+        <textarea className="music-final-text" aria-label={tab === "lyrics" ? "最终歌词" : "最终风格提示词"} value={tab === "lyrics" ? draft.lyrics : draft.captionZh || ""} disabled={locked || (tab === "lyrics" && brief.instrumental)} onChange={e => editDraft(tab === "lyrics" ? { lyrics: e.target.value } : { captionZh: e.target.value, captionNeedsAdaptation: !manualMode })} rows={manualMode ? 3 : 12} placeholder={tab === "lyrics" ? "AI创作的歌词会显示在这里。" : manualMode ? "中文风格说明，方便核对音乐方向。" : draft.caption && !draft.captionZh ? "这份旧草稿仅有英文，点击AI适配即可同时获得中文展示稿和英文生成稿。" : brief.modelId === "heartmula" ? "填写中文风格标签，如：纯音乐、电影感、管弦乐、庄重。" : "用中文描述风格与编曲，AI会同时创作中文展示稿和英文生成稿。"} />
+        {manualMode && tab === "caption" && <label className="field music-manual-caption"><span>英文生成提示词</span><textarea aria-label="英文生成提示词" value={draft.caption} disabled={locked} onChange={event => editDraft({ caption: event.target.value, captionNeedsAdaptation: false })} rows={5} placeholder="填写实际提交给音乐模型的英文风格与配器描述。" /></label>}
+        {tab === "caption" && <p className="music-help">{manualMode ? "核对中英文描述与音乐参数后，点击底部生成音乐。手工模式直接使用英文稿，不调用AI助手。" : "中文展示与英文生成稿由AI同时创作。修改中文后需重新适配，生成时使用配套英文稿。"}</p>}
         {compileError && current && <p className="music-message">{compileError}</p>}
         {(current ? compiled?.warnings || packet?.warnings || [] : []).map(warning => <p className="music-help" key={warning}>{warning}</p>)}
         <details className="music-details"><summary>查看最终模型输入与规则来源</summary><p className="music-help">{official?.kind === "official-skill" ? `官方技能：${official.skill}` : "依据HeartMuLa官方文档与推理协议整理"} <button className="music-text-button" onClick={() => official && window.voxcpmDesktop.openExternal(official.url)}>查看官方来源 ↗</button></p><pre className="music-input-preview">{current && compiled ? JSON.stringify(compiled.inputs, null, 2) : "完成当前模型的适配后，可在此查看实际提交字段。"}</pre><button className="ghost-button" disabled={!current || !compiled} onClick={() => void perform(async () => { await navigator.clipboard.writeText(JSON.stringify(compiled!.inputs, null, 2)); setMessage("最终模型输入已复制。"); })}>复制模型输入</button></details>
