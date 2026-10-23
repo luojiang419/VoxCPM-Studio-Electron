@@ -1,0 +1,19 @@
+{
+  "title": "JVOX Studio · 把文案变成声音",
+  "narration": "builds/promo/原创青年男声-整段旁白.wav",
+  "voiceControl": "中国青年男性，阳光爽朗，清亮有磁性的中音，标准普通话，专业游戏讲解风格，吐字清晰，语速中快，节奏利落，重点词自然重读，富有感染力但不喊叫。",
+  "gameExample": "注意这波团战！先看小地图，队友已经绕后。别急着交技能，等对手走进河道，再配合控制进场。拉开距离，补上最后一击，这就是抓住时机的关键！",
+  "dialogueExample": "解说：先看小地图，队友已经绕后。\n队友：准备好了，等控制命中再进场！\n解说：抓住这一波机会，配合拿下胜利。",
+  "batchExample": "欢迎来到本期游戏攻略，今天一起掌握团战进场时机。\n先看小地图，观察队友位置，再决定进攻路线。\n技能留给关键目标，拉开距离，稳稳拿下胜利。",
+  "chapters": [
+    {"id": "intro", "title": "游戏解说，从文案开始", "page": "production", "weight": 46},
+    {"id": "design", "title": "01 · 用文字设计原创声音", "page": "workspace", "weight": 102},
+    {"id": "example", "title": "实战案例 · 游戏团战解说", "page": "workspace", "weight": 67},
+    {"id": "save", "title": "02 · 试听、保存与导出", "page": "voices", "weight": 52},
+    {"id": "production", "title": "03 · 多角色配音工作台", "page": "production", "weight": 93},
+    {"id": "batch", "title": "04 · 批量处理与作品归档", "page": "batch", "weight": 69},
+    {"id": "quickstart", "title": "快速入门 · 四步完成第一条作品", "page": "workspace", "weight": 77}
+  ],
+  "recording": {"width": 1920, "height": 1080, "fps": 60, "codec": "h264_nvenc", "cq": 17},
+  "editing": {"bezier": [0.22, 1.0, 0.36, 1.0], "idleKeepSeconds": 0.65, "idleThreshold": 0.65, "shutterSamples": 3, "formats": [[1920, 1080], [1080, 1920]]}
+}
