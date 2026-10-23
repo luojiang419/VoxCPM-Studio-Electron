@@ -16,7 +16,9 @@ const env = { ...process.env, ...JSON.parse(resources.stdout),
   PIP_NO_INDEX: '1', PYTHONUTF8: '1', PYTHONIOENCODING: 'utf-8', PYTHONDONTWRITEBYTECODE: '1' };
 delete env.ELECTRON_RUN_AS_NODE;
 const frontend = path.join(root, 'frontend/voxcpm_studio_electron');
-const child = spawn(path.join(frontend, 'node_modules/electron/dist/electron.exe'), ['.'], {
+const args = ['.'];
+if (process.argv.includes('--software-rendering')) args.push('--disable-gpu');
+const child = spawn(path.join(frontend, 'node_modules/electron/dist/electron.exe'), args, {
   cwd: frontend, env, detached: true, windowsHide: false,
   stdio: ['ignore', fs.openSync(path.join(out, 'app.stdout.log'), 'a'), fs.openSync(path.join(out, 'app.stderr.log'), 'a')]
 });
