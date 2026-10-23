@@ -15,5 +15,10 @@
     {"id": "quickstart", "title": "快速入门 · 四步完成第一条作品", "page": "workspace", "weight": 77}
   ],
   "recording": {"width": 1920, "height": 1080, "fps": 60, "codec": "h264_nvenc", "cq": 17},
-  "editing": {"bezier": [0.22, 1.0, 0.36, 1.0], "idleKeepSeconds": 0.65, "idleThreshold": 0.65, "shutterSamples": 3, "formats": [[1920, 1080], [1080, 1920]]}
+  "editing": {"bezier": [0.22, 1.0, 0.36, 1.0], "idleKeepSeconds": 0.65, "idleThreshold": 0.65, "shutterSamples": 3, "formats": [[1920, 1080], [1080, 1920]]},
+  "portraitGeneration": {
+    "tool": "内置 image_gen",
+    "outputFile": "虚构青年主持人.png",
+    "prompt": "Create one square photorealistic portrait for an ORIGINAL FICTIONAL presenter used in a local photo-to-talking-video software demonstration. A generic Chinese man aged around 24, short neat black hair, warm sunny approachable expression, slight closed-mouth smile, direct forward gaze, shoulders square to camera. Head and shoulders centered, head occupies roughly half image height, entire face and chin visible and unobstructed. Plain navy crew-neck shirt. Soft even natural studio daylight, warm pale beige softly blurred background. Realistic skin texture, clear facial landmarks, professional but relaxed game tutorial presenter. No glasses, headset, microphone, facial hair, text, logos, watermark, other people. Must not resemble any real public figure. 1024x1024 square."
+  }
 }

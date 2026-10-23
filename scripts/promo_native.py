@@ -23,6 +23,38 @@ user32.GetForegroundWindow.restype = wintypes.HWND
 user32.GetWindowTextW.argtypes = [wintypes.HWND, wintypes.LPWSTR, ctypes.c_int]
 user32.GetWindowThreadProcessId.argtypes = [wintypes.HWND, ctypes.POINTER(wintypes.DWORD)]
 user32.GetWindowRect.argtypes = [wintypes.HWND, ctypes.POINTER(wintypes.RECT)]
+user32.SetForegroundWindow.argtypes = [wintypes.HWND]
+user32.ShowWindow.argtypes = [wintypes.HWND, ctypes.c_int]
+user32.GetAncestor.argtypes = [wintypes.HWND, wintypes.UINT]
+user32.GetAncestor.restype = wintypes.HWND
+
+def focus():
+    expected = json.loads((OUT / "session.json").read_text(encoding="utf-8"))["pid"]
+    matches = []
+    callback_type = ctypes.WINFUNCTYPE(wintypes.BOOL, wintypes.HWND, wintypes.LPARAM)
+    def visit(window, _):
+        pid = wintypes.DWORD()
+        user32.GetWindowThreadProcessId(window, ctypes.byref(pid))
+        name = ctypes.create_unicode_buffer(512)
+        user32.GetWindowTextW(window, name, len(name))
+        if pid.value == expected and name.value == "JVOX Studio配音系统":
+            matches.append(window)
+        return True
+    user32.EnumWindows(callback_type(visit), 0)
+    if len(matches) != 1:
+        raise RuntimeError("无法唯一定位本次录制窗口。")
+    user32.ShowWindow(matches[0], 9)
+    foreground = user32.GetForegroundWindow()
+    foreground_thread = user32.GetWindowThreadProcessId(foreground, None)
+    current_thread = ctypes.windll.kernel32.GetCurrentThreadId()
+    attached = bool(user32.AttachThreadInput(current_thread, foreground_thread, True))
+    try:
+        user32.BringWindowToTop(matches[0])
+        user32.SetForegroundWindow(matches[0])
+    finally:
+        if attached:
+            user32.AttachThreadInput(current_thread, foreground_thread, False)
+    time.sleep(.6)
 
 def target():
     window = user32.GetForegroundWindow()
@@ -31,11 +63,14 @@ def target():
     pid = wintypes.DWORD()
     user32.GetWindowThreadProcessId(window, ctypes.byref(pid))
     expected = json.loads((OUT / "session.json").read_text(encoding="utf-8"))["pid"]
-    if pid.value != expected or name.value != "JVOX Studio配音系统":
-        raise RuntimeError("前台不是本次录制的 JVOX 窗口，已停止输入。")
+    owner = user32.GetAncestor(window, 3)
+    owner_name = ctypes.create_unicode_buffer(512)
+    user32.GetWindowTextW(owner, owner_name, len(owner_name))
+    if pid.value != expected or (name.value != "JVOX Studio配音系统" and owner_name.value != "JVOX Studio配音系统"):
+        raise RuntimeError(f"前台不是本次录制的 JVOX 窗口（{name.value}, PID={pid.value}, 预期={expected}），已停止输入。")
     rect = wintypes.RECT()
-    user32.GetWindowRect(window, ctypes.byref(rect))
-    if (rect.left, rect.top, rect.right, rect.bottom) != (0, 0, 1920, 1080):
+    user32.GetWindowRect(owner, ctypes.byref(rect))
+    if name.value == "JVOX Studio配音系统" and (rect.left, rect.top, rect.right, rect.bottom) != (0, 0, 1920, 1080):
         raise RuntimeError("软件必须处于原生 1920×1080 全屏，已停止输入。")
     return window
 
@@ -94,6 +129,10 @@ def type_text(value):
     # Unicode 注入，避免更改用户剪贴板；逐字记录不保存文本内容。
     for i in range(0, len(raw), 2):
         unit = int.from_bytes(raw[i:i+2], "little")
+        if unit == 10:
+            send(key_event(13), key_event(13, True))
+            time.sleep(.025)
+            continue
         send(INPUT(type=1, ki=KEYBDINPUT(wScan=unit, dwFlags=4)),
              INPUT(type=1, ki=KEYBDINPUT(wScan=unit, dwFlags=6)))
         time.sleep(.012)
@@ -115,8 +154,9 @@ def record():
         "-framerate", "60", "-draw_mouse", "0", "-i", "desktop", "-c:v", "h264_nvenc", "-preset", "p5",
         "-cq", "17", "-pix_fmt", "yuv420p", "-movflags", "+faststart", "-y", str(recording / "screen.mp4")],
         stdin=subprocess.PIPE, stdout=subprocess.DEVNULL, stderr=(recording / "ffmpeg.log").open("w"))
-    (OUT / "active-recording.json").write_text(json.dumps({"root": str(recording), "startedAt": start,
-        "pid": process.pid}, ensure_ascii=False, indent=2), encoding="utf-8")
+    metadata = json.dumps({"root": str(recording), "startedAt": start, "pid": process.pid}, ensure_ascii=False, indent=2)
+    (OUT / "active-recording.json").write_text(metadata, encoding="utf-8")
+    (recording / "session.json").write_text(metadata, encoding="utf-8")
     print(str(recording), flush=True)
     try:
         with (recording / "cursor.jsonl").open("w", encoding="utf-8") as stream:
@@ -142,10 +182,12 @@ def record():
 
 if __name__ == "__main__":
     parser = argparse.ArgumentParser()
-    parser.add_argument("action", choices=["capture", "record", "stop", "click", "move", "type", "key", "mark"])
+    parser.add_argument("action", choices=["focus", "capture", "record", "stop", "click", "move", "type", "key", "mark"])
     parser.add_argument("values", nargs="*")
     args = parser.parse_args()
-    if args.action == "capture":
+    if args.action == "focus":
+        focus()
+    elif args.action == "capture":
         capture(args.values[0])
     elif args.action == "record":
         record()
@@ -157,7 +199,7 @@ if __name__ == "__main__":
     elif args.action == "type":
         type_text(Path(args.values[0]).read_text(encoding="utf-8"))
     elif args.action == "key":
-        keys = {"ctrl": 17, "shift": 16, "a": 65, "enter": 13, "tab": 9, "escape": 27, "backspace": 8}
+        keys = {"ctrl": 17, "shift": 16, "alt": 18, "a": 65, "n": 78, "enter": 13, "tab": 9, "escape": 27, "backspace": 8}
         values = [keys[key.lower()] for key in args.values]
         send(*(key_event(key) for key in values), *(key_event(key, True) for key in reversed(values)))
         mark("key", keys=args.values)

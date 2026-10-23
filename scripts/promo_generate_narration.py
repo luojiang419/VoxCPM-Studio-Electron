@@ -8,6 +8,11 @@ import urllib.request
 ROOT = Path(__file__).resolve().parents[1]
 OUT = ROOT / "builds/promo"
 OUT.mkdir(parents=True, exist_ok=True)
+if (OUT / "原创青年男声-整段旁白.wav").is_file() and (OUT / "narration-status.json").is_file():
+    previous = json.loads((OUT / "narration-status.json").read_text(encoding="utf-8"))
+    if previous.get("status") == "succeeded":
+        print("完整旁白已经生成，直接复用本地文件，不再提交。", flush=True)
+        raise SystemExit(0)
 state = json.loads((ROOT.parent / "data/cache/electron_backend_state.json").read_text(encoding="utf-8"))
 base = state["serviceUrl"]
 
