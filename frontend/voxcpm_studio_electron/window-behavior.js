@@ -36,6 +36,14 @@ class WindowBehavior {
 
   attach(window) {
     this.window = window;
+    // 主进程处理快捷键，输入框、播放器和弹窗获得焦点时也能切换。
+    window.webContents.on("before-input-event", (event, input) => {
+      if (input.key !== "F11" || input.control || input.alt || input.meta || input.shift) return;
+      event.preventDefault();
+      // 长按只切换一次，避免系统键盘重复事件导致画面闪烁。
+      if (input.type !== "keyDown" || input.isAutoRepeat || window.isDestroyed()) return;
+      window.setFullScreen(!window.isFullScreen());
+    });
     window.on("close", event => {
       // 更新安装、显式 app.quit() 和系统关机不再弹出偏好确认。
       if (this.quitting) return;
