@@ -8,15 +8,22 @@ const crypto = require("node:crypto");
 const { selectProfile, downloadAsset, safePath, validateAsset, resolveManagedPython, offlinePipArgs, RuntimeService, PROBE, STARTUP_PROBE } = require("../runtime-service");
 const config = require("../runtime-config.json");
 
-test("50 系及 Blackwell 路由 CUDA 12.8，40 系路由 CUDA 12.6，集显使用 CPU", () => {
+test("20/30/40 系路由 CUDA 12.6，50 系及 Blackwell 路由 CUDA 12.8，集显使用 CPU", () => {
   for (const name of ["NVIDIA GeForce RTX 5090", "NVIDIA GeForce RTX 5060 Laptop GPU"]) {
     assert.equal(selectProfile([{ index: "0", name, driver: "580.97", capability: 0 }]).profile, "cu128");
   }
   assert.equal(selectProfile([{ name: "NVIDIA B200", driver: "580.97", capability: 10 }]).profile, "cu128");
   assert.equal(selectProfile([{ name: "RTX 4070 Ti SUPER", driver: "580.97", capability: 8.9 }]).profile, "cu126");
+  for (const [name, capability] of [["RTX 2060", 7.5], ["RTX 2080 Ti", 7.5], ["RTX 3060 Laptop GPU", 8.6], ["RTX 3090", 8.6]]) {
+    assert.equal(selectProfile([{ name, driver: "580.97", capability }]).profile, "cu126");
+  }
   assert.equal(selectProfile([]).profile, "cpu");
   const result = selectProfile([{ index: "0", name: "RTX 3060", driver: "580.97", capability: 8.6 }, { index: "1", name: "RTX 5090", driver: "580.97", capability: 12 }]);
   assert.equal(result.gpu.index, "1");
+  const fallback = selectProfile([{ index: "0", name: "RTX 3060", driver: "580.97", capability: 0 },
+    { index: "1", name: "RTX 5090", driver: "580.97", capability: 0 }]);
+  assert.equal(fallback.profile, "cu128");
+  assert.equal(fallback.gpu.index, "1");
 });
 
 test('已安装资源只读模式直接启动并保留外部模型目录，禁止重新准备依赖', async t => {
@@ -233,18 +240,66 @@ async function startupFixture(t, managed = false) {
     options: { managed, existingPython: python, existingModel: path.join(root, "models/model-0") } };
 }
 
-test("正常启动不探测设备、不检查其他模型、不启动推理自检，缺失模型也可进入服务", async t => {
+test("正常启动检查显卡和包入口，不扫描模型或启动推理，缺失模型也可进入服务", async t => {
   const f = await startupFixture(t);
   await fs.rm(path.join(f.options.existingModel, "weights.bin"));
   const service = f.create();
-  service.detect = async () => { throw Error("不应执行设备探测"); };
   service.prepare = async () => { throw Error("不应执行完整准备"); };
   const result = await service.launch(f.options);
   assert.equal(result.python, f.python);
   assert.equal(result.modelDir, f.options.existingModel);
   assert.equal(result.env.VOXCPM_LAZY_STARTUP, "1");
   assert.equal(result.env.VOXCPM_RUNTIME_CONFIG, path.join(f.appDir, "runtime-config.json"));
-  assert.deepEqual(f.calls, []);
+  assert.deepEqual(f.calls.map(args => args[1]), [STARTUP_PROBE]);
+  assert.equal(result.env.CUDA_VISIBLE_DEVICES, "0");
+});
+
+test("正常启动缺包自动恢复依赖，恢复时模型保持按需准备", async t => {
+  const f = await startupFixture(t, true), service = f.create();
+  service.startupProbe = async () => { throw Error("numpy 缺失"); };
+  let options;
+  service.prepare = async value => { options = value; return { python: "repaired" }; };
+  assert.equal((await service.launch(f.options)).python, "repaired");
+  assert.equal(options.modelsOnDemand, true);
+  assert.equal(options.managed, true);
+});
+
+test("启动换到 50 系会按 cu128 核对旧托管环境，失败自动恢复", async t => {
+  const f = await startupFixture(t, true), service = f.create();
+  const selected = selectProfile([{ index: "1", name: "RTX 5090", driver: "580.97", capability: 12 }]);
+  service.detect = async () => selected;
+  service.startupProbe = async (python, actual, managed) => {
+    assert.equal(python, f.python); assert.equal(actual.profile, "cu128"); assert.equal(managed, true);
+    throw Error("CUDA 构建需要更新");
+  };
+  service.prepare = async options => ({ python: "py312-cu128", options });
+  const result = await service.launch(f.options);
+  assert.equal(result.python, "py312-cu128");
+  assert.equal(result.options.modelsOnDemand, true);
+});
+
+test("启动自检超时、取消和过旧驱动均不会触发重复安装", async t => {
+  const f = await startupFixture(t, true), service = f.create();
+  service.prepare = async () => { throw Error("不应重新安装"); };
+  service.startupProbe = async () => { throw Object.assign(Error("检查超时"), { code: "RUNTIME_PROCESS_TIMEOUT" }); };
+  await assert.rejects(service.launch(f.options), /检查超时/);
+  service.startupProbe = async () => { service.controller.abort(Error("用户暂停")); throw Error("退出"); };
+  await assert.rejects(service.launch(f.options), /用户暂停/);
+  service.detect = async () => selectProfile([{ name: "RTX 5090", driver: "566.36", capability: 12 }]);
+  await assert.rejects(service.launch(f.options), /570.65/);
+});
+
+test("仅恢复运行时时不扫描或下载音频模型", async t => {
+  const f = await startupFixture(t, true), service = f.create();
+  await fs.rm(path.join(f.options.existingModel, "weights.bin"));
+  service.prepareModels = async () => { throw Error("不应扫描模型"); };
+  const result = await service.prepare({ ...f.options, modelsOnDemand: true });
+  assert.equal(result.python, f.python);
+  assert.ok(f.calls.some(args => args.includes(PROBE)));
+  assert.ok(!f.calls.some(args => args.includes("install")));
+  const record = JSON.parse(await fs.readFile(path.join(f.dataRoot, "cache/runtime-ready.json")));
+  assert.deepEqual(record.files, []);
+  assert.ok(record.environmentFiles.length > 0);
 });
 
 test("缺少解释器的首次安装仍走完整准备", async t => {
@@ -335,6 +390,24 @@ test("丢失单个模型只补齐该文件，保留已可用的 Python 和依赖
   assert.ok(!f.calls.some(args => args.includes("install")));
   assert.ok(!f.calls.some(args => args.includes(PROBE) || args.includes("pip")), "模型缺失不能连带重复检查 Python/CUDA 环境");
   assert.equal(repaired.state.environmentCached, true);
+});
+
+test("内置模型配置 JSON 损坏时按清单修复，不在解析阶段终止", async t => {
+  const offline = process.env.VOXCPM_OFFLINE;
+  delete process.env.VOXCPM_OFFLINE;
+  t.after(() => { if (offline !== undefined) process.env.VOXCPM_OFFLINE = offline; });
+  const f = await startupFixture(t, true);
+  const configFile = path.join(f.options.existingModel, "config.json"), bytes = await fs.readFile(configFile);
+  await fs.writeFile(configFile, "{broken");
+  let downloads = 0;
+  t.mock.method(globalThis, "fetch", async () => {
+    downloads++;
+    return new Response(bytes, { headers: { "Content-Length": String(bytes.length) } });
+  });
+  await f.create().prepare(f.options);
+  assert.equal(downloads, 1);
+  assert.deepEqual(await fs.readFile(configFile), bytes);
+  assert.ok(!f.calls.some(args => args.includes("install")));
 });
 
 for (const change of ["模型清单变化", "包入口损坏", "依赖版本要求变化", "显卡驱动变化"]) {

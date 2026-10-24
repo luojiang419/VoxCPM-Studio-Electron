@@ -383,7 +383,7 @@ def lightweight_studio(tmp_path):
             return np.zeros(240, dtype=np.float32)
         return SimpleNamespace(tts_model=SimpleNamespace(sample_rate=24000), generate=generate)
 
-    namespace = {"verify_model_resources": lambda *args: None, "torch": SimpleNamespace(cuda=SimpleNamespace(is_available=lambda: False)), "VoxCPM": fake_model, "Path": Path, "json": json, "sf": sf, "zipfile": zipfile,
+    namespace = {"ensure_model_resources": lambda *args: None, "torch": SimpleNamespace(cuda=SimpleNamespace(is_available=lambda: False)), "VoxCPM": fake_model, "Path": Path, "json": json, "sf": sf, "zipfile": zipfile,
                  "NO_LORA_LABEL": "不使用 LoRA", "DEFAULT_ZIPENHANCER": "default-enhancer", "now_stamp": lambda: "test-run"}
     exec(compile(ast.fix_missing_locations(extracted), str(source), "exec"), namespace)
     studio = namespace["VoxCPMStudio"]()

@@ -111,8 +111,11 @@ async function downloadAsset(asset, directory, { signal, progress = () => {}, fe
 
 function selectProfile(gpus) {
   if (!gpus.length) return { profile: "cpu", label: "CPU 模式", gpu: null };
-  const gpu = [...gpus].sort((a, b) => b.capability - a.capability)[0];
-  const blackwell = gpu.capability >= 10 || /RTX\s*50\d\d|RTX\s*PRO\s*\d+.*Blackwell|\b[Bb](100|200)\b/i.test(gpu.name);
+  const isBlackwell = gpu => gpu.capability >= 10 || /RTX\s*50\d\d|RTX\s*PRO\s*\d+.*Blackwell|\b[Bb](100|200)\b/i.test(gpu.name);
+  // 旧驱动没有 compute_cap 字段时，多卡机器也要优先识别 50 系。
+  const score = gpu => isBlackwell(gpu) ? 12 : gpu.capability || (/RTX\s*40\d\d/i.test(gpu.name) ? 8.9 : /RTX\s*30\d\d/i.test(gpu.name) ? 8.6 : 0);
+  const gpu = [...gpus].sort((a, b) => score(b) - score(a))[0];
+  const blackwell = isBlackwell(gpu);
   const profile = blackwell ? "cu128" : "cu126";
   const required = blackwell ? 570.65 : 560.76;
   if (!Number.isFinite(Number(gpu.driver)) || Number(gpu.driver) < required) {
@@ -159,7 +162,8 @@ if expected != 'cpu' and (expected != 'existing' or torch.cuda.is_available()):
     if cap[0] >= 10:
         assert torch.version.cuda and tuple(map(int, torch.version.cuda.split('.'))) >= (12, 8), 'Blackwell 需要 CUDA 12.8+'
     # is_available 并不能证明架构兼容；实际测试基本 kernel、cuBLAS 和语音模型使用的 SDPA。
-    x = torch.ones((32,32), device='cuda', dtype=torch.bfloat16)
+    dtype = torch.bfloat16 if cap[0] >= 8 else torch.float32
+    x = torch.ones((32,32), device='cuda', dtype=dtype)
     y = x @ x
     z = torch.nn.functional.scaled_dot_product_attention(x[None,None], x[None,None], x[None,None])
     torch.cuda.synchronize()
@@ -181,7 +185,7 @@ progress('核对 FFmpeg 与依赖版本')
 if expected not in ('existing', 'existing-gpu'):
     import imageio_ffmpeg
     assert os.path.isfile(imageio_ffmpeg.get_ffmpeg_exe()), 'FFmpeg 缺失'
-if len(sys.argv) > 2:
+if len(sys.argv) > 2 and sys.argv[2]:
     import importlib.metadata as metadata
     for line in open(sys.argv[2], encoding='utf-8'):
         line = line.strip()
@@ -210,7 +214,7 @@ for name in modules:
             folder = Path(spec.origin).parent
             files += [str(p) for p in folder.glob('_C*.pyd')]
             files += [str(p) for p in (folder/'lib').glob('*.dll')]
-if len(sys.argv) > 2:
+if len(sys.argv) > 2 and sys.argv[2]:
     assert '.'.join(map(str, sys.version_info[:3])) == sys.argv[2], 'Python 版本需要更新'
     for line in Path(sys.argv[1]).read_text(encoding='utf-8').splitlines():
         line = line.strip()
@@ -219,6 +223,15 @@ if len(sys.argv) > 2:
             assert metadata.version(name) == version, name + ' 版本需要更新'
     for name in ['torch', 'torchaudio']:
         assert metadata.version(name) == sys.argv[3], name + ' CUDA 构建需要更新'
+if len(sys.argv) > 4 and sys.argv[4] != 'cpu':
+    # 无需导入 torch 即可发现旧 CPU/cu126 环境被带到 50 系机器。
+    import re
+    build = metadata.version('torch')
+    cuda = re.search(r'\+cu(\d+)', build)
+    assert cuda is not None, '已有 PyTorch 不是可确认的 CUDA 构建'
+    assert int(cuda[1]) >= (128 if sys.argv[4] == 'cu128' else 126), '已有 CUDA 构建不支持当前显卡'
+# 仅加载核心原生库，发现缺失/损坏 DLL；不初始化 CUDA 或导入全部语音框架。
+import torch, torchaudio
 print(json.dumps({'files': files}))
 `;
 
@@ -245,11 +258,26 @@ class RuntimeService {
   }
   cancel() { this.controller?.abort(new Error("资源准备已暂停，下次启动可继续")); }
   async launch({ existingPython, existingModel, managed = false } = {}) {
-    // 正常启动只定位解释器。完整准备仅用于安装器或用户显式修复。
-    if (!existingPython || !fs.existsSync(existingPython)) return this.prepare({ existingPython, existingModel, managed });
+    const options = { existingPython, existingModel, managed, modelsOnDemand: true };
+    if (!existingPython || !fs.existsSync(existingPython)) return this.prepare(options);
     this.controller = new AbortController();
     this.env = { ...process.env, PYTHONUTF8: "1", PYTHONIOENCODING: "utf-8", PYTHONNOUSERSITE: "1",
       VOXCPM_RUNTIME_CONFIG: path.join(this.appDir, "runtime-config.json"), VOXCPM_LAZY_STARTUP: "1" };
+    if (!this.readOnlyResources) {
+      this.logPath = path.join(this.dataRoot, "cache", "runtime-bootstrap.log");
+      await fsp.mkdir(path.dirname(this.logPath), { recursive: true });
+      this.emit({ status: "checking", activity: "startup", phase: "detect", message: "正在检查显卡与运行依赖", log: "" });
+      const selected = await this.detect();
+      if (selected.gpu) this.env.CUDA_VISIBLE_DEVICES = selected.gpu.index;
+      managed = managed || path.dirname(path.dirname(existingPython)) === path.join(this.root, "runtime", "managed");
+      try { await this.startupProbe(existingPython, selected, managed); }
+      catch (error) {
+        this.controller.signal.throwIfAborted();
+        if (error.code === "RUNTIME_PROCESS_TIMEOUT") throw error;
+        this.log(`运行依赖需要自动恢复：${error.message}\n`);
+        return this.prepare({ ...options, managed });
+      }
+    }
     this.emit({ status: "checking", activity: "startup", phase: "service", cached: true,
       message: "正在连接本地服务，模型将在使用时单独校验", modelName: "", modelState: "", name: "", size: 0 });
     const modelDir = existingModel || safePath(this.root, `models/${this.config.models[0].folder}`);
@@ -268,14 +296,13 @@ class RuntimeService {
   environmentSignature(selected, { existingPython, managed }) {
     const { models, ...config } = this.config;
     return crypto.createHash("sha256").update(JSON.stringify({ config, selected, existingPython, managed,
-      root: path.resolve(this.root), appRoot: path.resolve(this.appRoot), probe: 2 }))
+      root: path.resolve(this.root), appRoot: path.resolve(this.appRoot), probe: 3 }))
       .update(fs.readFileSync(path.join(this.appDir, "runtime-requirements.txt"))).digest("hex");
   }
   async startupProbe(python, selected, managed) {
-    const args = ["-c", STARTUP_PROBE];
-    if (managed) args.push(path.join(this.appDir, "runtime-requirements.txt"), this.config.python.version,
-      `${this.config.profiles[selected.profile].torch}+${selected.profile}`);
-    const output = await this.run(python, args, { quiet: true, timeout: 20000 });
+    const args = ["-c", STARTUP_PROBE, managed ? path.join(this.appDir, "runtime-requirements.txt") : "",
+      managed ? this.config.python.version : "", managed ? `${this.config.profiles[selected.profile].torch}+${selected.profile}` : "", selected.profile];
+    const output = await this.run(python, args, { quiet: true, timeout: 45000 });
     const parsed = JSON.parse(output.trim().split(/\r?\n/).at(-1));
     if (!Array.isArray(parsed.files)) throw new Error("运行环境快速检查返回无效结果");
     return parsed.files;
@@ -347,7 +374,7 @@ class RuntimeService {
       return null;
     }
   }
-  async rememberReady(signature, selected, python, modelDir, managed) {
+  async rememberReady(signature, selected, python, modelDir, managed, modelsOnDemand = false) {
     let temp;
     try {
       const files = await this.startupProbe(python, selected, managed);
@@ -358,7 +385,7 @@ class RuntimeService {
       const environmentFiles = await this.stamps(files);
       const ready = { protocol: 1, signature, python, modelDir, managed,
         environmentSignature: this.environmentReadySignature, environmentFiles,
-        files: [...environmentFiles, ...await this.stamps(await this.modelFiles(modelDir))], checkedAt: new Date().toISOString() };
+        files: modelsOnDemand ? [] : [...environmentFiles, ...await this.stamps(await this.modelFiles(modelDir))], checkedAt: new Date().toISOString() };
       this.controller.signal.throwIfAborted();
       temp = `${this.readyPath}.${process.pid}.${crypto.randomBytes(4).toString("hex")}.tmp`;
       await fsp.writeFile(temp, JSON.stringify(ready));
@@ -467,7 +494,7 @@ class RuntimeService {
     }).finally(() => { this.pending = null; });
     return this.pending;
   }
-  async prepareInternal({ existingPython, existingModel, managed = false } = {}) {
+  async prepareInternal({ existingPython, existingModel, managed = false, modelsOnDemand = false } = {}) {
     this.logPath = path.join(this.dataRoot, "cache", "runtime-bootstrap.log");
     this.readyPath = path.join(this.dataRoot, "cache", "runtime-ready.json");
     await fsp.mkdir(path.dirname(this.logPath), { recursive: true });
@@ -480,13 +507,13 @@ class RuntimeService {
     managed = managed || (path.dirname(existingDirectory) === path.join(this.root, "runtime", "managed") && /^py312-(cpu|cu126|cu128)$/.test(path.basename(existingDirectory)));
     const startupSignature = this.startupSignature(selected, { existingPython: managed ? "" : existingPython, existingModel, managed });
     this.environmentReadySignature = this.environmentSignature(selected, { existingPython: managed ? "" : existingPython, managed });
-    const reused = await this.reuseReady(startupSignature, selected);
+    const reused = modelsOnDemand ? null : await this.reuseReady(startupSignature, selected);
     if (reused) return reused;
     const environment = await this.reuseEnvironment(this.environmentReadySignature, selected);
     // 模型下载不依赖 Python 导入；先补齐模型，避免被首次框架加载和自检阻塞。
-    const modelDir = await this.prepareModels(existingModel);
+    const modelDir = modelsOnDemand ? existingModel || safePath(this.root, `models/${this.config.models[0].folder}`) : await this.prepareModels(existingModel);
     if (environment) {
-      await this.rememberReady(startupSignature, selected, environment.python, modelDir, environment.managed);
+      await this.rememberReady(startupSignature, selected, environment.python, modelDir, environment.managed, modelsOnDemand);
       this.emit({ status: "ready", phase: "environment-ready", environmentCached: true,
         message: "模型检查完成，已复用验证过的音频环境，正在启动服务", name: "", size: 0 });
       return this.runtimeResult(environment.python, modelDir, environment.managed);
@@ -503,7 +530,7 @@ class RuntimeService {
         this.log(`已有环境需要独立补齐：${e.message}\n`);
       }
       if (existingValid) {
-        await this.rememberReady(startupSignature, selected, existingPython, modelDir, false);
+        await this.rememberReady(startupSignature, selected, existingPython, modelDir, false, modelsOnDemand);
         this.emit({ status: "ready", phase: "environment-ready", message: "已有运行环境检查通过，正在启动服务" });
         return this.runtimeResult(existingPython, modelDir, false);
       }
@@ -618,7 +645,7 @@ try {
     await fsp.mkdir(ffmpegDir, { recursive: true });
     await this.run(python, ["-c", "import imageio_ffmpeg,shutil,sys; shutil.copy2(imageio_ffmpeg.get_ffmpeg_exe(),sys.argv[1])", path.join(ffmpegDir, "ffmpeg.exe")], { quiet: true, timeout: 15000 });
     await fsp.writeFile(marker, JSON.stringify({ signature, ...selected, checkedAt: new Date().toISOString() }));
-    await this.rememberReady(startupSignature, selected, python, modelDir, true);
+    await this.rememberReady(startupSignature, selected, python, modelDir, true, modelsOnDemand);
     this.emit({ status: "ready", phase: "environment-ready", message: "本地环境已就绪，正在启动服务", name: "", size: 0 });
     return this.runtimeResult(python, modelDir, true);
   }
@@ -635,7 +662,12 @@ try {
       this.check({ modelName: label, modelState: "checking", message: `${label} 模型文件检查中`, name: "", size: 0 });
       // 显式指定的其他版本模型由用户管理；默认 VoxCPM2 按清单检查所有必要文件。
       if (i === 0 && existingModel && fs.existsSync(path.join(existingModel, "config.json"))) {
-        const config = JSON.parse(await fsp.readFile(path.join(existingModel, "config.json"), "utf8"));
+        let config;
+        try { config = JSON.parse(await fsp.readFile(path.join(existingModel, "config.json"), "utf8")); }
+        catch (error) {
+          if (!(error instanceof SyntaxError)) throw error;
+          config = {}; // 配置损坏也必须能进入固定清单修复。
+        }
         if (config.architecture && config.architecture !== "voxcpm2") continue;
       }
       const target = i === 0 && existingModel ? existingModel : safePath(this.root, `models/${model.folder}`);

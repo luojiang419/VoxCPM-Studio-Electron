@@ -63,7 +63,7 @@ def generate(engine, models, packet, output):
                 self._unload()
         pipeline = LocalPipeline.from_pretrained(str(models / 'heartmula'), version='3B', lazy_load=True,
             device={'mula': torch.device('cuda'), 'codec': torch.device('cuda')},
-            dtype={'mula': torch.bfloat16, 'codec': torch.float32})
+            dtype={'mula': torch.bfloat16 if torch.cuda.get_device_capability()[0] >= 8 else torch.float32, 'codec': torch.float32})
         # 官方pipeline会把看似文件名的字符串按路径读取；仅传入本次管理目录的文本文件。
         lyrics_file, tags_file = output.parent / 'lyrics.txt', output.parent / 'tags.txt'
         lyrics_file.write_text(packet['inputs']['lyrics'], encoding='utf8'); tags_file.write_text(packet['inputs']['tags'], encoding='utf8')

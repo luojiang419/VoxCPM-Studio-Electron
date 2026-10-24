@@ -7,6 +7,9 @@ ROOT = Path(__file__).resolve().parents[1]
 package = types.ModuleType("voxcpm")
 package.__path__ = [str(ROOT / "backend/voxcpm"), str(ROOT.parent / "src/voxcpm")]
 sys.modules["voxcpm"] = package
+model_package = types.ModuleType("voxcpm.model")
+model_package.__path__ = [str(ROOT / "backend/voxcpm/model"), str(ROOT.parent / "src/voxcpm/model")]
+sys.modules["voxcpm.model"] = model_package
 
 from fastapi.responses import FileResponse
 from fastapi.staticfiles import StaticFiles

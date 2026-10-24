@@ -299,3 +299,67 @@ def test_missing_file_auto_repair_continues_original_api_task(tmp_path, download
         assert len(download_server.requests) == 1
         assert not service.active
         assert not (tmp_path / asset['name']).exists()  # 没有下载到错误的默认目录。
+
+
+def test_audio_models_repair_on_first_use_and_continue_loading(tmp_path, download_server, monkeypatch):
+    from voxcpm import studio_app
+    monkeypatch.delenv('VOXCPM_INSTALLED_RESOURCES_READONLY', raising=False)
+    models = tmp_path / 'models'
+    folders = ['tts', 'asr', 'denoiser']
+    manifest = tmp_path / 'runtime-config.json'
+    asset = {**spec(download_server), 'name': 'config.json'}
+    manifest.write_text(json.dumps({'models': [{'folder': folder, 'files': [asset]} for folder in folders]}))
+    monkeypatch.setenv('VOXCPM_RUNTIME_CONFIG', str(manifest))
+    monkeypatch.setenv('VOXCPM_PROJECT_ROOT', str(tmp_path))
+    monkeypatch.setenv('VOXCPM_DATA_ROOT', str(tmp_path / 'data'))
+    monkeypatch.setenv('VOXCPM_MODELS_ROOT', str(models))
+    monkeypatch.setattr(studio_app, 'LOCAL_VOXCPM2_DIR', models / 'tts')
+    monkeypatch.setattr(studio_app, 'LOCAL_ASR_DIR', models / 'asr')
+    monkeypatch.setattr(studio_app, 'LOCAL_ZIPENHANCER_DIR', models / 'denoiser')
+    monkeypatch.setattr(studio_app, 'torch', SimpleNamespace(cuda=SimpleNamespace(is_available=lambda: False)))
+    calls = []
+
+    def load(**kwargs):
+        assert (Path(kwargs['voxcpm_model_path']) / 'config.json').read_bytes() == download_server.data
+        if kwargs['enable_denoiser']:
+            assert (Path(kwargs['zipenhancer_model_path']) / 'config.json').read_bytes() == download_server.data
+        calls.append(kwargs)
+        return SimpleNamespace()
+
+    monkeypatch.setattr(studio_app, 'VoxCPM', load)
+    def load_asr(**kwargs):
+        assert (Path(kwargs['model']) / 'config.json').read_bytes() == download_server.data
+        return SimpleNamespace()
+    monkeypatch.setattr(studio_app, 'AutoModel', load_asr)
+    studio = object.__new__(studio_app.VoxCPMStudio)
+    studio.voxcpm_model, studio.loaded_model_key, studio.asr_model = None, None, None
+    studio.settings = SimpleNamespace(disable_denoiser=False, disable_optimize=True, zipenhancer_path=str(models / 'denoiser'))
+    studio.resolve_model_source = lambda _: str(models / 'tts')
+    studio.default_lora_config = lambda: None
+    studio.lora_signature = lambda _: 'fixture'
+    studio.get_or_load_voxcpm(load_denoiser=False)
+    assert len(download_server.requests) == 1
+    assert not (models / 'asr').exists() and not (models / 'denoiser').exists()
+    studio.get_or_load_voxcpm(load_denoiser=False)
+    assert len(download_server.requests) == 1 and len(calls) == 1
+    studio.get_or_load_asr()
+    assert len(download_server.requests) == 2 and not (models / 'denoiser').exists()
+    studio.settings.zipenhancer_path = ''  # 默认模型 ID 必须复用刚修复的本地目录。
+    studio.get_or_load_voxcpm(load_denoiser=True)
+    assert len(download_server.requests) == 3 and calls[-1]['enable_denoiser']
+    assert calls[-1]['zipenhancer_model_path'] == str(models / 'denoiser')
+
+
+@pytest.mark.parametrize('capability,expected', [(7, 'float32'), (8, 'bfloat16'), (12, 'bfloat16')])
+def test_tts_parameters_and_cache_choose_supported_dtype(capability, expected):
+    import ast
+    source = Path(__file__).resolve().parents[1] / 'backend/voxcpm/model/utils.py'
+    function = next(node for node in ast.parse(source.read_text(encoding='utf8')).body if isinstance(node, ast.FunctionDef) and node.name == 'get_dtype')
+    fake = SimpleNamespace(cuda=SimpleNamespace(is_available=lambda: True, get_device_capability=lambda: (capability, 5)),
+                           bfloat16='bfloat16', float32='float32', float16='float16')
+    namespace = {'torch': fake}
+    exec(compile(ast.Module(body=[function], type_ignores=[]), str(source), 'exec'), namespace)
+    for name in ('bf16', 'bfloat16'):
+        assert namespace['get_dtype'](name) == expected
+    assert namespace['get_dtype']('fp16') == 'float16'
+    assert namespace['get_dtype']('float32') == 'float32'

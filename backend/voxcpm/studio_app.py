@@ -21,7 +21,7 @@ if os.name == "nt":
 
 import importlib
 import yaml
-from .studio_resources import verify_model_resources
+from .studio_resources import ensure_model_resources
 
 
 class _LazyModule:
@@ -1545,6 +1545,11 @@ class VoxCPMStudio:
 
     def ensure_model_directory(self, model_source: str) -> str:
         source_path = Path(model_source)
+        if source_path.resolve() == LOCAL_VOXCPM2_DIR.resolve() or model_source.lower() == DEFAULT_HF_MODEL_ID.lower():
+            # 内置模型整目录缺失时也使用固定清单恢复，不回退整仓库下载。
+            ensure_model_resources(0, LOCAL_VOXCPM2_DIR)
+            if LOCAL_VOXCPM2_DIR.is_dir():
+                return str(LOCAL_VOXCPM2_DIR)
         if source_path.is_dir():
             return str(source_path)
 
@@ -1593,7 +1598,7 @@ class VoxCPMStudio:
         selected_lora = selected_lora or NO_LORA_LABEL
         model_source = self.resolve_model_source(selected_lora)
         resolved_model_dir = self.ensure_model_directory(model_source)
-        verify_model_resources(0, resolved_model_dir)
+        ensure_model_resources(0, resolved_model_dir)
 
         lora_config, _ = self.load_lora_config_from_checkpoint(selected_lora) if selected_lora != NO_LORA_LABEL else (None, None)
         lora_config = lora_config or self.default_lora_config()
@@ -1601,6 +1606,8 @@ class VoxCPMStudio:
         # 预热保留设置默认行为，实际生成仅在请求参考音频增强时加载。
         enable_denoiser = not self.settings.disable_denoiser and load_denoiser is not False
         zipenhancer_path = (self.settings.zipenhancer_path or DEFAULT_ZIPENHANCER) if enable_denoiser else None
+        if zipenhancer_path == DEFAULT_ZIPENHANCER:
+            zipenhancer_path = str(LOCAL_ZIPENHANCER_DIR)
 
         runtime_key = json.dumps(
             {
@@ -1620,7 +1627,7 @@ class VoxCPMStudio:
         optimize = not self.settings.disable_optimize
 
         if enable_denoiser:
-            verify_model_resources(2, zipenhancer_path if Path(zipenhancer_path).is_dir() else None)
+            ensure_model_resources(2, zipenhancer_path)
         self.device = "cuda" if torch.cuda.is_available() else "cpu"
         self.voxcpm_model = VoxCPM(
             voxcpm_model_path=resolved_model_dir,
@@ -1635,7 +1642,7 @@ class VoxCPMStudio:
         return self.voxcpm_model
 
     def get_or_load_asr(self) -> AutoModel:
-        verify_model_resources(1)
+        ensure_model_resources(1)
         if self.asr_model is not None:
             return self.asr_model
         device = "cuda:0" if torch.cuda.is_available() else "cpu"

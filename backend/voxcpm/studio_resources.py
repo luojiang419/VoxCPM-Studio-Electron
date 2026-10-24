@@ -290,4 +290,4 @@ def ensure_model_resources(model, directory=None, *, root=None, data_root=None, 
                     progress(round((completed + asset['size']) * 100 / total), f'正在复检已修复模型：{file.name}')
                     verify_files([asset], target, cache, cancelled)
             completed += asset['size']
-        progress(100, '当前音乐模型资源已就绪，继续生成')
+        progress(100, '当前模型资源已就绪，继续执行')
