@@ -57,4 +57,4 @@ function installationSession({ root, dataRoot, report, session }) {
     fail(error) { return finish({ session, root: path.resolve(root), ok: false, status: "error", error: String(error?.message || error) }); },
   };
 }
-module.exports = { installationSession };
+module.exports = { installationSession, writeReport };

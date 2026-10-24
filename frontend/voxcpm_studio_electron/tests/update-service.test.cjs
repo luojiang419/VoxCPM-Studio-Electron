@@ -165,3 +165,38 @@ test("延期不下载或退出；立即更新自动衔接，失败不退出且�
   assert.deepEqual(order, ["download", "download", "ready", "download", "ready"]);
   assert.equal(quits, 1); assert.equal(service.prompt, null);
 });
+
+test("更新进度文件短暂占用时串行重试，下载继续，关闭状态不会被旧进度覆盖", async t => {
+  const temp = fs.mkdtempSync(path.join(os.tmpdir(), "voxcpm-prompt-lock-"));
+  t.after(() => fs.rmSync(temp, { recursive: true, force: true }));
+  const service = new UpdateService({ root: temp, dataRoot: temp, appDir: temp, currentVersion: "2.0.4", config: {} });
+  const prompt = service.prompt = { folder: temp, child: { kill: () => assert.fail('不应终止窗口') } };
+  const original = fs.promises.rename;
+  let attempts = 0;
+  t.mock.method(fs.promises, "rename", async (...args) => {
+    if (++attempts < 3) throw Object.assign(Error('sharing violation'), { code: 'EPERM' });
+    return original.apply(fs.promises, args);
+  });
+  for (let progress = 0; progress < 100; progress++) assert.doesNotThrow(() => service.setState({ status: 'downloading', progress }));
+  const closed = service.closePrompt();
+  await service.writePromptState(prompt, { status: 'downloading', progress: 15 });
+  await closed;
+  assert.ok(attempts >= 3);
+  assert.equal(JSON.parse(fs.readFileSync(path.join(temp, 'prompt-state.json'))).status, 'closed');
+  assert.equal(fs.readdirSync(temp).filter(name => name.endsWith('.tmp')).length, 0);
+});
+
+test("永久进度写入错误不从下载回调抛出，关闭失败只结束本次原生提示窗口", async t => {
+  const temp = fs.mkdtempSync(path.join(os.tmpdir(), "voxcpm-prompt-io-"));
+  t.after(() => fs.rmSync(temp, { recursive: true, force: true }));
+  const service = new UpdateService({ root: temp, dataRoot: temp, appDir: temp, currentVersion: "2.0.4", config: {} });
+  let killed = 0;
+  const prompt = service.prompt = { folder: temp, child: { kill: () => killed++ } };
+  t.mock.method(fs.promises, 'rename', async () => { throw Object.assign(Error('write failed'), { code: 'EIO' }); });
+  t.mock.method(console, 'warn', () => {});
+  assert.doesNotThrow(() => service.setState({ status: 'downloading', progress: 88 }));
+  await prompt.writePending;
+  assert.equal(service.state.status, 'downloading'); assert.equal(killed, 0);
+  await service.closePrompt();
+  assert.equal(killed, 1); assert.equal(service.prompt, null);
+});

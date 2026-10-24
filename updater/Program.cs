@@ -332,7 +332,9 @@ namespace VoxStandaloneUpdater {
         }
 
         Dictionary<string, object> Read(string file) {
-            return json.Deserialize<Dictionary<string, object>>(File.ReadAllText(file, Encoding.UTF8));
+            using(var stream=new FileStream(file,FileMode.Open,FileAccess.Read,FileShare.ReadWrite|FileShare.Delete))
+            using(var reader=new StreamReader(stream,Encoding.UTF8))
+                return json.Deserialize<Dictionary<string, object>>(reader.ReadToEnd());
         }
 
         void Write(string file, object value) {

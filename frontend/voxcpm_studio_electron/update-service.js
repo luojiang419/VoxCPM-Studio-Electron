@@ -7,6 +7,7 @@ const { spawn, execFile } = require("child_process");
 const { promisify } = require("util");
 const { resolveManagedPython, downloadAsset } = require("./runtime-service");
 const { pipeline } = require("stream/promises");
+const { writeReport } = require("./install-protocol");
 
 function versionParts(value) {
   if (!/^\d+\.\d+\.\d+$/.test(value)) throw new Error("更新版本格式无效");
@@ -137,10 +138,26 @@ class UpdateService {
   }
   setState(patch) {
     Object.assign(this.state, patch);
-    if (this.prompt) atomicJson(path.join(this.prompt.folder, "prompt-state.json"), {
+    if (this.prompt) this.writePromptState(this.prompt, {
       status: this.state.status, message: this.state.message, progress: this.state.progress,
     });
     this.onState({ ...this.state }); return { ...this.state };
+  }
+  writePromptState(prompt, value) {
+    if (prompt.closed && value.status !== "closed") return prompt.writePending || Promise.resolve();
+    prompt.latestState = value;
+    if (!prompt.writePending) prompt.writePending = (async () => {
+      while (prompt.latestState) {
+        const snapshot = prompt.latestState; prompt.latestState = null;
+        try { await writeReport(path.join(prompt.folder, "prompt-state.json"), snapshot); }
+        catch (error) {
+          // 窗口进度是显示数据，文件占用不能中断下载流或关闭工作台。
+          if (!prompt.writeWarned) { prompt.writeWarned = true; console.warn(`更新窗口进度暂未写入（${error.code || "IO"}），更新继续。`); }
+          if (snapshot.status === "closed") prompt.child?.kill?.();
+        }
+      }
+    })().finally(() => { prompt.writePending = null; });
+    return prompt.writePending;
   }
   getState() {
     try { this.state.lastResult = JSON.parse(fs.readFileSync(path.join(this.cache, "last-result.json"), "utf8")); } catch { /* 无更新记录。 */ }
@@ -252,6 +269,7 @@ class UpdateService {
     const prompt = { folder, busy: false, child: null, timer: null };
     this.prompt = prompt;
     this.setState({ promptOpen: true });
+    await prompt.writePending;
     try {
       const child = spawn(executable, ["--session", folder], { detached: true, stdio: "ignore", windowsHide: false, cwd: folder,
         env: Object.fromEntries(Object.entries(process.env).filter(([key]) => key !== "ELECTRON_RUN_AS_NODE")) });
@@ -278,15 +296,17 @@ class UpdateService {
       }, 200);
       prompt.timer.unref();
       return this.getState();
-    } catch (error) { this.closePrompt(); throw error; }
+    } catch (error) { await this.closePrompt(); throw error; }
   }
   closePrompt() {
     const prompt = this.prompt;
     if (!prompt) return;
     clearInterval(prompt.timer);
-    atomicJson(path.join(prompt.folder, "prompt-state.json"), { status: "closed" });
+    prompt.closed = true;
+    const written = this.writePromptState(prompt, { status: "closed" });
     this.prompt = null;
     this.setState({ promptOpen: false });
+    return written;
   }
   async handlePromptChoice(prompt) {
     const file = path.join(prompt.folder, "choice.json");
@@ -294,14 +314,14 @@ class UpdateService {
     const choice = JSON.parse(fs.readFileSync(file, "utf8"));
     fs.unlinkSync(file);
     if (choice.session !== prompt.folder || choice.hostPid !== prompt.child.pid) return;
-    if (choice.action === "later") { this.closePrompt(); return; }
+    if (choice.action === "later") { await this.closePrompt(); return; }
     if (choice.action !== "now") return;
     prompt.busy = true;
     try {
       if (this.state.status !== "downloaded") await this.download();
       if (this.state.status !== "downloaded") return; // 下载错误已显示在原生窗口，可直接重试。
       await this.launch();
-      this.closePrompt();
+      await this.closePrompt();
       await this.onInstallReady(); // 仅在签名新更新器和事务均就绪后允许主程序退出。
     } finally { prompt.busy = false; }
   }
