@@ -125,8 +125,8 @@ function selectProfile(gpus) {
   return { profile, label: `${gpu.name} · CUDA ${blackwell ? "12.8" : "12.6"}`, gpu };
 }
 
-function resolveManagedPython(root) {
-  for (const profile of ["cu128", "cu126", "cpu"]) {
+function resolveManagedPython(root, preferredProfile) {
+  for (const profile of [...new Set([preferredProfile, "cu128", "cu126", "cpu"].filter(Boolean))]) {
     const directory = path.join(root, "runtime", "managed", `py312-${profile}`);
     const python = path.join(directory, "python.exe");
     if (fs.existsSync(path.join(directory, "ready.json")) && fs.existsSync(python)) return python;
@@ -239,6 +239,8 @@ class RuntimeService {
   constructor({ root, appRoot, dataRoot, appDir, onState = () => {}, config, runProcess,
     readOnlyResources = process.env.VOXCPM_INSTALLED_RESOURCES_READONLY === '1' } = {}) {
     Object.assign(this, { root, appRoot, dataRoot, appDir, onState });
+    this.localDirectories = [...new Set([...(process.env.VOXCPM_LOCAL_ASSET_DIRS || '').split(path.delimiter).filter(Boolean),
+      ...(root ? [path.join(root, 'offline-assets')] : [])])];
     this.readOnlyResources = readOnlyResources;
     this.config = config || JSON.parse(fs.readFileSync(path.join(appDir, "runtime-config.json"), "utf8"));
     if (this.config.protocol !== 1) throw new Error("不支持的运行环境清单");
@@ -270,6 +272,10 @@ class RuntimeService {
       const selected = await this.detect();
       if (selected.gpu) this.env.CUDA_VISIBLE_DEVICES = selected.gpu.index;
       managed = managed || path.dirname(path.dirname(existingPython)) === path.join(this.root, "runtime", "managed");
+      if (managed) {
+        const matched = resolveManagedPython(this.root, selected.profile);
+        if (matched && path.basename(path.dirname(matched)) === `py312-${selected.profile}`) existingPython = matched;
+      }
       try { await this.startupProbe(existingPython, selected, managed); }
       catch (error) {
         this.controller.signal.throwIfAborted();
@@ -540,7 +546,7 @@ class RuntimeService {
     const python = path.join(directory, "python.exe");
     const cache = path.join(this.dataRoot, "cache", "runtime-downloads");
     const progress = (value) => this.assetProgress(value);
-    const get = (asset, target = cache) => downloadAsset(asset, target, { signal: this.controller.signal, progress });
+    const get = (asset, target = cache) => downloadAsset(asset, target, { signal: this.controller.signal, progress, localDirectories: this.localDirectories });
     let pythonUsable = false;
     if (fs.existsSync(python)) {
       try {
@@ -651,7 +657,7 @@ try {
   }
   modelEnv() {
     const modelsRoot = this.env?.VOXCPM_MODELS_ROOT || process.env.VOXCPM_MODELS_ROOT || path.join(this.root, 'models');
-    return { ...this.env, VOXCPM_MODELS_ROOT: modelsRoot,
+    return { ...this.env, VOXCPM_LOCAL_ASSET_DIRS: this.localDirectories.join(path.delimiter), VOXCPM_MODELS_ROOT: modelsRoot,
       ZIPENHANCER_MODEL_PATH: this.env?.ZIPENHANCER_MODEL_PATH || process.env.ZIPENHANCER_MODEL_PATH || safePath(modelsRoot, this.config.models[2].folder) };
   }
   async prepareModels(existingModel) {
@@ -672,7 +678,7 @@ try {
       }
       const target = i === 0 && existingModel ? existingModel : safePath(this.root, `models/${model.folder}`);
       for (const asset of model.files) await downloadAsset(asset, target, {
-        signal: this.controller.signal, progress: (value) => this.assetProgress(value) });
+        signal: this.controller.signal, progress: (value) => this.assetProgress(value), localDirectories: this.localDirectories });
       this.check({ modelName: label, modelState: "ready", message: `${label} 模型文件检查完成`, name: "", size: 0 });
       if (i === 0) modelDir = target;
     }

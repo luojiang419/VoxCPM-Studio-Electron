@@ -225,7 +225,7 @@ class ComponentService {
         if (Number(space.bavail) * Number(space.bsize) < Math.max(0, asset.size - (partial?.size || 0)) + 512 * 1024 ** 2) throw new Error('下载空间不足，请释放空间后继续');
         let downloading = false;
         await downloadAsset({ ...asset, name: path.basename(target) }, path.dirname(target), { signal,
-          fetchImpl: this.fetchImpl, progress: p => {
+          localDirectories: this.runtimeService.localDirectories, fetchImpl: this.fetchImpl, progress: p => {
             downloading ||= !!p.downloading;
             emit({ ...p, activity: downloading ? 'prepare' : 'startup', status: downloading ? 'working' : 'checking', message: `${downloading ? '正在下载缺失资源' : '正在校验已安装文件'}：${path.basename(target)}` });
           } });

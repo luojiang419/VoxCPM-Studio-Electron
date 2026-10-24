@@ -17,7 +17,7 @@ using System.Windows.Forms;
 namespace VoxBootstrap {
     public sealed class Asset { public string name; public long size; public string sha256; public string[] urls; }
     public sealed class ComponentChoice { public string id, label; public long size; public int minMemoryMB; public Asset[] files; }
-    public sealed class Manifest { public int protocol; public int componentProtocol; public ComponentChoice[] components; public long musicRuntimeSize, musicArchiveSize; public string musicRuntimeVersion; public string releaseId; public string appVersion; public string appReleaseId; public string entry; public Asset package; public Asset[] files; }
+    public sealed class Manifest { public int protocol; public int componentProtocol; public ComponentChoice[] components; public long musicRuntimeSize, musicArchiveSize; public string musicRuntimeVersion; public string releaseId; public string appVersion; public string appReleaseId; public string entry; public Asset package; public Asset[] files; public bool fullBundle; public long installedSize; }
     public sealed class Status { public string text; public long done; public long total; }
 
     public static class Core {
@@ -48,11 +48,14 @@ namespace VoxBootstrap {
                 if (asset.size < 0 || !System.Text.RegularExpressions.Regex.IsMatch(asset.sha256 ?? "", "^[a-f0-9]{64}$")) throw new IOException("清单校验信息无效");
             }
             foreach (Asset file in manifest.files) {
-                if (!names.Add(file.name) || new[] { "data/", "models/", "runtime/" }.Any(p => file.name.StartsWith(p, StringComparison.OrdinalIgnoreCase)))
+                bool protectedPath = new[] { "data/", "models/", "runtime/" }.Any(p => file.name.StartsWith(p, StringComparison.OrdinalIgnoreCase));
+                bool bundledResource = manifest.fullBundle && new[] { "models/", "runtime/", "data/lipsync/", "data/tools/updater-runtime/" }.Any(p => file.name.StartsWith(p, StringComparison.OrdinalIgnoreCase));
+                if (!names.Add(file.name) || (protectedPath && !bundledResource))
                     throw new IOException("桌面资源清单包含重复项或用户数据路径");
             }
-            if (!names.Contains(manifest.entry) || manifest.package.urls == null || manifest.package.urls.Length == 0 ||
+            if (!names.Contains(manifest.entry) || manifest.package.urls == null || (!manifest.fullBundle && manifest.package.urls.Length == 0) ||
                 manifest.package.urls.Any(u => new Uri(u).Scheme != "https")) throw new IOException("启动器下载地址无效");
+            if (manifest.fullBundle && (manifest.installedSize != manifest.files.Sum(a => a.size) || manifest.installedSize <= 0)) throw new IOException("全量包大小清单无效");
         }
         public static void Download(Asset asset, string directory, CancellationToken token, IProgress<Status> progress, bool allowHttp = false) {
             Directory.CreateDirectory(directory);
@@ -128,9 +131,11 @@ namespace VoxBootstrap {
             foreach (Asset file in manifest.files) { token.ThrowIfCancellationRequested(); if (!Verified(SafePath(root, file.name), file)) return false; }
             return true;
         }
-        public static void Extract(string archive, string staging, Manifest manifest, CancellationToken token) {
+        public static void Extract(string archive, string staging, Manifest manifest, CancellationToken token, IProgress<Status> progress = null) {
             var expected = manifest.files.ToDictionary(a => a.name, StringComparer.OrdinalIgnoreCase);
             var seen = new HashSet<string>(StringComparer.OrdinalIgnoreCase);
+            long extracted = 0, fullSize = manifest.files.Sum(a => a.size);
+            var progressClock = Stopwatch.StartNew();
             using (var zip = ZipFile.OpenRead(archive)) {
                 foreach (var entry in zip.Entries) {
                     token.ThrowIfCancellationRequested();
@@ -147,7 +152,11 @@ namespace VoxBootstrap {
                         while ((count = input.Read(buffer, 0, buffer.Length)) > 0) {
                             token.ThrowIfCancellationRequested(); done += count;
                             if (done > asset.size) throw new IOException("解压大小超过清单");
-                            output.Write(buffer, 0, count);
+                            output.Write(buffer, 0, count); extracted += count;
+                            if (progress != null && progressClock.ElapsedMilliseconds >= 250) {
+                                progress.Report(new Status { text = manifest.fullBundle ? "正在展开本地模型与运行时" : "正在展开桌面环境", done = extracted, total = fullSize });
+                                progressClock.Restart();
+                            }
                         }
                     }
                     if (!Verified(target, asset)) throw new IOException("解压文件 SHA-256 校验失败");
@@ -155,7 +164,7 @@ namespace VoxBootstrap {
             }
             if (seen.Count != expected.Count) throw new IOException("桌面压缩包缺少必要文件");
         }
-        public static string Prepare(string root, Manifest manifest, CancellationToken token, IProgress<Status> progress) {
+        public static string Prepare(string root, Manifest manifest, CancellationToken token, IProgress<Status> progress, string localPackageDirectory = null) {
             Validate(manifest); Directory.CreateDirectory(root);
             progress.Report(new Status { text = "正在校验桌面环境" });
             if (!DesktopReady(root, manifest, token)) {
@@ -166,6 +175,12 @@ namespace VoxBootstrap {
                     finally { process.Dispose(); }
                 }
                 string cache = Path.Combine(root, "data", "cache", "bootstrap");
+                string archivePath = SafePath(cache, manifest.package.name);
+                if (manifest.fullBundle) {
+                    archivePath = SafePath(localPackageDirectory ?? Path.GetDirectoryName(Assembly.GetExecutingAssembly().Location), manifest.package.name);
+                    progress.Report(new Status { text = "正在校验本地全量资源包", total = manifest.package.size });
+                    if (!Verified(archivePath, manifest.package)) throw new IOException("本地全量资源包缺失或校验失败，请将完整资源 ZIP 与安装器放在同一目录。");
+                } else {
 #if UNIFIED
                 string payload=VoxLegacyRepair.Program.PreparePayload(Path.Combine(Environment.GetFolderPath(Environment.SpecialFolder.LocalApplicationData),"VoxCPMStudioRepair","packages"));
                 Directory.CreateDirectory(cache);
@@ -175,11 +190,20 @@ namespace VoxBootstrap {
 #else
                 Download(manifest.package, cache, token, progress);
 #endif
+                }
                 string staging = Path.Combine(root, ".desktop-staging-" + Guid.NewGuid().ToString("N"));
                 Directory.CreateDirectory(staging);
                 try {
                     progress.Report(new Status { text = "正在校验并展开桌面环境" });
-                    Extract(SafePath(cache, manifest.package.name), staging, manifest, token);
+                    Extract(archivePath, staging, manifest, token, progress);
+                    if (manifest.fullBundle) foreach (Asset file in manifest.files) {
+                        string current = SafePath(root, file.name);
+                        while (!String.Equals(current, Path.GetFullPath(root), StringComparison.OrdinalIgnoreCase)) {
+                            if ((File.Exists(current) || Directory.Exists(current)) && (File.GetAttributes(current) & FileAttributes.ReparsePoint) != 0)
+                                throw new IOException("全量安装目标不能经过目录连接或符号链接：" + file.name);
+                            current = Path.GetDirectoryName(current);
+                        }
+                    }
                     foreach (Asset file in manifest.files) {
                         token.ThrowIfCancellationRequested();
                         string target = SafePath(root, file.name); Directory.CreateDirectory(Path.GetDirectoryName(target));
@@ -402,7 +426,7 @@ namespace VoxBootstrap {
                 using (var pen = new Pen(i > 14 && i < 24 ? Accent : (dark ? Color.FromArgb(115, 120, 108) : Color.FromArgb(181, 186, 171)), 2.8f)) { pen.StartCap = LineCap.Round; pen.EndCap = LineCap.Round; g.DrawLine(pen, x, 184 - h / 2, x, 184 + h / 2); }
             }
             TextAt(g, "安装位置", 12, Muted, 43, 240, 130);
-            TextAt(g, "非 C 盘优先 · 至少 25 GiB", 11, Muted, 480, 242, 210);
+            TextAt(g, "非 C 盘优先 · 至少 " + (manifest.fullBundle ? Math.Ceiling(manifest.installedSize / 1073741824.0 + 5).ToString() : "25") + " GiB", 11, Muted, 480, 242, 210);
             TextAt(g, "安装到专用应用文件夹", 11, Muted, 44, 411, 400);
             using (var shape = Round(new RectangleF(42, 430, 636, 48), 12)) using (var pen = new Pen(dark ? Color.FromArgb(65, 70, 60) : Color.FromArgb(218, 222, 209))) g.DrawPath(pen, shape);
             g.TranslateTransform(0, 280);
@@ -419,7 +443,7 @@ namespace VoxBootstrap {
             float filled = (float)(594 * fraction);
             if (filled > 2) using (var shape = Round(new RectangleF(textLayout.Bar.X,textLayout.Bar.Y,filled,5), 2.5f)) using (var brush = new SolidBrush(Accent)) g.FillPath(brush, shape);
             if (total == 0 && view == "working") using (var brush = new SolidBrush(Accent)) g.FillRectangle(brush,textLayout.Bar.X+(float)(pulse*464),textLayout.Bar.Y,130,5);
-            DrawStatusText(g,total > 0 ? String.Format("{0:F1} MB / {1:F1} MB", downloaded / 1048576.0, total / 1048576.0) : "首次联网准备 · 已有资源自动复用",10,Muted,textLayout.Footnote,false);
+            DrawStatusText(g,total > 0 ? String.Format("{0:F1} MB / {1:F1} MB", downloaded / 1048576.0, total / 1048576.0) : manifest.fullBundle ? "资源随包携带 · 缺失时按需补齐" : "首次联网准备 · 已有资源自动复用",10,Muted,textLayout.Footnote,false);
             }
             string[] steps = { "安装应用", "准备环境", "完成安装" };
             for (int i = 0; i < 3; i++) {
@@ -488,6 +512,8 @@ namespace VoxBootstrap {
             try {
                 root = Installer.Canonical(root); installPath.Text = root;
                 Installer.ValidateDestinationCapacity(root);
+                if (manifest.fullBundle && new DriveInfo(Path.GetPathRoot(root)).AvailableFreeSpace < manifest.installedSize + 5L * 1024 * 1024 * 1024)
+                    throw new IOException("全量安装空间不足，请至少保留 " + Math.Ceiling(manifest.installedSize / 1073741824.0 + 5) + " GiB 可用空间。");
                 if (selection != null) ComponentPicker.ValidateCapacity(root, selection, manifest);
                 lease = Installer.AcquireRoot(root);
                 Installer.Begin(root, manifest, lockHeld: true);
@@ -528,7 +554,7 @@ namespace VoxBootstrap {
                 if (Installer.RouteUninstall(args)) return;
                 Manifest manifest;
                 using (var stream = Assembly.GetExecutingAssembly().GetManifestResourceStream("bootstrap-manifest.json"))
-                using (var reader = new StreamReader(stream)) manifest = new JavaScriptSerializer().Deserialize<Manifest>(reader.ReadToEnd());
+                using (var reader = new StreamReader(stream)) manifest = new JavaScriptSerializer { MaxJsonLength = Int32.MaxValue }.Deserialize<Manifest>(reader.ReadToEnd());
                 Core.Validate(manifest);
 #if UNIFIED
                 string specified=null, report=null; bool exit=args.Contains("--exit-on-complete");

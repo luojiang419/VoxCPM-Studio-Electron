@@ -278,6 +278,39 @@ test("启动换到 50 系会按 cu128 核对旧托管环境，失败自动恢复
   assert.equal(result.options.modelsOnDemand, true);
 });
 
+for (const [name, capability, profile] of [["RTX 2080 Ti", 7.5, "cu126"], ["RTX 3060", 8.6, "cu126"],
+  ["RTX 4070 Ti SUPER", 8.9, "cu126"], ["RTX 5090", 12, "cu128"]]) {
+  test(`全量包双运行时并存时 ${name} 直接选 ${profile}，不触发重装`, async t => {
+    const f = await startupFixture(t, true);
+    const other = path.join(f.root, 'runtime/managed/py312-cu128');
+    await fs.mkdir(other, { recursive: true });
+    await fs.writeFile(path.join(other, 'python.exe'), 'fixture');
+    await fs.writeFile(path.join(other, 'ready.json'), '{}');
+    f.localConfig.profiles.cu128 = { torch: '2.7.1', wheels: [] };
+    const service = f.create();
+    service.detect = async () => selectProfile([{ index: '0', name, capability, driver: '580.97' }]);
+    let checked;
+    service.startupProbe = async python => { checked = python; return []; };
+    service.prepare = async () => { throw Error('匹配的完整运行时不应重新安装'); };
+    const expected = path.join(f.root, `runtime/managed/py312-${profile}/python.exe`);
+    const result = await service.launch({ ...f.options, existingPython: path.join(other, 'python.exe') });
+    assert.equal(checked, expected);
+    assert.equal(result.python, expected);
+    assert.ok(result.env.VOXCPM_LOCAL_ASSET_DIRS.split(path.delimiter).includes(path.join(f.root, 'offline-assets')));
+  });
+}
+
+test('全量包默认从自身离线资源目录恢复文件，不依赖构建机环境变量', async t => {
+  const f = await startupFixture(t, true), service = f.create();
+  const file = path.join(f.options.existingModel, 'weights.bin'), bytes = await fs.readFile(file);
+  const local = path.join(f.root, 'offline-assets');
+  await fs.mkdir(local); await fs.writeFile(path.join(local, 'weights.bin'), bytes); await fs.rm(file);
+  t.mock.method(globalThis, 'fetch', () => { throw Error('不应连接外网'); });
+  service.controller = new AbortController();
+  await service.prepareModels(f.options.existingModel);
+  assert.deepEqual(await fs.readFile(file), bytes);
+});
+
 test("启动自检超时、取消和过旧驱动均不会触发重复安装", async t => {
   const f = await startupFixture(t, true), service = f.create();
   service.prepare = async () => { throw Error("不应重新安装"); };

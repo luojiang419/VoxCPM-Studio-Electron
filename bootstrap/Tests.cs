@@ -52,10 +52,10 @@ public static class BootstrapTests {
     static int passes;
     static void Run(string name, Action test) { test(); passes++; Console.WriteLine("PASS " + name); }
     public static int Main(string[] args) {
-        if (args.Length == 2) {
+        if (args.Length == 2 || args.Length == 3) {
             try {
-                var manifest = new JavaScriptSerializer().Deserialize<Manifest>(File.ReadAllText(args[0], Encoding.UTF8));
-                Console.WriteLine(Core.Prepare(Path.GetFullPath(args[1]), manifest, CancellationToken.None, new Quiet()));
+                var manifest = new JavaScriptSerializer { MaxJsonLength = Int32.MaxValue }.Deserialize<Manifest>(File.ReadAllText(args[0], Encoding.UTF8));
+                Console.WriteLine(Core.Prepare(Path.GetFullPath(args[1]), manifest, CancellationToken.None, new Quiet(), args.Length == 3 ? args[2] : null));
                 return 0;
             } catch (Exception error) { Console.Error.WriteLine(error); return 1; }
         }
@@ -118,6 +118,29 @@ public static class BootstrapTests {
                 File.WriteAllBytes(executable, new byte[content.Length]);
                 Reject(() => Core.DesktopReady(directory, manifest, CancellationToken.None), "桌面核心损坏应被拒绝");
                 Check(File.ReadAllText(Path.Combine(directory, "resources/app/package.json")).Contains("2.0.3"), "新版配置不应被覆盖");
+            });
+            Run("全量包受限资源路径、本地安装与缺失损坏拒绝", () => {
+                string source = Path.Combine(root, "full-source"); Directory.CreateDirectory(source);
+                string archive = Path.Combine(source, "full.zip");
+                var assets = new[] { "app.exe", "models/voice/model.bin", "runtime/managed/py312-cu128/python.exe", "data/lipsync/source/model.bin", "offline-assets/dependency.whl" }
+                    .Select(name => new Asset { name = name, size = content.Length, sha256 = BytesHash(content), urls = new string[0] }).ToArray();
+                using(var zip=ZipFile.Open(archive,ZipArchiveMode.Create)) foreach(var asset in assets)
+                    using(var stream=zip.CreateEntry("JVOXStudio/"+asset.name).Open()) stream.Write(content,0,content.Length);
+                var manifest = new Manifest { protocol=1, releaseId="20261024000000", entry="app.exe", files=assets,
+                    fullBundle=true, installedSize=assets.Sum(a=>a.size),
+                    package=new Asset { name="full.zip",size=new FileInfo(archive).Length,sha256=Core.Hash(archive),urls=new string[0] } };
+                Core.Validate(manifest);
+                manifest.fullBundle=false; Reject(()=>Core.Validate(manifest),"旧桌面清单不能允许资源路径"); manifest.fullBundle=true;
+                var original=assets[1].name; assets[1].name="data/config/api-keys.json";
+                Reject(()=>Core.Validate(manifest),"全量包不能包含个人设置或密钥目录"); assets[1].name=original;
+                string target=Path.Combine(root,"full-install");
+                Check(Core.Prepare(target,manifest,CancellationToken.None,quiet,source)==Path.Combine(target,"app.exe"),"本地全量安装失败");
+                Check(Core.DesktopReady(target,manifest,CancellationToken.None),"全量文件校验失败");
+                Check(!File.Exists(Path.Combine(target,"data/cache/bootstrap/full.zip")),"不应再复制一份大型资源包");
+                File.WriteAllText(archive,"corrupt");
+                Reject(()=>Core.Prepare(Path.Combine(root,"full-corrupt"),manifest,CancellationToken.None,quiet,source),"损坏本地资源包不能通过");
+                File.Delete(archive);
+                Reject(()=>Core.Prepare(Path.Combine(root,"full-missing"),manifest,CancellationToken.None,quiet,source),"丢失本地资源包不能转为联网假安装");
             });
             Console.WriteLine(passes + " native bootstrap tests passed"); return 0;
         } catch (Exception error) { Console.Error.WriteLine(error); return 1; }
