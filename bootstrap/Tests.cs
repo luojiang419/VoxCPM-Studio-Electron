@@ -13,6 +13,16 @@ using VoxBootstrap;
 
 public static class BootstrapTests {
     sealed class Quiet : IProgress<Status> { public void Report(Status value) { } }
+    sealed class ConsoleProgress : IProgress<Status> {
+        readonly System.Diagnostics.Stopwatch clock=System.Diagnostics.Stopwatch.StartNew();
+        string previous;
+        public void Report(Status value) {
+            if(value.text!=previous || clock.ElapsedMilliseconds>10000) {
+                Console.WriteLine(value.text+(value.total>0 ? String.Format(" {0:F2}/{1:F2} GiB",value.done/1073741824.0,value.total/1073741824.0) : ""));
+                previous=value.text; clock.Restart();
+            }
+        }
+    }
     sealed class Server : IDisposable {
         readonly TcpListener listener = new TcpListener(IPAddress.Loopback, 0);
         readonly byte[] bytes;
@@ -52,10 +62,13 @@ public static class BootstrapTests {
     static int passes;
     static void Run(string name, Action test) { test(); passes++; Console.WriteLine("PASS " + name); }
     public static int Main(string[] args) {
+        Core.EnableLongPaths();
         if (args.Length == 2 || args.Length == 3) {
             try {
                 var manifest = new JavaScriptSerializer { MaxJsonLength = Int32.MaxValue }.Deserialize<Manifest>(File.ReadAllText(args[0], Encoding.UTF8));
-                Console.WriteLine(Core.Prepare(Path.GetFullPath(args[1]), manifest, CancellationToken.None, new Quiet(), args.Length == 3 ? args[2] : null));
+                if(manifest.fullBundle && !Directory.Exists(args[1]))
+                    Installer.Begin(Path.GetFullPath(args[1]),manifest,remember:false,registryKey:Installer.UninstallKey+".Test."+Guid.NewGuid().ToString("N"));
+                Console.WriteLine(Core.Prepare(Path.GetFullPath(args[1]), manifest, CancellationToken.None, new ConsoleProgress(), args.Length == 3 ? args[2] : null));
                 return 0;
             } catch (Exception error) { Console.Error.WriteLine(error); return 1; }
         }
@@ -134,6 +147,8 @@ public static class BootstrapTests {
                 var original=assets[1].name; assets[1].name="data/config/api-keys.json";
                 Reject(()=>Core.Validate(manifest),"全量包不能包含个人设置或密钥目录"); assets[1].name=original;
                 string target=Path.Combine(root,"full-install");
+                Installer.Begin(target,manifest,remember:false,registryKey:Installer.UninstallKey+".Test."+Guid.NewGuid().ToString("N"));
+                Check(Installer.ReadState(target).files.All(name=>!name.Contains("/")),"全量安装标记应只记录根文件，依赖按所属目录管理");
                 Check(Core.Prepare(target,manifest,CancellationToken.None,quiet,source)==Path.Combine(target,"app.exe"),"本地全量安装失败");
                 Check(Core.DesktopReady(target,manifest,CancellationToken.None),"全量文件校验失败");
                 Check(!File.Exists(Path.Combine(target,"data/cache/bootstrap/full.zip")),"不应再复制一份大型资源包");

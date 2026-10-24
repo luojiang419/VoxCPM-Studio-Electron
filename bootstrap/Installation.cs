@@ -28,7 +28,7 @@ namespace VoxBootstrap {
         public const string Marker = ".voxcpm-install.json";
         public const string UninstallKey = @"Software\Microsoft\Windows\CurrentVersion\Uninstall\VoxCPMStudio";
         const string SettingsKey = @"Software\VoxCPMStudio\Installer";
-        static readonly JavaScriptSerializer Json = new JavaScriptSerializer();
+        static readonly JavaScriptSerializer Json = new JavaScriptSerializer { MaxJsonLength = Int32.MaxValue };
         public static string Canonical(string value) { return Path.GetFullPath(value).TrimEnd(Path.DirectorySeparatorChar, Path.AltDirectorySeparatorChar); }
         public static bool SamePath(string a, string b) { return String.Equals(Canonical(a), Canonical(b), StringComparison.OrdinalIgnoreCase); }
         public const long RequiredSpace = 25L * 1024 * 1024 * 1024;
@@ -197,7 +197,9 @@ namespace VoxBootstrap {
             if (state == null) state = new InstallState { root = root, id = Guid.NewGuid().ToString("N") };
             else if (state.state == "uninstalled") state.id = Guid.NewGuid().ToString("N");
             state.state = "preparing"; state.version = manifest.appVersion;
-            state.files = manifest.files.Select(a => a.name).Concat(new[] { "uninstall.exe", "voxcpm.ico", "voxcpm-installer.ico" }).Distinct().ToArray();
+            // 运行时和模型由所属目录统一卸载，不把十三万条依赖路径写入个人安装标记。
+            state.files = manifest.files.Where(a => !manifest.fullBundle || !a.name.Contains("/"))
+                .Select(a => a.name).Concat(new[] { "uninstall.exe", "voxcpm.ico", "voxcpm-installer.ico", "uninstall.exe.config" }).Distinct().ToArray();
             SaveState(state);
             if (remember) using (var key = Registry.CurrentUser.CreateSubKey(SettingsKey)) key.SetValue("InstallLocation", root);
             return state;
@@ -341,7 +343,7 @@ namespace VoxBootstrap {
                 var state = ReadState(root); if (state.id != id) throw new IOException("卸载会话归属不匹配。");
                 ValidateRegistry(state.registryKey ?? UninstallKey);
                 // 文件清理成功后才移除快捷方式和应用登记，失败时保留可重试的卸载入口。
-                foreach (string name in new[] { "app", "resources", "locales", "runtime", "models", "ffmpeg", "electron_shell" }) DeleteOwnedTree(Core.SafePath(root, name));
+                foreach (string name in new[] { "app", "resources", "locales", "runtime", "models", "ffmpeg", "electron_shell", "offline-assets" }) DeleteOwnedTree(Core.SafePath(root, name));
                 foreach (string name in state.files ?? new string[0]) {
                     if (name.Contains("/") || name.Contains("\\") || name == Marker || name == "uninstall.exe" || name == "voxcpm.ico" || name == "voxcpm-installer.ico") continue;
                     string file = Core.SafePath(root, name); if (File.Exists(file)) { File.SetAttributes(file, FileAttributes.Normal); File.Delete(file); }

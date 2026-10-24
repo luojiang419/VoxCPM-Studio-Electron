@@ -127,20 +127,25 @@ namespace VoxBootstrap {
             // 续装交给Node按缺失文件和断点缓存计算，不能再次要求一整份初装空间。
             if(File.Exists(Path.Combine(root,Installer.Marker)) && Installer.ReadState(root).state!="uninstalled") return;
             long missing = 0;
+            var bundled = manifest.fullBundle ? manifest.files.ToDictionary(a => a.name, StringComparer.OrdinalIgnoreCase) : null;
             foreach (var component in manifest.components.Where(c => selection.selected.Contains(c.id))) {
                 if (component.files == null) {
+                    if (manifest.fullBundle && manifest.files.Any(a => a.name.StartsWith("data/lipsync/source/checkpoints/", StringComparison.OrdinalIgnoreCase))) continue;
                     if (!File.Exists(Path.Combine(root,"data","lipsync","runtime.json")) && !File.Exists(Path.Combine(root,"data","lipsync","runtime-1.6.json"))) missing += component.size;
                     continue;
                 }
                 foreach (var asset in component.files) {
+                    Asset present;
+                    if (bundled != null && bundled.TryGetValue(asset.name,out present) && present.size==asset.size && present.sha256==asset.sha256) continue;
                     string target = Core.SafePath(root,asset.name);
                     if (!File.Exists(target) || new FileInfo(target).Length != asset.size) missing += Math.Max(0,asset.size-(File.Exists(target+".part")?new FileInfo(target+".part").Length:0));
                 }
             }
-            if (selection.selected.Any(id => id != "lipsync") && !File.Exists(Core.SafePath(root,"runtime/music/"+manifest.musicRuntimeVersion+"/ready.json")))
+            bool musicBundled = bundled != null && bundled.ContainsKey("runtime/music/"+manifest.musicRuntimeVersion+"/ready.json");
+            if (selection.selected.Any(id => id != "lipsync") && !musicBundled && !File.Exists(Core.SafePath(root,"runtime/music/"+manifest.musicRuntimeVersion+"/ready.json")))
                 missing += manifest.musicRuntimeSize + 2 * manifest.musicArchiveSize;
             bool existing = File.Exists(Path.Combine(root,Installer.Marker));
-            long required = missing + (existing ? 1024L*1024*1024 : Installer.RequiredSpace);
+            long required = missing + (manifest.fullBundle ? manifest.installedSize + 5L*1024*1024*1024 : existing ? 1024L*1024*1024 : Installer.RequiredSpace);
             long free = new DriveInfo(Path.GetPathRoot(Path.GetFullPath(root))).AvailableFreeSpace;
             if (free < required) throw new IOException("所选功能空间不足：还需约 " + (required/Math.Pow(1024,3)).ToString("F1") + " GiB，可用 " + (free/Math.Pow(1024,3)).ToString("F1") + " GiB。请取消部分模型或更换安装分区。");
         }

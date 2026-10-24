@@ -1,9 +1,9 @@
-状态：进行中，固定模型与两套主环境、独立音乐环境和视频离线依赖已复制到专用分发暂存目录。
-下一步：生成当前应用快照，替换可迁移命令入口，封装 ZIP64 与原生安装器，再换目录独立验收。
-TODO：全量压缩/安装器、换目录启动/安装验收、文档与最终提交；不得停在暂存目录。
-最近验证：44 项运行时路由/修复、11 项视频资源、25 项组件/更新、10 项原生启动器回归通过；cu126 实际 GPU 算子通过，cu128 实际运算验证进行中。
-branch/commit：feat/full-offline-distribution，基于 890fea8；今日 GitHub 已检查，不自动推送。
-阻塞：无构建阻塞。仅本机 RTX 4070 Ti SUPER 可做实际运算；20/30/50 系实体全功能验证不虚报。
+状态：全部完成。最终双 CUDA 全量包已生成在本项目 builds/正式分发，真实完整解压、迁移、运行验收及最终 SHA256 均通过。
+下一步：将整个分发文件夹交给用户；EXE 与完整资源 ZIP 必须同目录。无需继续构建或下载资源。
+TODO：无本轮交付项；20/30/50 系实体全功能测试仍属于明确未覆盖范围。
+最近验证：130,247 文件原生 ZIP64 解压与 SHA256 通过；迁移后双 CUDA、pip、桌面/API、48kHz/3.84秒实际配音、视频1.6离线准备通过；122项相关回归通过，最终界面截图已检查。按清单清理3个可再生副本，释放约87.62GiB。
+branch/commit：feat/full-offline-distribution，功能提交 a3469c1；构建工具与验证收尾随本任务最后提交。今日 GitHub 已检查，不自动推送。
+阻塞：无。本机仅4070 Ti SUPER；50系为路由模拟与cu128实际导入/算子/sm_120验证，不虚报50系实体测试。
 
 [CODEX_LONG_TASK_CONTINUE_V3]
 
@@ -23,3 +23,22 @@ branch/commit：feat/full-offline-distribution，基于 890fea8；今日 GitHub 
 - 模型按固定 SHA256 复制；音乐引擎只使用原始 runtime-info 的 53,273 项文件清单，排除后来产生的用户目录；视频源码从已有固定哈希源码 ZIP 展开，只复制 1.6 和公共模型。不携带原安装的作品、密钥、配置或历史缓存。
 - 资源准备最初串行小文件复制较慢，已保留副本并切换 8 路并发；首次音乐目标根未建立时路径保护中止过一次，随后固定目标根后完成，未发生越界复制。两套环境检查点保留，续跑未重复安装已完成环境。
 - 构建脚本 `scripts/build_full_distribution.py` 分 resources / package 阶段；打包将生成独立应用快照，正式版本保持 2.0.4，仅增加发布序号，不自动上传公网。
+
+## 封装与验收恢复要点
+
+- 应用快照 `builds/updates/2.0.4-20261024034042/`；首轮包 `builds/正式分发/JVOX-全量安装包-2.0.4-20261024/`。资源 ZIP 33,235,632,924 字节，展开 45,907,126,534 字节，130,247 个文件；命令入口增量刷新后以最终 package-ready.json 数值为准。
+- `runtime-validation.json` 已记录 cu126 / cu128 在 G 盘分发暂存中的真实导入、矩阵与 SDPA 运算；cu128 架构列表含 sm_120，物理测试仍为4070，未冒充50系实机。
+- 94 个 pip/torchrun 等原 wheel EXE 默认绑定原安装绝对路径，改用相对定位的 C# 入口与原 __main__.py。初次包装测试发现子进程 stdout 未转发，已修复为二进制转发 stdout/stderr 与 stdin。当前大包初轮封装使用旧入口，需要 `consoles` 阶段以 7-Zip 原样复用大型压缩数据、仅更新命令/音乐元数据，再重编原生壳；不要重新压缩全部模型。
+- 首轮 package 进程启动后，原生壳增加了 Windows longPathAware manifest 和 .NET 长路径开关、大清单解析、紧凑安装标记、全量容量去重与卸载资源范围。必须通过 consoles/launcher 阶段刷新最终 EXE，不能分发首轮未带 longPathAware 的 EXE。`refresh_launcher` 按源文件指纹生成独立 launcher-* 目录，更新分发记录与 SHA256。
+- 全量资源 inventory 明确排除 __pycache__ / pyc / pyo，不包含验证时生成的字节码。曾尝试清理未存在的临时清单被自动审核拦截；未执行删除，因文件本来不存在，直接复用已有资源检查点继续，未绕过该删除操作。
+- 增量命令更新命令：`python scripts/build_full_distribution.py consoles --work builds/full-offline-20261024-v1 --output builds/正式分发/JVOX-全量安装包-2.0.4-20261024`。执行后独立验收：`python scripts/smoke_full_distribution.py --work builds/full-offline-20261024-v1`；验收各阶段有单独记录，恢复不重做已完成解压。
+
+## 最终交付
+
+- 版本 `2.0.4 / 20261024034042`，目录 `builds/正式分发/JVOX-全量安装包-2.0.4-20261024/`。资源 ZIP 为 33,235,678,490 字节（约30.95GiB），展开内容45,907,222,790字节（约42.75GiB）；EXE为25,017,344字节。
+- 最终 EXE SHA256：`d6550761ec9023dbf6a3039a44a34d78e815d8e26c2db1033e44866d7c0e9d74`；完整资源 ZIP SHA256：`6f53e27591060e6af1158e202b429967bad5e4c9f3d7cbf4949f9603109bfb4d`。最终原生源指纹 `daf41775f66f`。
+- `validation/report.json` 与包内 `验证结果.json` 均为 passed。原生真实ZIP64逐项校验/解压、换中文空格目录、两套环境本地导入及GPU算子、相对定位pip、实际配音、从随包资源建立视频1.6、实际Electron及API健康、ACE权重状态与零外部模型借用均通过。CLI命令先前stdout问题已验证修复。
+- 最终UI `validation/final-installer.png` 已检查：48GiB空间提示、全量资源本地携带说明正常；`validation/workspace.png` 为迁移后的实际工作台。新安装选项明确标记内置/首次需联网，内置视频1.6建议16GB，不让较小显存默认选择未携带的1.5；其他版本仍可在软件内按需下载。
+- 保留完整ZIP、EXE、SHA256、分发说明、分发记录、验证摘要、签名应用快照及详细验证记录。没有上传33GB资源、没有激活新的公网应用入口、没有修改正式安装。
+- 按项目清理规则生成并预览 `builds/storage-cleanup/plan.json`，仅清理本工作目录的 payload、desktop 和 validation/移动后的安装 JVOX，3项成功、0失败、释放约87.62GiB。之前清理计划/结果已另存历史；最新结果在 `builds/storage-cleanup/result.json`。原始模型、固定依赖缓存、分发文件、用户作品与密钥均保留。
+- 大型暂存已经清理，resources/package 阶段加入明确提示避免误用陈旧检查点。以后重新构建使用新工作目录；不要重建本轮已完成的全量包。当前工作目录的小型清单、计划、报告、截图、WAV仍在。

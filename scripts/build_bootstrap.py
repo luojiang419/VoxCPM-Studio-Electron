@@ -17,14 +17,18 @@ from modelscope_runtime import DEFAULT_REPO, file_url, publish_file, sha256
 ROOT = Path(__file__).resolve().parents[1]
 
 
-def build(payload: Path, output: Path, release_id: str, payload_url: str | None = None, demo: bool = False):
+def build(payload: Path, output: Path, release_id: str, payload_url: str | None = None, demo: bool = False,
+          full_bundle: bool = False, inventory: list | None = None):
     if output.exists():
         raise ValueError(f"启动器输出目录已存在：{output}")
     output.mkdir(parents=True)
     prefix = f"bootstrap/2.0.2/{release_id}"
     manifest = {"protocol": 1, "componentProtocol": 2, "releaseId": release_id, "entry": "JVOX Studio配音系统.exe",
                 "package": {"name": payload.name, "size": payload.stat().st_size, "sha256": sha256(payload),
-                            "urls": [payload_url or file_url(DEFAULT_REPO, prefix + "/" + payload.name)]}, "files": []}
+                            "urls": [] if full_bundle else [payload_url or file_url(DEFAULT_REPO, prefix + "/" + payload.name)]}, "files": []}
+    prepared = {asset['name']: asset for asset in inventory} if inventory is not None else None
+    if prepared is not None and len(prepared) != len(inventory):
+        raise ValueError('全量文件清单包含重复路径')
     with zipfile.ZipFile(payload) as archive:
         roots = {a.filename.split("/", 1)[0] for a in archive.infolist()}
         if len(roots) != 1:
@@ -32,9 +36,18 @@ def build(payload: Path, output: Path, release_id: str, payload_url: str | None 
         for entry in archive.infolist():
             if entry.is_dir():
                 raise ValueError("桌面包应只记录文件")
-            with archive.open(entry) as stream:
-                digest = hashlib.file_digest(stream, "sha256").hexdigest()
-            manifest["files"].append({"name": entry.filename.split("/", 1)[1], "size": entry.file_size, "sha256": digest})
+            relative = entry.filename.split("/", 1)[1]
+            if prepared is not None:
+                asset = prepared.get(relative)
+                if asset is None or asset['size'] != entry.file_size:
+                    raise ValueError('资源 ZIP 与准备清单不一致：' + relative)
+                manifest['files'].append(asset)
+            else:
+                with archive.open(entry) as stream:
+                    digest = hashlib.file_digest(stream, "sha256").hexdigest()
+                manifest["files"].append({"name": relative, "size": entry.file_size, "sha256": digest})
+        if prepared is not None and len(manifest['files']) != len(prepared):
+            raise ValueError('资源 ZIP 遗漏了文件')
         root = next(iter(roots))
         manifest["appVersion"] = json.loads(archive.read(root + "/resources/app/package.json"))["version"]
         manifest["appReleaseId"] = json.loads(archive.read(root + "/resources/app/update-config.json"))["releaseId"]
@@ -46,11 +59,21 @@ def build(payload: Path, output: Path, release_id: str, payload_url: str | None 
         manifest['components'] = [{'id': 'lipsync', 'label': '视频对口型与照片说话', 'size': 6 * 1024**3, 'minMemoryMB': 7680}] + [
             {'id': m['id'], 'label': m['label'], 'size': sum(a['size'] for a in m['files']), 'minMemoryMB': limits[m['id']],
              'files': [{key: a[key] for key in ('name', 'size', 'sha256')} for a in m['files']]} for m in music['models']]
+    if full_bundle:
+        manifest.update(fullBundle=True, installedSize=sum(asset['size'] for asset in manifest['files']))
+        supplied = {asset['name'] for asset in manifest['files']}
+        for component in manifest['components']:
+            if component['id'] == 'lipsync':
+                component.update(label='视频对口型与照片说话（内置 1.6）', minMemoryMB=15360)
+            else:
+                complete = all(asset['name'] in supplied for asset in component['files'])
+                component['label'] += '（已内置）' if complete else '（首次需联网）'
     source_manifest = output.parent / (output.name + "-manifest.json")
     source_manifest.write_text(json.dumps(manifest, ensure_ascii=False, separators=(",", ":")), encoding="utf-8")
     executable = output / ("JVOX Studio配音系统安装器-界面演示.exe" if demo else "JVOX Studio配音系统安装器.exe")
     compiler = Path("C:/Windows/Microsoft.NET/Framework64/v4.0.30319/csc.exe")
     subprocess.run([str(compiler), "/nologo", "/target:winexe", "/platform:anycpu", "/optimize+", *(["/define:DEMO"] if demo else []), "/out:" + str(executable),
+                    "/win32manifest:" + str(ROOT / "bootstrap/long-path.manifest"),
                     "/win32icon:" + str(ROOT / "assets/brand/voxcpm-installer.ico"),
                     "/resource:" + str(ROOT / "assets/brand/voxcpm-app.ico") + ",app.ico",
                     "/resource:" + str(ROOT / "assets/brand/voxcpm-installer.ico") + ",installer.ico",

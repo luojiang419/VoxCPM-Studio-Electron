@@ -21,6 +21,10 @@ namespace VoxBootstrap {
     public sealed class Status { public string text; public long done; public long total; }
 
     public static class Core {
+        public static void EnableLongPaths() {
+            AppContext.SetSwitch("Switch.System.IO.UseLegacyPathHandling", false);
+            AppContext.SetSwitch("Switch.System.IO.BlockLongPaths", false);
+        }
         public static string SafePath(string root, string relative) {
             if (String.IsNullOrEmpty(relative) || relative.Contains("\\") || relative.Contains(":")) throw new IOException("资源路径无效");
             foreach (string part in relative.Split('/'))
@@ -520,6 +524,8 @@ namespace VoxBootstrap {
                 if (selection != null) ComponentPicker.Save(root, selection);
                 owned = true;
                 await Task.Run(() => Installer.InstallUninstaller(root));
+                if (manifest.fullBundle) File.WriteAllText(Path.Combine(root, "uninstall.exe.config"),
+                    "<configuration><runtime><AppContextSwitchOverrides value=\"Switch.System.IO.UseLegacyPathHandling=false;Switch.System.IO.BlockLongPaths=false\" /></runtime></configuration>");
                 await Task.Run(() => Core.Prepare(root, manifest, cancellation.Token, reporter));
                 Installer.ExtractResource("app.ico", Path.Combine(root, "voxcpm.ico"));
                 Installer.ExtractResource("installer.ico", Path.Combine(root, "voxcpm-installer.ico"));
@@ -548,6 +554,7 @@ namespace VoxBootstrap {
     }
     public static class Program {
         [STAThread] public static void Main(string[] args) {
+            Core.EnableLongPaths();
             ServicePointManager.SecurityProtocol = SecurityProtocolType.Tls12;
             Application.EnableVisualStyles(); Application.SetCompatibleTextRenderingDefault(false);
             try {
@@ -556,6 +563,10 @@ namespace VoxBootstrap {
                 using (var stream = Assembly.GetExecutingAssembly().GetManifestResourceStream("bootstrap-manifest.json"))
                 using (var reader = new StreamReader(stream)) manifest = new JavaScriptSerializer { MaxJsonLength = Int32.MaxValue }.Deserialize<Manifest>(reader.ReadToEnd());
                 Core.Validate(manifest);
+#if !UNIFIED
+                string specifiedFullRoot=null;
+                for(int i=0;i<args.Length-1;i++) if(args[i]=="--root") specifiedFullRoot=args[i+1];
+#endif
 #if UNIFIED
                 string specified=null, report=null; bool exit=args.Contains("--exit-on-complete");
                 for(int i=0;i<args.Length;i++) {
@@ -585,6 +596,8 @@ namespace VoxBootstrap {
                     try { Application.Run(new Launcher(manifest, demo
 #if UNIFIED
                         ,detectRoot: specified==null ? (Func<string>)null : (() => specified)
+#else
+                        ,detectRoot: specifiedFullRoot==null ? (Func<string>)null : (() => specifiedFullRoot)
 #endif
                         )); } finally { mutex.ReleaseMutex(); }
                 }
