@@ -1,0 +1,243 @@
+.jvox-account-entry {
+  display: flex !important;
+  align-items: flex-start;
+  flex-direction: column;
+  gap: 5px !important;
+  padding: 12px 10px !important;
+  width: 100%;
+  text-align: left;
+  background: #ffffff05;
+  border: 1px solid #ffffff18;
+  border-radius: 7px;
+  color: #efefed;
+  margin-bottom: 20px;
+}
+.jvox-account-label {
+  font-size: 13px;
+  font-weight: 500;
+}
+.jvox-account-entry small {
+  font-size: 11px;
+  color: #b7b7b8;
+}
+.jvox-account-dialog {
+  color-scheme: dark;
+  color: #efefed;
+  background: #1e1e1f;
+  border: 1px solid #ffffff26;
+  border-radius: 12px;
+  padding: 30px;
+  width: min(850px, calc(100vw - 50px));
+  max-height: 90vh;
+  overflow: auto;
+  font:
+    14px/1.8 "Segoe UI",
+    "Microsoft YaHei UI",
+    sans-serif;
+  box-shadow: 0 20px 80px #0008;
+}
+.jvox-account-dialog::backdrop {
+  background: #080809bc;
+  backdrop-filter: blur(4px);
+}
+.jvox-account-top {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  color: #9b9b9e;
+  font-size: 10px;
+  letter-spacing: 2px;
+  border-bottom: 1px solid #ffffff16;
+  padding-bottom: 20px;
+  margin-bottom: 28px;
+}
+.jvox-account-top button {
+  color: #bdbdbf;
+  font:
+    12px "Segoe UI",
+    sans-serif;
+  background: none;
+  border: 0;
+  cursor: pointer;
+  padding: 7px;
+}
+.jvox-account-dialog h2 {
+  font-size: 28px;
+  line-height: 1.5;
+  font-weight: 550;
+  margin: 12px 0;
+}
+.jvox-account-dialog p {
+  font-size: 13px;
+  color: #b7b7b9;
+  margin: 15px 0;
+  line-height: 1.9;
+}
+.jvox-account-kicker {
+  color: #96969a;
+  font-size: 10px;
+  letter-spacing: 2px;
+}
+.jvox-auth-layout {
+  display: grid;
+  grid-template-columns: 0.95fr 1.05fr;
+  gap: 35px;
+}
+.jvox-auth-story {
+  border-right: 1px solid #ffffff16;
+  padding: 15px 28px 20px 0;
+}
+.jvox-auth-story h2 {
+  font-size: 36px;
+  margin: 30px 0;
+}
+.jvox-auth-story p {
+  line-height: 2;
+}
+.jvox-auth-tabs {
+  display: flex;
+  gap: 26px;
+  border-bottom: 1px solid #ffffff1b;
+  margin-bottom: 23px;
+}
+.jvox-auth-tabs button {
+  background: none;
+  border: 0;
+  border-bottom: 2px solid transparent;
+  color: #a4a4a7;
+  padding: 0 3px 10px;
+  cursor: pointer;
+}
+.jvox-auth-tabs button.active {
+  color: #efefed;
+  border-bottom-color: #deddd6;
+}
+.jvox-account-dialog label {
+  display: flex;
+  flex-direction: column;
+  gap: 7px;
+  margin: 15px 0;
+}
+.jvox-account-dialog label span {
+  font-size: 12px;
+  color: #bdbdbf;
+}
+.jvox-account-dialog input {
+  box-sizing: border-box;
+  width: 100%;
+  border: 1px solid #ffffff23;
+  padding: 10px 12px;
+  border-radius: 6px;
+  background: transparent;
+  color: #efefed;
+  font:
+    13px "Segoe UI",
+    "Microsoft YaHei UI",
+    sans-serif;
+}
+.jvox-account-primary,
+.jvox-account-secondary {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  min-height: 43px;
+  padding: 10px 20px;
+  border-radius: 6px;
+  font:
+    13px "Segoe UI",
+    "Microsoft YaHei UI",
+    sans-serif;
+  cursor: pointer;
+}
+.jvox-account-primary {
+  background: #deddd6;
+  color: #202021;
+  border: 1px solid transparent;
+}
+.jvox-account-primary:hover {
+  background: #eeede6;
+}
+.jvox-account-secondary {
+  background: transparent;
+  color: #ceced0;
+  border: 1px solid #ffffff25;
+}
+.jvox-account-dialog form > .jvox-account-primary {
+  width: 100%;
+  margin-top: 13px;
+}
+.jvox-account-dialog button:disabled {
+  opacity: 0.45;
+  cursor: wait;
+}
+.jvox-account-dialog :focus-visible {
+  outline: 2px solid #c3c7b4;
+  outline-offset: 3px;
+}
+.jvox-account-message {
+  padding: 12px 15px;
+  border-left: 2px solid #c5b39c;
+  background: #ffffff04;
+  overflow-wrap: anywhere;
+}
+.jvox-account-status {
+  padding: 23px 0;
+  border-block: 1px solid #ffffff18;
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+  margin: 24px 0;
+}
+.jvox-account-status > span {
+  font-size: 12px;
+  color: #afc59d;
+}
+.jvox-account-status > strong {
+  font-size: 32px;
+  line-height: 1.5;
+  font-weight: 450;
+  font-variant-numeric: tabular-nums;
+}
+.jvox-account-status > small {
+  font-size: 12px;
+  color: #b6b6b9;
+}
+.jvox-contact {
+  padding: 18px 0;
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
+  border-block: 1px solid #ffffff14;
+  overflow-wrap: anywhere;
+}
+.jvox-contact > small {
+  font-size: 11px;
+  color: #a4a4a8;
+}
+.jvox-contact > strong {
+  font-size: 15px;
+  font-weight: 450;
+}
+.jvox-account-actions {
+  display: flex;
+  gap: 15px;
+  margin-top: 24px;
+}
+.jvox-account-note {
+  font-size: 11px !important;
+  color: #96969b !important;
+}
+@media (max-width: 700px) {
+  .jvox-auth-layout {
+    grid-template-columns: 1fr;
+  }
+  .jvox-auth-story {
+    display: none;
+  }
+  .jvox-account-dialog {
+    padding: 22px;
+  }
+  .jvox-account-status > strong {
+    font-size: 25px;
+  }
+}

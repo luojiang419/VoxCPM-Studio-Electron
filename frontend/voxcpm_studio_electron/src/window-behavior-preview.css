@@ -1,0 +1,15 @@
+.wc-preview .workspace { position: relative; }
+.wc-preview-content { max-width: 760px; width: 100%; margin: auto; padding: 32px 54px 70px; overflow: auto; }
+.wc-preview-kicker { font-size: 9px; letter-spacing: 2.3px; color: var(--muted); margin: 0 0 16px; }
+.wc-preview-content > h2 { font-size: 31px; letter-spacing: -.8px; font-weight: 500; margin: 0 0 12px; }
+.wc-preview-intro { font-size: 12px; line-height: 1.8; color: var(--muted); margin: 0 0 30px; }
+.wc-preview .wc-preview-card { border: 1px solid var(--line-strong); border-radius: 15px; padding: 26px; background: var(--panel); }
+.wc-preview-card h3 { margin: 0 0 24px; font-size: 14px; font-weight: 600; }
+.wc-preview-card .settings-tool-section + .settings-tool-section { margin-top: 24px; padding-top: 24px; border-top: 1px solid var(--line); }
+.wc-preview-theme { display: grid; grid-template-columns: repeat(2, 1fr); gap: 10px; margin-top: 12px; }
+.wc-preview-theme button { border: 1px solid var(--line-strong); border-radius: 8px; padding: 12px; font-size: 12px; background: var(--panel); color: var(--muted); }
+.wc-preview-theme button[aria-pressed="true"] { background: var(--accent-soft); border-color: var(--accent); color: var(--text); }
+.wc-preview-action { display: flex; gap: 12px; margin-top: 26px; }.wc-preview-action button { font-family: inherit; }
+.wc-preview-status { color: var(--muted); font-size: 11px; line-height: 1.8; margin-top: 16px; }
+.wc-preview-footer { position: absolute; bottom: 23px; left: 54px; right: 54px; font-size: 9px; letter-spacing: 1.6px; color: var(--muted); display: flex; justify-content: space-between; opacity: .65; }
+@media (max-width: 800px) { .wc-preview { grid-template-columns: 1fr; }.wc-preview > .sidebar { display: none; }.wc-preview-content { padding: 28px; }.wc-preview-content > h2 { font-size: 25px; }.wc-preview-footer { display: none; } }

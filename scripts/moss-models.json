@@ -1,0 +1,210 @@
+{
+  "codec": {
+    "name": "MOSS-Audio-Tokenizer",
+    "hfRevision": "3cd226ba2947efa357ef453bcad111b6eafba782",
+    "files": [
+      {
+        "size": 52,
+        "path": "__init__.py",
+        "sha256": "ed0b4910a5e53b1dfc3234cfcf96e2c6890d339f9134a3dfed8481d01b3768fd"
+      },
+      {
+        "size": 6601,
+        "path": "config.json",
+        "sha256": "0f669e288d39c9c0ffae4e39babe5167b57e89d3132f0785655d1096a8da8e45"
+      },
+      {
+        "size": 12933,
+        "path": "configuration_moss_audio_tokenizer.py",
+        "sha256": "349b7ff7e1b3f160f9c80df9a0311672b326b8b73e90459122fb39e6878962bf"
+      },
+      {
+        "size": 4998259168,
+        "path": "model-00001-of-00002.safetensors",
+        "sha256": "037f441ed30a0ab59f6049de83b824a1b3bd6feb7dbd46c3fbca41fc2f649f28"
+      },
+      {
+        "size": 2100202560,
+        "path": "model-00002-of-00002.safetensors",
+        "sha256": "a187d73d2cda1c2d0676586d9d03c09c0a5813450266af32029c871493fc9582"
+      },
+      {
+        "size": 148113,
+        "path": "model.safetensors.index.json",
+        "sha256": "e107e83fee64adc3ccdb993975290cecb00fcf7d72cdaa388011abad16bcc82d"
+      },
+      {
+        "size": 70906,
+        "path": "modeling_moss_audio_tokenizer.py",
+        "sha256": "65cae7744845f1b8ac65957e918cea508efe331a38e87b882b7530b6c8d7caa5"
+      }
+    ]
+  },
+  "voice": {
+    "name": "MOSS-VoiceGenerator",
+    "hfRevision": "97521ec2b6f3ec5026ac1f5751f8fc302d82c2d4",
+    "files": [
+      {
+        "size": 0,
+        "path": "__init__.py",
+        "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
+      },
+      {
+        "size": 704,
+        "path": "added_tokens.json",
+        "sha256": "9dfb40d3a3f8654c8af17771d767a494e973b9a33d5c3aeffa1b21f77db8e6d3"
+      },
+      {
+        "size": 352,
+        "path": "chat_template.jinja",
+        "sha256": "894e3ace884e212ae34e1f46063686e7ebcc8b2fa0153af4579dfa5685f63184"
+      },
+      {
+        "size": 2203,
+        "path": "config.json",
+        "sha256": "5b6ccfbf309a5844c130d09c9b5fa8b9eef55db27f1b7072695483b6f5524685"
+      },
+      {
+        "size": 5584,
+        "path": "configuration_moss_tts.py",
+        "sha256": "257842f2fa90124307408f36d55b74e135ee32b7afacbe30280964f7feb329d1"
+      },
+      {
+        "size": 5092,
+        "path": "inference_utils.py",
+        "sha256": "12cdf3260114e44c8cba816782f743779ab621e0ba4047e59a3f3579cfcb0e26"
+      },
+      {
+        "size": 1671853,
+        "path": "merges.txt",
+        "sha256": "8831e4f1a044471340f7c0a83d7bd71306a5b867e95fd870f74d0c5308a904d5"
+      },
+      {
+        "size": 4228278872,
+        "path": "model.safetensors",
+        "sha256": "dbe345257ff9f6cc84195bed830a268b39d5e0b728ff3ba90e715150a49b16d4"
+      },
+      {
+        "size": 25329,
+        "path": "modeling_moss_tts.py",
+        "sha256": "666d7320f93ce6b1c1f6ed4dba6fd4b9520a082a90fa7a17211efd83247d28a0"
+      },
+      {
+        "size": 37220,
+        "path": "processing_moss_tts.py",
+        "sha256": "16dda5233f9f752518d07a6b780d6555945b48547fba0b4e7faf6eb2c4ed0038"
+      },
+      {
+        "size": 145,
+        "path": "processor_config.json",
+        "sha256": "6821d4805f10fb8b5cc743c021215097e03f1a25f7c220dfc4fb0d62b5dc97e0"
+      },
+      {
+        "size": 631,
+        "path": "special_tokens_map.json",
+        "sha256": "55cbd0665670e196ce105db3f0d787e5eb35bce235fcb2bd50acbdd60c1e39c6"
+      },
+      {
+        "size": 11422691,
+        "path": "tokenizer.json",
+        "sha256": "cb3c8fa82993d515469c2800cc455bff4aaa3c4fed9da1f2b0c0668c304f335a"
+      },
+      {
+        "size": 5501,
+        "path": "tokenizer_config.json",
+        "sha256": "87b1f37a4a73e4c4b61637a1446763e8bdea274347f0418cd5c68ead488c8ea4"
+      },
+      {
+        "size": 2776833,
+        "path": "vocab.json",
+        "sha256": "ca10d7e9fb3ed18575dd1e277a2579c16d108e32f27439684afa0e10b1440910"
+      }
+    ]
+  },
+  "soundeffect": {
+    "name": "MOSS-SoundEffect-v2.0",
+    "hfRevision": "e35df4d82fbe87fcd5d14e5d100e349c0c3c076d",
+    "files": [
+      {
+        "size": 71,
+        "path": "configuration.json",
+        "sha256": "3eefed50f26939655a89fcb85efb21acbe4b0fe470f9f61146092fdd83c8d894"
+      },
+      {
+        "size": 504,
+        "path": "model_index.json",
+        "sha256": "28ed3d19217bf774394bd5992d1a6dfd1ffab2863117423c3fe4945dadabb3be"
+      },
+      {
+        "size": 134,
+        "path": "scheduler/scheduler_config.json",
+        "sha256": "060d9ee9ea73310ff1a47e589a5e37d3e03d99711a6277646b3f679030606977"
+      },
+      {
+        "size": 726,
+        "path": "text_encoder/config.json",
+        "sha256": "1ddb5b89ebc90dcb417a45c213d818577e65976454d29385c8f6140771d95197"
+      },
+      {
+        "size": 239,
+        "path": "text_encoder/generation_config.json",
+        "sha256": "2325da0f15bb848e018c5ae071b7943332e9f871d6b60e2ed22ca97d4cb993d2"
+      },
+      {
+        "size": 3441185608,
+        "path": "text_encoder/model-00001-of-00002.safetensors",
+        "sha256": "169ad53ec313c3a34b06c0809216e4fc072cce444a5d4ff2b59690d064130ed5"
+      },
+      {
+        "size": 622329984,
+        "path": "text_encoder/model-00002-of-00002.safetensors",
+        "sha256": "912becff8d60672aa8628ef08c05898d9adf17c2ad4ae3caf99b065622fdeff9"
+      },
+      {
+        "size": 25605,
+        "path": "text_encoder/model.safetensors.index.json",
+        "sha256": "0d660e94b165eb912669a5249dff44b83188c4777a07ddb9611fb78d91b0578d"
+      },
+      {
+        "size": 1671853,
+        "path": "tokenizer/merges.txt",
+        "sha256": "8831e4f1a044471340f7c0a83d7bd71306a5b867e95fd870f74d0c5308a904d5"
+      },
+      {
+        "size": 11422654,
+        "path": "tokenizer/tokenizer.json",
+        "sha256": "aeb13307a71acd8fe81861d94ad54ab689df773318809eed3cbe794b4492dae4"
+      },
+      {
+        "size": 9732,
+        "path": "tokenizer/tokenizer_config.json",
+        "sha256": "d5d09f07b48c3086c508b30d1c9114bd1189145b74e982a265350c923acd8101"
+      },
+      {
+        "size": 2776833,
+        "path": "tokenizer/vocab.json",
+        "sha256": "ca10d7e9fb3ed18575dd1e277a2579c16d108e32f27439684afa0e10b1440910"
+      },
+      {
+        "size": 311,
+        "path": "transformer/config.json",
+        "sha256": "168ed701ba50c85d15a4a052a29038b81a8dbde0590cda3c5672b3cb1a263906"
+      },
+      {
+        "size": 5664274560,
+        "path": "transformer/diffusion_pytorch_model.safetensors",
+        "sha256": "bda86e4d6730ff47cea47851d219880191e9d21d4d264b21a6ffe7cb2db9dfb0"
+      },
+      {
+        "size": 169,
+        "path": "vae/config.json",
+        "sha256": "92cdfc4c26b7f88efc15316e70faa6c53695f933ebaf1300c636b040d8e69d04"
+      },
+      {
+        "size": 1486465965,
+        "path": "vae/vae_128d_48k.pth",
+        "sha256": "07e6139ff33bd21ba8a7a7f40ed24aab13ac0d100cd686f8a9f3e03dc5251cb1"
+      }
+    ]
+  }
+}

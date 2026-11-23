@@ -1,0 +1,72 @@
+{
+  "name": "voxcpm-studio-electron",
+  "version": "2.0.4",
+  "description": "JVOX Studio配音系统，本地配音、声音克隆、视频与音乐创作工作台。",
+  "main": "main.js",
+  "private": true,
+  "scripts": {
+    "test:update": "node --test tests/update-service.test.cjs",
+    "test:runtime": "node --test tests/runtime-service.test.cjs",
+    "typecheck": "tsc --noEmit",
+    "build": "vite build",
+    "start": "pwsh -NoProfile -File ../../scripts/start_local.ps1",
+    "dev": "pwsh -NoProfile -File ../../scripts/start_local.ps1",
+    "build:updater": "python ../../scripts/build_updater_runtime.py && python ../../scripts/build_standalone_updater.py",
+    "package:dir": "npm run build:updater && npm run build && electron-builder --dir",
+    "package:win": "npm run build:updater && npm run build && electron-builder --win portable"
+  },
+  "dependencies": {
+    "react": "^18.3.1",
+    "react-dom": "^18.3.1"
+  },
+  "devDependencies": {
+    "@types/react": "^18.3.18",
+    "@types/react-dom": "^18.3.5",
+    "@vitejs/plugin-react": "^4.4.1",
+    "electron": "^35.3.0",
+    "electron-builder": "^26.0.12",
+    "typescript": "^5.8.3",
+    "vite": "^6.3.5"
+  },
+  "build": {
+    "appId": "com.openbmb.voxcpm.studio.electron",
+    "productName": "JVOX Studio配音系统",
+    "directories": {
+      "output": "release"
+    },
+    "files": [
+      "dist/**/*",
+      "main.js",
+      "license-service.js",
+      "license-config.json",
+      "preload.js",
+      "update-service.js",
+      "update-window.js",
+      "update-config.json",
+      "updater.py",
+      "standalone-updater.exe",
+      "updater-runtime-config.json",
+      "runtime-service.js",
+      "window-behavior.js",
+      "runtime-config.json",
+      "runtime-requirements.txt",
+      "install-protocol.js",
+      "component-service.js",
+      "music-config.json",
+      "app.ico",
+      "app-icon.png",
+      "package.json",
+      "brand-uninstaller.exe"
+    ],
+    "win": {
+      "target": [
+        {
+          "target": "portable",
+          "arch": [
+            "x64"
+          ]
+        }
+      ]
+    }
+  }
+}

@@ -1,0 +1,71 @@
+/* 仅作用于资源概览；长路径在各自条目中展开，不再撑高摘要卡片。 */
+.studio-shell .overview-shell { display: flex; flex-direction: column; }
+.overview-dashboard { flex: 1; min-height: min-content; display: flex; flex-direction: column; gap: 18px; }
+.overview-status { display: flex; align-items: center; justify-content: space-between; gap: 20px; padding: 20px 22px; border: 1px solid var(--line); border-radius: 12px; background: var(--panel); }
+.overview-status-copy { display: flex; align-items: center; gap: 14px; min-width: 0; }
+.overview-status-copy > div { min-width: 0; }
+.overview-status-dot { width: 9px; height: 9px; flex: none; border-radius: 50%; background: var(--accent); box-shadow: 0 0 0 5px var(--accent-soft); }
+.overview-status-ready .overview-status-dot { background: var(--success); }
+.overview-status-error .overview-status-dot { background: var(--danger); }
+.overview-status h2 { margin: 0; font-size: 19px; font-weight: 650; }
+.overview-status p { margin: 6px 0 0; color: var(--muted); font-size: 12px; line-height: 1.6; overflow-wrap: anywhere; }
+.overview-status > button { flex: none; }
+.overview-metrics { display: grid; grid-template-columns: 1.2fr 1fr 1fr; gap: 16px; }
+.overview-metric { min-width: 0; padding: 18px 22px; background: var(--panel); border: 1px solid var(--line); border-radius: 12px; }
+.overview-metric .card-kicker { margin: 0 0 12px; font-size: 11px; letter-spacing: .04em; }
+.overview-metric h2 { margin: 0; font-size: 25px; font-weight: 600; letter-spacing: -.5px; line-height: 1.3; overflow: hidden; white-space: nowrap; text-overflow: ellipsis; font-variant-numeric: tabular-nums; }
+.overview-metric small { margin-left: 8px; font-size: 12px; font-weight: 400; color: var(--muted); letter-spacing: 0; }
+.overview-metric > p:last-child { margin: 8px 0 0; font-size: 12px; line-height: 1.5; color: var(--muted); overflow: hidden; white-space: nowrap; text-overflow: ellipsis; }
+.overview-meter { height: 4px; margin-top: 16px; background: var(--panel-soft); border-radius: 9px; overflow: hidden; }
+.overview-meter > span { display: block; height: 100%; background: var(--accent); border-radius: inherit; transition: width .3s ease; }
+.overview-details-grid { flex: 1; display: grid; grid-template-columns: minmax(260px, .8fr) minmax(0, 1.65fr); gap: 18px; }
+.overview-details-grid > .panel-card { min-width: 0; padding: 22px; gap: 0; align-content: start; }
+.overview-section-heading { display: flex; align-items: center; justify-content: space-between; gap: 12px; padding-bottom: 18px; border-bottom: 1px solid var(--line); }
+.overview-section-heading h3 { margin: 0; font-size: 15px; font-weight: 600; }
+.overview-section-heading > span { color: var(--muted); font-size: 11px; white-space: nowrap; }
+.overview-environment { grid-template-rows: auto 1fr auto; }
+.overview-hardware { margin: 0; display: grid; align-content: start; }
+.overview-hardware > div { display: grid; grid-template-columns: 78px minmax(0, 1fr); align-items: baseline; gap: 16px; padding: 22px 0; border-bottom: 1px solid var(--line); }
+.overview-hardware > div:last-child { border: 0; }
+.overview-hardware dt { font-size: 12px; color: var(--muted); }
+.overview-hardware dd { margin: 0; font-size: 13px; font-weight: 500; line-height: 1.7; overflow-wrap: anywhere; }
+.overview-shortcuts { margin-top: 20px; padding-top: 20px; border-top: 1px solid var(--line); }
+.overview-shortcuts .card-kicker { margin: 0 0 12px; font-size: 11px; }
+.overview-shortcuts .action-row { gap: 8px; }
+.overview-shortcuts .ghost-button { display: flex; align-items: center; justify-content: space-between; flex: 1; gap: 10px; padding: 10px 12px; min-height: 38px; font-size: 12px; white-space: nowrap; }
+.overview-shortcuts button span { color: var(--muted); }
+.overview-directories { grid-template-rows: auto 1fr; }
+.overview-path-list { display: flex; flex-direction: column; min-width: 0; }
+.overview-path { flex: 1; min-width: 0; display: flex; flex-direction: column; align-content: center; border-bottom: 1px solid var(--line); }
+.overview-path:last-child { border: 0; }
+.overview-path summary { display: grid; grid-template-columns: 72px minmax(0, 1fr) 12px; align-items: center; gap: 16px; padding: 19px 0; list-style: none; cursor: pointer; }
+.overview-path summary::-webkit-details-marker { display: none; }
+.overview-path summary > span:first-child { font-size: 12px; color: var(--muted); }
+.overview-path strong { min-width: 0; overflow: hidden; white-space: nowrap; text-overflow: ellipsis; font-size: 12px; line-height: 1.6; font-weight: 400; }
+.overview-path-chevron { color: var(--muted); font-size: 19px; line-height: 1; text-align: center; transition: transform .15s; }
+.overview-path[open] .overview-path-chevron { transform: rotate(90deg); }
+.overview-path code { display: block; padding: 12px 14px; margin: 0 0 14px 88px; border-radius: 6px; background: var(--panel-soft); font: 12px/1.8 Consolas, "Microsoft YaHei UI", monospace; overflow-wrap: anywhere; user-select: text; }
+.overview-path summary:hover strong { color: var(--accent); }
+.overview-path :is(summary, code):focus-visible { outline: 2px solid var(--accent); outline-offset: 3px; border-radius: 4px; }
+@media (max-height: 820px) {
+  .overview-dashboard { gap: 14px; }
+  .overview-status { padding: 16px 20px; }
+  .overview-metric { padding: 15px 20px; }
+  .overview-details-grid > .panel-card { padding: 18px 20px; }
+  .overview-hardware > div { padding: 15px 0; }
+  .overview-path summary { padding: 11px 0; }
+  .overview-shortcuts { margin-top: 14px; padding-top: 14px; }
+}
+@media (max-width: 1200px) {
+  .overview-details-grid { grid-template-columns: minmax(245px, .8fr) minmax(0, 1.25fr); gap: 14px; }
+  .overview-section-heading > span { font-size: 10px; }
+  .overview-hardware > div { grid-template-columns: 68px minmax(0, 1fr); gap: 10px; }
+  .overview-path summary { grid-template-columns: 62px minmax(0, 1fr) 12px; gap: 12px; }
+  .overview-path code { margin-left: 0; }
+}
+@media (max-width: 980px) {
+  .overview-details-grid { grid-template-columns: minmax(0, 1fr); }
+  .overview-metrics { grid-template-columns: repeat(3, minmax(0, 1fr)); gap: 10px; }
+  .overview-metric { padding: 16px; }
+  .overview-metric h2 { font-size: 20px; }
+}

@@ -1,0 +1,85 @@
+{
+  "version": "20261020-v2",
+  "checkedOn": "2026-10-18",
+  "files": {
+    "ace-songwriting.md": {
+      "url": "https://raw.githubusercontent.com/ace-step/ACE-Step-1.5/ca1e85fe9430179831e6bc6be790c332190a3866/.claude/skills/acestep-songwriting/SKILL.md",
+      "sha256": "c510cd4242df10cf5cc71f618b49dd9e12d69ff65a83f9b3f9660dcd0986910d"
+    },
+    "ace-license.txt": {
+      "url": "https://raw.githubusercontent.com/ace-step/ACE-Step-1.5/ca1e85fe9430179831e6bc6be790c332190a3866/LICENSE",
+      "sha256": "05a6bce42a62636d2cfb24139cc008b6b899754e244175814bb5dd2f4a485357"
+    },
+    "yue2-music.md": {
+      "url": "https://raw.githubusercontent.com/multimodal-art-projection/YuE/1647252d68b70cbead046ffd3f7caf036dde47ee/skills/yue2-music/SKILL.md",
+      "sha256": "49909582781c3c144dd2b71f0830ce45901d6a03d645a0b6dff0a35669440152"
+    },
+    "yue2-generation.md": {
+      "url": "https://raw.githubusercontent.com/multimodal-art-projection/YuE/1647252d68b70cbead046ffd3f7caf036dde47ee/skills/yue2-music/references/generation-and-covers.md",
+      "sha256": "f8bc42ce439747bf6022ac410b45edf6f915fc669030048b76c576d40e644a22"
+    },
+    "yue2-instrumental.md": {
+      "url": "https://raw.githubusercontent.com/multimodal-art-projection/YuE/1647252d68b70cbead046ffd3f7caf036dde47ee/skills/yue2-music/instrumental/SKILL.md",
+      "sha256": "bb4cae9cfbff4355c7b5b8c377a2156c2c36350fd674caea5c9af9e636ecc0c2"
+    },
+    "yue2-license.txt": {
+      "url": "https://raw.githubusercontent.com/multimodal-art-projection/YuE/1647252d68b70cbead046ffd3f7caf036dde47ee/skills/yue2-music/LICENSE",
+      "sha256": "cfc7749b96f63bd31c3c42b5c471bf756814053e847c10f3eb003417bc523d30"
+    },
+    "heartmula-readme.md": {
+      "url": "https://raw.githubusercontent.com/HeartMuLa/heartlib/5858ca8f1ffe58d62be7c007ea55f1033c5ca456/README.md",
+      "sha256": "612fd65fbace5137ea58b50cdf2168b596496405a328bce0fefcbae8018c23e5"
+    },
+    "heartmula-tags.txt": {
+      "url": "https://raw.githubusercontent.com/HeartMuLa/heartlib/5858ca8f1ffe58d62be7c007ea55f1033c5ca456/assets/tags.txt",
+      "sha256": "721f027fdc12bc40270068a9dca7514e74eb0f2a902a9285595309b4c0ac589b"
+    },
+    "heartmula-lyrics.txt": {
+      "url": "https://raw.githubusercontent.com/HeartMuLa/heartlib/5858ca8f1ffe58d62be7c007ea55f1033c5ca456/assets/lyrics.txt",
+      "sha256": "d8f50bd5d3f9d9397f09be819dffdfc585a4a346f876c6e2c93b6b1e30aa45bb"
+    },
+    "heartmula-license.txt": {
+      "url": "https://raw.githubusercontent.com/HeartMuLa/heartlib/5858ca8f1ffe58d62be7c007ea55f1033c5ca456/LICENSE",
+      "sha256": "c71d239df91726fc519c6eb72d318ec65820627232b2f796219e87dcf35d0ab4"
+    },
+    "minimax-rewriter.zip": {
+      "url": "https://codeload.github.com/MiniMax-AI/MiniMax-Music3/zip/945655064d59b98004dd70002e7eb5c8c6e11373",
+      "sha256": "c49b905ddc874472789830353f1e3bc85640e30cecc8120597f4e8ff1543dfae",
+      "textFiles": 1021
+    },
+    "instrumental-rules.md": {
+      "kind": "local-rules",
+      "sha256": "e2dc11cc8b5d7ac479d1b2972750f80df1b848a1c29b7916b3a15cff90d5ca90"
+    }
+  },
+  "models": {
+    "ace-xl-turbo": {
+      "name": "ACE-Step 1.5 XL Turbo",
+      "kind": "official-skill",
+      "skill": "acestep-songwriting",
+      "revision": "ca1e85fe9430179831e6bc6be790c332190a3866",
+      "url": "https://github.com/ace-step/ACE-Step-1.5/blob/ca1e85fe9430179831e6bc6be790c332190a3866/.claude/skills/acestep-songwriting/SKILL.md"
+    },
+    "minimax-music3": {
+      "name": "MiniMax Music 3",
+      "kind": "official-skill",
+      "skill": "music-caption-rewriter",
+      "revision": "945655064d59b98004dd70002e7eb5c8c6e11373",
+      "url": "https://github.com/MiniMax-AI/MiniMax-Music3/blob/945655064d59b98004dd70002e7eb5c8c6e11373/skills/music-caption-rewriter/SKILL.md"
+    },
+    "yue2": {
+      "name": "YuE2-3B",
+      "kind": "official-skill",
+      "skill": "yue2-music",
+      "revision": "1647252d68b70cbead046ffd3f7caf036dde47ee",
+      "url": "https://github.com/multimodal-art-projection/YuE/blob/1647252d68b70cbead046ffd3f7caf036dde47ee/skills/yue2-music/SKILL.md"
+    },
+    "heartmula": {
+      "name": "HeartMuLa 3B",
+      "kind": "official-docs",
+      "skill": null,
+      "revision": "5858ca8f1ffe58d62be7c007ea55f1033c5ca456",
+      "url": "https://github.com/HeartMuLa/heartlib/blob/5858ca8f1ffe58d62be7c007ea55f1033c5ca456/README.md"
+    }
+  }
+}

@@ -1,0 +1,3 @@
+# 官方文本快照按原始字节校验SHA256，禁止Windows检出时改写换行。
+backend/voxcpm/music_skills/** -text
+auth-service/deploy/*.sh text eol=lf
