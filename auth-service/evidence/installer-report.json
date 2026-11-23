@@ -1,0 +1,12 @@
+{
+  "passed": true,
+  "releaseId": "20261025043808",
+  "executable": "JVOX-Studio-Setup-2.0.4.exe",
+  "sha256": "6f380a89388a9e1a53a1390ac4352085985f97ad9951b4be4c184bbb5acda6f5",
+  "size": 117632000,
+  "filesVerified": 309,
+  "reinstallPreservesData": true,
+  "refusesLegacyRoot": true,
+  "uninstallPreservedPersonalData": true,
+  "automatedTests": 91
+}
