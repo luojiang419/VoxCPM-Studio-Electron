@@ -1,0 +1,98 @@
+/* 主文本与声音配置分栏；合成结果始终在主区底栏播放。 */
+.studio-shell .voice-workspace-shell { display: flex; overflow: hidden; padding: 18px 24px; }
+.voice-workspace-shell .workspace-grid { flex: 1; min-width: 0; min-height: 0; grid-template-columns: minmax(0, 1.4fr) minmax(320px, .9fr); grid-template-rows: minmax(0, 1fr); align-items: stretch; }
+.voice-workspace-shell .panel-card { min-width: 0; padding: 16px; gap: 14px; overflow: hidden; }
+.voice-workspace-shell .panel-card-workspace { display: flex; flex-direction: column; }
+.studio-shell .voice-workspace-shell .panel-head { position: static; flex: none; flex-direction: row; align-items: center; padding: 0; gap: 12px; }
+.voice-workspace-shell .panel-head h3 { font-size: 16px; }
+.voice-workspace-shell .panel-kicker { margin-bottom: 4px; font-size: 11px; }
+.voice-workspace-shell .ghost-button { font-size: 12px; }
+.voice-workspace-shell .workspace-form-scroll { flex: 1; min-height: 0; overflow: auto; overscroll-behavior: contain; scrollbar-gutter: stable; padding: 0 4px 2px 0; }
+.voice-workspace-shell .form-grid { grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 12px; }
+.voice-workspace-shell .workspace-compose-form { min-height: 100%; grid-template-rows: auto minmax(200px, 1fr) auto auto; }
+.voice-workspace-shell .workspace-compose-form > .field:nth-child(3) { display: flex; flex-direction: column; }
+.voice-workspace-shell textarea[aria-label="合成文本"] { flex: 1; min-height: 180px; resize: none; }
+.voice-workspace-shell .field { min-width: 0; align-content: start; }
+.voice-workspace-shell .field-label { font-size: 12px; font-weight: 500; }
+.voice-workspace-shell input, .voice-workspace-shell select, .voice-workspace-shell textarea { font-size: 13px; padding: 9px 10px; }
+.voice-workspace-shell textarea { min-height: 64px; resize: vertical; line-height: 1.7; }
+.voice-workspace-shell input[type="range"] { height: 26px; margin: 0; padding: 0; }
+.voice-workspace-shell .toggle-row { min-height: 40px; padding: 8px 10px; border-radius: 8px; font-size: 12px; }
+.voice-workspace-shell .workspace-side-column { position: static; min-width: 0; align-self: stretch; grid-template-rows: auto minmax(0, 1fr); align-content: stretch; }
+.voice-workspace-shell .workspace-reference-panel { display: flex; flex-direction: column; }
+.voice-workspace-shell .workspace-reference-body { display: grid; gap: 12px; min-height: 0; overflow: auto; overscroll-behavior: contain; }
+.voice-workspace-shell .reference-audio-card { border-radius: 8px; gap: 8px; padding: 12px; min-width: 0; }
+.voice-workspace-shell .reference-audio-card-empty { min-height: 82px; }
+.voice-workspace-shell .reference-audio-empty-state { gap: 5px; }
+.voice-workspace-shell .reference-audio-empty-state strong { font-size: 13px; font-weight: 500; }
+.voice-workspace-shell .reference-audio-empty-state span { font-size: 11px; }
+.voice-workspace-shell .reference-audio-meta { min-width: 0; }
+.voice-workspace-shell .reference-audio-meta strong { font-size: 12px; overflow-wrap: anywhere; }
+.voice-workspace-shell .reference-audio-meta span { font-size: 11px; }
+.voice-workspace-shell .audio-player { display: block; width: 100%; height: 40px; min-width: 0; }
+.voice-workspace-shell .panel-card-control-presets { align-self: stretch; max-height: none; grid-template-rows: auto auto minmax(0, 1fr); }
+.voice-workspace-shell .panel-card-control-presets textarea { resize: none; }
+.voice-workspace-shell .control-preset-add .ghost-button { min-height: 32px; }
+.voice-workspace-shell .preset-module { grid-template-rows: auto minmax(0, 1fr); }
+.voice-workspace-shell .preset-chip-grid { grid-template-columns: repeat(2, minmax(0, 1fr)); max-height: none; overscroll-behavior: contain; scrollbar-gutter: stable; padding-right: 4px; }
+.voice-workspace-shell .preset-chip { min-height: 58px; padding: 10px; border-radius: 8px; font-size: 12px; line-height: 1.65; overflow-wrap: anywhere; }
+.voice-workspace-shell .workspace-clone-mode .workspace-side-column { grid-template-rows: minmax(0, 1fr); }
+.voice-workspace-shell .workspace-clone-mode .workspace-reference-body { flex: 1; align-content: start; }
+
+.workspace-generation-footer { flex: none; min-width: 0; border-top: 1px solid var(--line-strong); background: var(--panel); }
+.workspace-generation-footer > audio { display: none; }
+.workspace-transport { display: grid; grid-template-columns: minmax(170px, 1fr) minmax(100px, 1.3fr) auto; align-items: center; gap: 20px; padding: 20px 24px; }
+.workspace-player { display: flex; align-items: center; gap: 11px; min-width: 0; }
+.workspace-play-button { flex-shrink: 0; display: grid; place-items: center; width: 35px; height: 35px; padding: 0; border: 1px solid var(--line-strong); border-radius: 50%; background: var(--panel-soft); color: var(--text); }
+.workspace-play-button.is-playing { color: var(--accent); border-color: var(--accent); }
+.workspace-now-playing { display: grid; gap: 3px; min-width: 0; }
+.workspace-now-playing strong { font-size: 11px; font-weight: 500; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.workspace-now-playing span { color: var(--muted); font-size: 10px; font-variant-numeric: tabular-nums; }
+.workspace-seek-controls { display: flex; align-items: center; gap: 10px; min-width: 0; }
+.studio-shell .workspace-audio-seek { min-width: 0; width: 100%; margin: 0; padding: 0; height: 24px; border: 0; background: transparent; accent-color: var(--accent); }
+.workspace-mute-button { display: grid; place-items: center; flex-shrink: 0; width: 28px; height: 28px; padding: 0; border: 0; border-radius: 5px; background: transparent; color: var(--muted); }
+.workspace-mute-button:not(:disabled):hover { background: var(--panel-soft); color: var(--text); }
+.workspace-generation-footer .workspace-action-bar { position: static; display: flex; align-items: center; margin: 0; padding: 0; gap: 8px; border: 0; border-radius: 0; background: transparent; box-shadow: none; }
+.workspace-generation-footer .workspace-action-bar button { display: inline-flex; align-items: center; justify-content: center; gap: 7px; flex: none; min-width: 0; min-height: 36px; padding: 9px 12px; font-size: 11px; font-weight: 500; line-height: 1.4; white-space: nowrap; }
+.workspace-generation-footer .workspace-action-bar .primary-button { font-weight: 650; }
+.workspace-generation-footer button:disabled { opacity: .35; cursor: not-allowed; }
+.workspace-generation-footer .workspace-status-panel { display: flex; align-items: center; flex-wrap: wrap; gap: 6px 16px; padding: 10px 24px 0; }
+.workspace-generation-footer .status-text { flex: 1; min-width: 160px; margin: 0; font-size: 11px; line-height: 1.6; max-height: 40px; overflow: auto; overflow-wrap: anywhere; }
+.workspace-generation-footer .workspace-status-meta, .workspace-generation-footer .workspace-status-meta strong { font-size: 10px; }
+.workspace-generation-footer .workspace-progress-track { flex-basis: 100%; height: 3px; border: 0; background: var(--line); }
+.workspace-playback-error { margin: 0; padding: 10px 24px 0; color: var(--danger); font-size: 12px; line-height: 1.6; }
+.save-voice-dialog { width: min(460px, calc(100vw - 40px)); max-height: calc(100dvh - 40px); overflow: auto; margin: auto; padding: 24px; border: 1px solid var(--line-strong); border-radius: 12px; background: var(--panel); color: var(--text); box-shadow: 0 20px 70px #0003; }
+.save-voice-dialog::backdrop { background: #0007; backdrop-filter: blur(3px); }
+.save-voice-dialog h2 { margin: 0; font-size: 20px; font-weight: 550; }
+.save-voice-dialog p { margin: 12px 0 20px; font-size: 12px; line-height: 1.8; color: var(--muted); }
+.save-voice-dialog label { display: block; margin: 16px 0 8px; font-size: 12px; }
+.save-voice-dialog input { font-size: 13px; }
+.save-voice-dialog .save-voice-error { color: var(--danger); margin-bottom: 0; }
+.save-voice-actions { display: flex; justify-content: flex-end; gap: 10px; margin-top: 24px; }
+.save-voice-actions button { min-height: 36px; padding: 8px 12px; font-size: 12px; }
+.save-voice-actions button:disabled { opacity: .4; cursor: not-allowed; }
+body[data-theme="light"] .workspace-play-button:not(:disabled) { background: var(--panel); box-shadow: var(--button-shadow); }
+
+@media (max-height: 820px) {
+  .studio-shell .voice-workspace-shell { padding: 12px 20px; }
+  .voice-workspace-shell .panel-card { padding: 14px; gap: 10px; }
+  .voice-workspace-shell .form-grid { gap: 10px; }
+  .voice-workspace-shell .reference-audio-card-empty { min-height: 66px; padding: 8px; }
+}
+@media (max-width: 1250px) {
+  .workspace-transport { gap: 14px; padding-left: 20px; padding-right: 20px; }
+  .workspace-generation-footer .workspace-action-bar button { padding-left: 9px; padding-right: 9px; }
+}
+@media (max-width: 1000px), (max-height: 620px) {
+  .studio-shell .voice-workspace-shell { display: block; overflow: auto; }
+  .voice-workspace-shell .workspace-grid { grid-template-columns: minmax(0, 1fr); grid-template-rows: auto auto; }
+  .voice-workspace-shell .workspace-form-scroll { flex: none; overflow: visible; }
+  .voice-workspace-shell .workspace-side-column { grid-template-rows: auto auto; }
+  .voice-workspace-shell .workspace-reference-body { overflow: visible; }
+  .voice-workspace-shell .preset-chip-grid { max-height: 300px; }
+}
+@media (max-width: 1000px) {
+  .workspace-transport { grid-template-columns: minmax(0, 1fr) auto; padding-top: 12px; padding-bottom: 12px; gap: 10px; }
+  .workspace-seek-controls { grid-row: 2; grid-column: 1 / -1; }
+  .workspace-generation-footer .workspace-action-bar { grid-row: 1; grid-column: 2; }
+}
