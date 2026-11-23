@@ -1,0 +1,337 @@
+{
+  "protocol": 1,
+  "runtime": {
+    "version": "20261018-v1",
+    "size": 3713546480,
+    "sha256": "7e3fcb2f5927d8485dda83b36c778336efb42343f09c0860a283bd9a4530324d",
+    "parts": [
+      {
+        "name": "music-runtime.zip.part00",
+        "size": 268435456,
+        "sha256": "860e68a40c98b9b4e665649844e4a136044360940cc9305cfe4e5ff3cb5d23b0",
+        "urls": [
+          "https://modelscope.cn/api/v1/models/jiangjiang419/voxcpm-studio-updates/repo?Revision=master&FilePath=music%2F20261018-v1%2Fmusic-runtime.zip.part00"
+        ]
+      },
+      {
+        "name": "music-runtime.zip.part01",
+        "size": 268435456,
+        "sha256": "57ed03666f92c128f23c9bf1297f9acf4ee4bba1c1f83c24a490d59386ba7894",
+        "urls": [
+          "https://modelscope.cn/api/v1/models/jiangjiang419/voxcpm-studio-updates/repo?Revision=master&FilePath=music%2F20261018-v1%2Fmusic-runtime.zip.part01"
+        ]
+      },
+      {
+        "name": "music-runtime.zip.part02",
+        "size": 268435456,
+        "sha256": "54ed34b4f514cf5e36dc8318426ae40c31aae461d6cdda85ccbfbcc2e7ed75b0",
+        "urls": [
+          "https://modelscope.cn/api/v1/models/jiangjiang419/voxcpm-studio-updates/repo?Revision=master&FilePath=music%2F20261018-v1%2Fmusic-runtime.zip.part02"
+        ]
+      },
+      {
+        "name": "music-runtime.zip.part03",
+        "size": 268435456,
+        "sha256": "cd183539e5d81a70aa857d858282e981097f69e8391493d326a69f7b55a6317e",
+        "urls": [
+          "https://modelscope.cn/api/v1/models/jiangjiang419/voxcpm-studio-updates/repo?Revision=master&FilePath=music%2F20261018-v1%2Fmusic-runtime.zip.part03"
+        ]
+      },
+      {
+        "name": "music-runtime.zip.part04",
+        "size": 268435456,
+        "sha256": "44ede77d056cc63211512fbb3fd31902c7d14a0e08d796ac073b8468302b1ea2",
+        "urls": [
+          "https://modelscope.cn/api/v1/models/jiangjiang419/voxcpm-studio-updates/repo?Revision=master&FilePath=music%2F20261018-v1%2Fmusic-runtime.zip.part04"
+        ]
+      },
+      {
+        "name": "music-runtime.zip.part05",
+        "size": 268435456,
+        "sha256": "d52200eafd7c238ea295db976a573db5172f6fbfe872b1d7309111560a3f6262",
+        "urls": [
+          "https://modelscope.cn/api/v1/models/jiangjiang419/voxcpm-studio-updates/repo?Revision=master&FilePath=music%2F20261018-v1%2Fmusic-runtime.zip.part05"
+        ]
+      },
+      {
+        "name": "music-runtime.zip.part06",
+        "size": 268435456,
+        "sha256": "22c969fbb8e270f6a3a8ea134db423cbd6feb90c02352ff0b21c2f1fecc2ce0d",
+        "urls": [
+          "https://modelscope.cn/api/v1/models/jiangjiang419/voxcpm-studio-updates/repo?Revision=master&FilePath=music%2F20261018-v1%2Fmusic-runtime.zip.part06"
+        ]
+      },
+      {
+        "name": "music-runtime.zip.part07",
+        "size": 268435456,
+        "sha256": "764e3856af7b4fe6fc3d8ced7a8e69f0b9ab66d673a7ddb297c4c0c073b5df16",
+        "urls": [
+          "https://modelscope.cn/api/v1/models/jiangjiang419/voxcpm-studio-updates/repo?Revision=master&FilePath=music%2F20261018-v1%2Fmusic-runtime.zip.part07"
+        ]
+      },
+      {
+        "name": "music-runtime.zip.part08",
+        "size": 268435456,
+        "sha256": "42dc50625d9ab49f415a3374c589015dc936d92088298e7776c43539aa2c366f",
+        "urls": [
+          "https://modelscope.cn/api/v1/models/jiangjiang419/voxcpm-studio-updates/repo?Revision=master&FilePath=music%2F20261018-v1%2Fmusic-runtime.zip.part08"
+        ]
+      },
+      {
+        "name": "music-runtime.zip.part09",
+        "size": 268435456,
+        "sha256": "0e6d116da144ba101d2532514e3b7ae7a70d00d7459229c0e9f65ff96b5333d2",
+        "urls": [
+          "https://modelscope.cn/api/v1/models/jiangjiang419/voxcpm-studio-updates/repo?Revision=master&FilePath=music%2F20261018-v1%2Fmusic-runtime.zip.part09"
+        ]
+      },
+      {
+        "name": "music-runtime.zip.part10",
+        "size": 268435456,
+        "sha256": "ef98d5993649526a4d9a399647c6ff9a8123cf5f591c198c065ac97f09c3032f",
+        "urls": [
+          "https://modelscope.cn/api/v1/models/jiangjiang419/voxcpm-studio-updates/repo?Revision=master&FilePath=music%2F20261018-v1%2Fmusic-runtime.zip.part10"
+        ]
+      },
+      {
+        "name": "music-runtime.zip.part11",
+        "size": 268435456,
+        "sha256": "76244847754896cc206f1b9a52f79d6e524b6e1c28027ac2d170cbe0ae71aa60",
+        "urls": [
+          "https://modelscope.cn/api/v1/models/jiangjiang419/voxcpm-studio-updates/repo?Revision=master&FilePath=music%2F20261018-v1%2Fmusic-runtime.zip.part11"
+        ]
+      },
+      {
+        "name": "music-runtime.zip.part12",
+        "size": 268435456,
+        "sha256": "c6195a8505f05ff45fa99544b584b9c6fef02c6334fd5a44329c380bb99e34d6",
+        "urls": [
+          "https://modelscope.cn/api/v1/models/jiangjiang419/voxcpm-studio-updates/repo?Revision=master&FilePath=music%2F20261018-v1%2Fmusic-runtime.zip.part12"
+        ]
+      },
+      {
+        "name": "music-runtime.zip.part13",
+        "size": 223885552,
+        "sha256": "d5208a582d679dcd61fa78bce8df520427912ef804adc417bd4e82bfb69ed726",
+        "urls": [
+          "https://modelscope.cn/api/v1/models/jiangjiang419/voxcpm-studio-updates/repo?Revision=master&FilePath=music%2F20261018-v1%2Fmusic-runtime.zip.part13"
+        ]
+      }
+    ],
+    "installed_size": 6033963354,
+    "required": [
+      "python/python.exe",
+      "python/Lib/site-packages/torch/__init__.py",
+      "ComfyUI/main.py",
+      "yue2_comfy/nodes.py",
+      "heartlib/heartlib/__init__.py",
+      "runtime-info.json"
+    ]
+  },
+  "models": [
+    {
+      "id": "ace-xl-turbo",
+      "label": "ACE-Step 1.5 XL Turbo",
+      "files": [
+        {
+          "name": "models/music/comfy/diffusion_models/acestep_v1.5_xl_turbo_bf16.safetensors",
+          "size": 9974719892,
+          "sha256": "86a1afb0a1f711f0e3304ff65d874df3ae6783db683dcf982513fb9b6d14ae71",
+          "reusePath": "vendor/ComfyUI/models/diffusion_models/acestep_v1.5_xl_turbo_bf16.safetensors",
+          "urls": [
+            "https://modelscope.cn/api/v1/models/Comfy-Org/ace_step_1.5_ComfyUI_files/repo?Revision=master&FilePath=split_files%2Fdiffusion_models%2Facestep_v1.5_xl_turbo_bf16.safetensors"
+          ]
+        },
+        {
+          "name": "models/music/comfy/text_encoders/qwen_0.6b_ace15.safetensors",
+          "size": 1191588248,
+          "sha256": "fd4590c82153b8ddb67e15a2e7aaa8afa8b83a858c8a9b82a4831063156aa7a7",
+          "reusePath": "vendor/ComfyUI/models/text_encoders/qwen_0.6b_ace15.safetensors",
+          "urls": [
+            "https://modelscope.cn/api/v1/models/Comfy-Org/ace_step_1.5_ComfyUI_files/repo?Revision=master&FilePath=split_files%2Ftext_encoders%2Fqwen_0.6b_ace15.safetensors"
+          ]
+        },
+        {
+          "name": "models/music/comfy/text_encoders/qwen_1.7b_ace15.safetensors",
+          "size": 3708523360,
+          "sha256": "ed63e9247d1f55f3ace04fa11e95b085fc82d459c82c5626f0b2e37b91ebd710",
+          "reusePath": "vendor/ComfyUI/models/text_encoders/qwen_1.7b_ace15.safetensors",
+          "urls": [
+            "https://modelscope.cn/api/v1/models/Comfy-Org/ace_step_1.5_ComfyUI_files/repo?Revision=master&FilePath=split_files%2Ftext_encoders%2Fqwen_1.7b_ace15.safetensors"
+          ]
+        },
+        {
+          "name": "models/music/comfy/vae/ace_1.5_vae.safetensors",
+          "size": 337431732,
+          "sha256": "6de92e3a862acd287e08b024ac90f0783a8635451b728721a33ff03565bcb2bb",
+          "reusePath": "vendor/ComfyUI/models/vae/ace_1.5_vae.safetensors",
+          "urls": [
+            "https://modelscope.cn/api/v1/models/Comfy-Org/ace_step_1.5_ComfyUI_files/repo?Revision=master&FilePath=split_files%2Fvae%2Face_1.5_vae.safetensors"
+          ]
+        }
+      ]
+    },
+    {
+      "id": "yue2",
+      "label": "YuE2-3B",
+      "files": [
+        {
+          "name": "models/music/comfy/checkpoints/yue2_3b_int8_convrot.safetensors",
+          "size": 3960938800,
+          "sha256": "96fe199377309001ed8cd26a944baeee8cc31a20ba7c36d1d3c0a7e1f4149db6",
+          "reusePath": "vendor/ComfyUI/models/checkpoints/yue2_3b_int8_convrot.safetensors",
+          "urls": [
+            "https://modelscope.cn/api/v1/models/Comfy-Org/YuE2/repo?Revision=master&FilePath=checkpoints%2Fyue2_3b_int8_convrot.safetensors"
+          ]
+        }
+      ]
+    },
+    {
+      "id": "minimax-music3",
+      "label": "MiniMax Music 3",
+      "files": [
+        {
+          "name": "models/music/comfy/diffusion_models/minimax_music3_dit_fp16.safetensors",
+          "size": 4914197682,
+          "sha256": "45494a2b6b69af115902ff28eaf54118d19067aa54da01000f3e3efce7ba0e34",
+          "reusePath": "vendor/ComfyUI/models/diffusion_models/minimax_music3_dit_fp16.safetensors",
+          "urls": [
+            "https://modelscope.cn/api/v1/models/Comfy-Org/MiniMax-Music-3/repo?Revision=master&FilePath=diffusion_models%2Fminimax_music3_dit_fp16.safetensors"
+          ]
+        },
+        {
+          "name": "models/music/comfy/text_encoders/minimax_music3_text_encoder_pruned_int8_convrot.safetensors",
+          "size": 9196611886,
+          "sha256": "010b7416d2336a08c711bc22ee65849c9623069ddb7d89bec011a75699e52014",
+          "reusePath": "vendor/ComfyUI/models/text_encoders/minimax_music3_text_encoder_pruned_int8_convrot.safetensors",
+          "urls": [
+            "https://modelscope.cn/api/v1/models/Comfy-Org/MiniMax-Music-3/repo?Revision=master&FilePath=text_encoders%2Fminimax_music3_text_encoder_pruned_int8_convrot.safetensors"
+          ]
+        },
+        {
+          "name": "models/music/comfy/vae/minimax_music3_dav.safetensors",
+          "size": 216696128,
+          "sha256": "2a32155b769be01445fcc2a8663b910fc9e1751e18dc1c3ec528064512d9ef0c",
+          "reusePath": "vendor/ComfyUI/models/vae/minimax_music3_dav.safetensors",
+          "urls": [
+            "https://modelscope.cn/api/v1/models/Comfy-Org/MiniMax-Music-3/repo?Revision=master&FilePath=vae%2Fminimax_music3_dav.safetensors"
+          ]
+        }
+      ]
+    },
+    {
+      "id": "heartmula",
+      "label": "HeartMuLa 3B",
+      "files": [
+        {
+          "name": "models/music/heartmula/HeartMuLa-oss-3B/config.json",
+          "size": 308,
+          "sha256": "a05bf0650f560d235fb3a0c109173d44eb3a9b6231fe599968e12706cd20edf4",
+          "reusePath": "models/music/heartmula/HeartMuLa-oss-3B/config.json",
+          "urls": [
+            "https://modelscope.cn/api/v1/models/HeartMuLa/HeartMuLa-oss-3B-happy-new-year/repo?Revision=master&FilePath=config.json"
+          ]
+        },
+        {
+          "name": "models/music/heartmula/HeartMuLa-oss-3B/model-00001-of-00004.safetensors",
+          "size": 4933188000,
+          "sha256": "4815367cdbddc0192abe3dbe81e2ae6a6e8978a39ad4dd1d26a20e445b3aeea6",
+          "reusePath": "models/music/heartmula/HeartMuLa-oss-3B/model-00001-of-00004.safetensors",
+          "urls": [
+            "https://modelscope.cn/api/v1/models/HeartMuLa/HeartMuLa-oss-3B-happy-new-year/repo?Revision=master&FilePath=model-00001-of-00004.safetensors"
+          ]
+        },
+        {
+          "name": "models/music/heartmula/HeartMuLa-oss-3B/model-00002-of-00004.safetensors",
+          "size": 4932808592,
+          "sha256": "f079416ba4c0570231f7a2830a2e95033336a8b3528d1c033a07923a25f4b5d7",
+          "reusePath": "models/music/heartmula/HeartMuLa-oss-3B/model-00002-of-00004.safetensors",
+          "urls": [
+            "https://modelscope.cn/api/v1/models/HeartMuLa/HeartMuLa-oss-3B-happy-new-year/repo?Revision=master&FilePath=model-00002-of-00004.safetensors"
+          ]
+        },
+        {
+          "name": "models/music/heartmula/HeartMuLa-oss-3B/model-00003-of-00004.safetensors",
+          "size": 4935901576,
+          "sha256": "b43cd60ff50033fa9a5e08c4eb26edff55d5e95e0a313592804ab026ed3b895d",
+          "reusePath": "models/music/heartmula/HeartMuLa-oss-3B/model-00003-of-00004.safetensors",
+          "urls": [
+            "https://modelscope.cn/api/v1/models/HeartMuLa/HeartMuLa-oss-3B-happy-new-year/repo?Revision=master&FilePath=model-00003-of-00004.safetensors"
+          ]
+        },
+        {
+          "name": "models/music/heartmula/HeartMuLa-oss-3B/model-00004-of-00004.safetensors",
+          "size": 950588000,
+          "sha256": "07c5f5820c0c00f0b8ad4544ed8a24ae1888f7d8c8a5d8bb3cdaba418a39cf2f",
+          "reusePath": "models/music/heartmula/HeartMuLa-oss-3B/model-00004-of-00004.safetensors",
+          "urls": [
+            "https://modelscope.cn/api/v1/models/HeartMuLa/HeartMuLa-oss-3B-happy-new-year/repo?Revision=master&FilePath=model-00004-of-00004.safetensors"
+          ]
+        },
+        {
+          "name": "models/music/heartmula/HeartMuLa-oss-3B/model.safetensors.index.json",
+          "size": 22579,
+          "sha256": "a96e28d71e3f767c94a7d25723f7ab77ce2abd06d5495315d9770be0e87e00ca",
+          "reusePath": "models/music/heartmula/HeartMuLa-oss-3B/model.safetensors.index.json",
+          "urls": [
+            "https://modelscope.cn/api/v1/models/HeartMuLa/HeartMuLa-oss-3B-happy-new-year/repo?Revision=master&FilePath=model.safetensors.index.json"
+          ]
+        },
+        {
+          "name": "models/music/heartmula/HeartCodec-oss/config.json",
+          "size": 981,
+          "sha256": "b55a505b4cf5cd22bba40aac0d9d5082d560c1c942fe17583aaa95f28e3c08cf",
+          "reusePath": "models/music/heartmula/HeartCodec-oss/config.json",
+          "urls": [
+            "https://modelscope.cn/api/v1/models/HeartMuLa/HeartCodec-oss-20260123/repo?Revision=master&FilePath=config.json"
+          ]
+        },
+        {
+          "name": "models/music/heartmula/HeartCodec-oss/model-00001-of-00002.safetensors",
+          "size": 4930472472,
+          "sha256": "50d2c022468a0e127992d99e02117d2efbad2b10fddc8ceaf09550f154e185d4",
+          "reusePath": "models/music/heartmula/HeartCodec-oss/model-00001-of-00002.safetensors",
+          "urls": [
+            "https://modelscope.cn/api/v1/models/HeartMuLa/HeartCodec-oss-20260123/repo?Revision=master&FilePath=model-00001-of-00002.safetensors"
+          ]
+        },
+        {
+          "name": "models/music/heartmula/HeartCodec-oss/model-00002-of-00002.safetensors",
+          "size": 1707911436,
+          "sha256": "6f319d0f5b31858dfe98bd8fc89d3083cbfff74ac75a0531f1a7b86949197917",
+          "reusePath": "models/music/heartmula/HeartCodec-oss/model-00002-of-00002.safetensors",
+          "urls": [
+            "https://modelscope.cn/api/v1/models/HeartMuLa/HeartCodec-oss-20260123/repo?Revision=master&FilePath=model-00002-of-00002.safetensors"
+          ]
+        },
+        {
+          "name": "models/music/heartmula/HeartCodec-oss/model.safetensors.index.json",
+          "size": 83875,
+          "sha256": "d19153a142865e4a90508294f36c7ec5ab07d33bf0e8b01a0717c75b80ce6a63",
+          "reusePath": "models/music/heartmula/HeartCodec-oss/model.safetensors.index.json",
+          "urls": [
+            "https://modelscope.cn/api/v1/models/HeartMuLa/HeartCodec-oss-20260123/repo?Revision=master&FilePath=model.safetensors.index.json"
+          ]
+        },
+        {
+          "name": "models/music/heartmula/gen_config.json",
+          "size": 101,
+          "sha256": "2fc578fc8d8445fa9d73d1925146d53d25b2e5f5d74b8a19aa5c000e37094f41",
+          "reusePath": "models/music/heartmula/gen_config.json",
+          "urls": [
+            "https://modelscope.cn/api/v1/models/HeartMuLa/HeartMuLaGen/repo?Revision=master&FilePath=gen_config.json"
+          ]
+        },
+        {
+          "name": "models/music/heartmula/tokenizer.json",
+          "size": 9085657,
+          "sha256": "79e3e522635f3171300913bb421464a87de6222182a0570b9b2ccba2a964b2b4",
+          "reusePath": "models/music/heartmula/tokenizer.json",
+          "urls": [
+            "https://modelscope.cn/api/v1/models/HeartMuLa/HeartMuLaGen/repo?Revision=master&FilePath=tokenizer.json"
+          ]
+        }
+      ]
+    }
+  ]
+}

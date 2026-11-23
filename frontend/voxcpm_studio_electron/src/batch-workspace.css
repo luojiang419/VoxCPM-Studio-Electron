@@ -1,0 +1,31 @@
+/* 批量页固定双栏，滚动只发生在表单和日志内部。 */
+.studio-shell .batch-workspace-shell { display: flex; min-height: 0; overflow: hidden; padding: 18px 24px; }
+.batch-workspace-shell .batch-grid { flex: 1; min-width: 0; min-height: 0; grid-template-columns: minmax(0, 1.1fr) minmax(0, .9fr); grid-template-rows: minmax(0, 1fr); align-items: stretch; }
+.batch-workspace-shell .panel-card { display: flex; flex-direction: column; min-width: 0; min-height: 0; gap: 14px; padding: 16px; overflow: hidden; }
+.studio-shell .batch-workspace-shell .panel-card > .panel-head { position: static; flex: none; flex-direction: row; align-items: center; padding: 0; }
+.batch-workspace-shell .panel-head h3 { font-size: 17px; }
+.batch-workspace-shell .panel-kicker { font-size: 11px; margin-bottom: 4px; }
+.batch-form-scroll { flex: 1; min-height: 0; overflow: auto; overscroll-behavior: contain; scrollbar-gutter: stable; padding-right: 5px; }
+.batch-workspace-shell .form-grid { grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 12px; }
+.batch-workspace-shell .field { min-width: 0; }
+.batch-workspace-shell .field-label { font-size: 12px; font-weight: 500; }
+.batch-workspace-shell input, .batch-workspace-shell select, .batch-workspace-shell textarea { min-width: 0; padding: 9px 10px; font-size: 13px; }
+.batch-workspace-shell textarea { line-height: 1.65; }
+.batch-workspace-shell input[type="range"] { height: 30px; padding: 0; margin: 0; }
+.batch-workspace-shell .path-row { grid-template-columns: minmax(0, 1fr) auto; }
+.batch-workspace-shell .ghost-button { font-size: 12px; }
+.batch-workspace-shell .toggle-row { min-height: 44px; padding: 8px 10px; border-radius: 8px; font-size: 12px; }
+.batch-actions { display: grid; flex: none; gap: 10px; padding-top: 12px; border-top: 1px solid var(--line); }
+.batch-actions .action-row { gap: 8px; }
+.batch-actions button { min-height: 38px; padding: 8px 12px; font-size: 13px; }
+.batch-actions .status-text { margin: 0; max-height: 56px; overflow: auto; overflow-wrap: anywhere; font-size: 12px; line-height: 1.6; }
+.batch-result-card > .field { flex: none; }
+.batch-result-card > .field:last-child { display: flex; flex-direction: column; flex: 1; min-height: 0; }
+.batch-workspace-shell textarea[aria-label="批量日志"] { flex: 1; min-height: 0; width: 100%; resize: none; overflow: auto; overscroll-behavior: contain; scrollbar-gutter: stable; }
+@media (max-width: 1350px), (max-height: 820px) {
+  .studio-shell .batch-workspace-shell { padding: 12px 20px; }
+  .batch-workspace-shell .panel-card { padding: 14px; gap: 12px; }
+}
+@media (max-width: 1000px) {
+  .batch-workspace-shell .batch-grid { grid-template-columns: minmax(0, 1fr); grid-template-rows: minmax(0, 1.4fr) minmax(150px, 1fr); }
+}
